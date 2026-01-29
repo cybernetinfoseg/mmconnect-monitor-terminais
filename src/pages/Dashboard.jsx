@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '../utils';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -25,13 +27,22 @@ export default function Dashboard() {
   const [clienteFilter, setClienteFilter] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  // Fetch terminals with auto-refresh every 5 seconds
+  // Fetch terminals with auto-refresh every 5 minutes (300000ms)
   const { data: terminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals'],
     queryFn: () => base44.entities.Terminal.list(),
-    refetchInterval: 5000,
+    refetchInterval: 300000, // 5 minutes
     onSuccess: () => setLastRefresh(new Date()),
   });
+
+  // Real-time subscription for immediate updates
+  useEffect(() => {
+    const unsubscribe = base44.entities.Terminal.subscribe((event) => {
+      refetch();
+      setLastRefresh(new Date());
+    });
+    return unsubscribe;
+  }, [refetch]);
 
   // Fetch alerts
   const { data: alerts = [] } = useQuery({
@@ -206,7 +217,7 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
                   <span>Terminais</span>
                   <span className="text-xs font-normal text-slate-400">
-                    Auto-refresh: 5s
+                    Tempo real + refresh: 5min
                   </span>
                 </CardTitle>
               </CardHeader>
