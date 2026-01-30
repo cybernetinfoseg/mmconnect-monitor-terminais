@@ -55,6 +55,7 @@ import Incidents from './pages/Incidents';
 import TVMode from './pages/TVMode';
 import Terminais from './pages/Terminais';
 import WebhookAPI from './pages/WebhookAPI';
+import WebhookReceiver from './pages/WebhookReceiver';
 import __Layout from './Layout.jsx';
 
 
@@ -67,6 +68,7 @@ export const PAGES = {
     "TVMode": TVMode,
     "Terminais": Terminais,
     "WebhookAPI": WebhookAPI,
+    "WebhookReceiver": WebhookReceiver,
 }
 
 export const pagesConfig = {
