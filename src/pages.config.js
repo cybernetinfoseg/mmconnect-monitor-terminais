@@ -47,28 +47,24 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import Clientes from './pages/Clientes';
 import Dashboard from './pages/Dashboard';
-import DataSources from './pages/DataSources';
 import History from './pages/History';
 import Incidents from './pages/Incidents';
 import TVMode from './pages/TVMode';
+import Clientes from './pages/Clientes';
 import Terminais from './pages/Terminais';
-import WebhookAPI from './pages/WebhookAPI';
-import WebhookReceiver from './pages/WebhookReceiver';
+import DataSources from './pages/DataSources';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Clientes": Clientes,
     "Dashboard": Dashboard,
-    "DataSources": DataSources,
     "History": History,
     "Incidents": Incidents,
     "TVMode": TVMode,
+    "Clientes": Clientes,
     "Terminais": Terminais,
-    "WebhookAPI": WebhookAPI,
-    "WebhookReceiver": WebhookReceiver,
+    "DataSources": DataSources,
 }
 
 export const pagesConfig = {
