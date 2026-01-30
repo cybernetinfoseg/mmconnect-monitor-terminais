@@ -10,7 +10,7 @@ import {
   Menu,
   X,
   Building2,
-  Database
+  Webhook
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ const navItems = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
   { name: 'Clientes', page: 'Clientes', icon: Building2 },
-  { name: 'Fontes de Dados', page: 'DataSources', icon: Database },
+  { name: 'API Webhook', page: 'WebhookAPI', icon: Webhook },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Modo TV', page: 'TVMode', icon: Tv },
