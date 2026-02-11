@@ -19,7 +19,9 @@ import {
   Play,
   Pause,
   Globe,
-  Server
+  Server,
+  Clock,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -179,6 +181,28 @@ export default function Terminais() {
       id: terminal.id,
       data: { monitoramento_ativo: !terminal.monitoramento_ativo }
     });
+  };
+
+  const handleAcertarHora = async (terminal) => {
+    try {
+      const { data } = await base44.functions.invoke('acertarHora', {
+        terminal_id: terminal.id
+      });
+      alert(`Hora acertada no terminal ${terminal.nome}`);
+    } catch (error) {
+      alert(`Erro ao acertar hora: ${error.message}`);
+    }
+  };
+
+  const handleRecolherMarcacoes = async (terminal) => {
+    try {
+      const { data } = await base44.functions.invoke('recolherMarcacoes', {
+        terminal_id: terminal.id
+      });
+      alert(`${data.total} marcações recolhidas do terminal ${terminal.nome}`);
+    } catch (error) {
+      alert(`Erro ao recolher marcações: ${error.message}`);
+    }
   };
 
   const getConnectionInfo = (terminal) => {
@@ -383,6 +407,15 @@ export default function Terminais() {
                                 <Edit className="h-4 w-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleAcertarHora(terminal)}>
+                                <Clock className="h-4 w-4 mr-2" />
+                                Acertar Hora
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRecolherMarcacoes(terminal)}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Recolher Marcações
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => toggleMonitoramento(terminal)}>
                                 {terminal.monitoramento_ativo ? (
                                   <><Pause className="h-4 w-4 mr-2" />Pausar Monitoramento</>

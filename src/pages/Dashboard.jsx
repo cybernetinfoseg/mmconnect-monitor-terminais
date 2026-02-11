@@ -12,7 +12,8 @@ import {
   Building2, 
   RefreshCw,
   Activity,
-  AlertTriangle
+  AlertTriangle,
+  CloudDownload
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
   const [clienteFilter, setClienteFilter] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [syncing, setSyncing] = useState(false);
 
   // Fetch terminals with auto-refresh every 5 minutes (300000ms)
   const { data: terminals = [], isLoading, refetch } = useQuery({
@@ -85,6 +87,19 @@ export default function Dashboard() {
     };
   }, [filteredTerminals]);
 
+  const handleSyncTerminais = async () => {
+    setSyncing(true);
+    try {
+      const { data } = await base44.functions.invoke('syncTerminais', {});
+      alert(`Sincronização concluída!\n${data.created} criados, ${data.updated} atualizados`);
+      refetch();
+    } catch (error) {
+      alert(`Erro na sincronização: ${error.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50">
       {/* Header */}
@@ -109,6 +124,16 @@ export default function Dashboard() {
                 {lastRefresh.toLocaleTimeString('pt-BR')}
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSyncTerminais}
+              disabled={syncing}
+              className="bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-700"
+            >
+              <CloudDownload className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Sincronizando...' : 'Sync TimeAccess'}
+            </Button>
             <Button
               variant="outline"
               size="sm"
