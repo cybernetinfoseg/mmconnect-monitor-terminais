@@ -47,20 +47,28 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import Dashboard from './pages/Dashboard';
-import TVMode from './pages/TVMode';
 import History from './pages/History';
 import Incidents from './pages/Incidents';
+import TVMode from './pages/TVMode';
+import Dashboard from './pages/Dashboard';
+import Terminais from './pages/Terminais';
+import Clientes from './pages/Clientes';
+import Configuracoes from './pages/Configuracoes';
+import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Dashboard": Dashboard,
-    "TVMode": TVMode,
     "History": History,
     "Incidents": Incidents,
+    "TVMode": TVMode,
+    "Dashboard": Dashboard,
+    "Terminais": Terminais,
+    "Clientes": Clientes,
+    "Configuracoes": Configuracoes,
 }
 
 export const pagesConfig = {
     mainPage: "Dashboard",
     Pages: PAGES,
+    Layout: __Layout,
 };

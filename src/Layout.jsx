@@ -8,7 +8,8 @@ import {
   AlertTriangle,
   Tv,
   Menu,
-  X
+  X,
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 const navItems = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
   { name: 'Modo TV', page: 'TVMode', icon: Tv },
+  { name: 'Terminais', page: 'Terminais', icon: Monitor },
+  { name: 'Clientes', page: 'Clientes', icon: Building2 },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
 ];

@@ -8,20 +8,31 @@ import {
   WifiOff, 
   Activity,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  RefreshCw
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import StatusBadge from '../components/dashboard/StatusBadge';
 import LiveClock from '../components/dashboard/LiveClock';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 
 export default function TVMode() {
-  // Fetch terminals with auto-refresh every 5 seconds
-  const { data: terminals = [] } = useQuery({
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch terminals with auto-refresh every 5 minutes
+  const { data: terminals = [], refetch } = useQuery({
     queryKey: ['terminals-tv'],
-    queryFn: () => base44.entities.Terminal.list(),
-    refetchInterval: 5000,
+    queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
+    refetchInterval: 300000, // 5 minutos
   });
+
+  // Manual refresh
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await refetch();
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
 
   // Fetch alerts
   const { data: alerts = [] } = useQuery({
@@ -92,11 +103,23 @@ export default function TVMode() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-sm font-medium text-emerald-400">LIVE</span>
+              <span className="text-sm font-medium text-emerald-400">LIVE • 5min</span>
             </div>
           </div>
           
-          <LiveClock />
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+              Atualizar
+            </Button>
+            <LiveClock />
+          </div>
         </div>
       </div>
 
