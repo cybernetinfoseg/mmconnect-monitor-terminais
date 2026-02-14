@@ -97,75 +97,24 @@ export default function Terminais() {
     }
   });
 
-  // Test terminal directly from browser (for local network access)
-  const testTerminalLocal = async (terminal) => {
-    let host = '';
-    let port = terminal.porta || 5005;
-    
-    switch (terminal.tipo_conexao) {
-      case 'ip_local':
-        host = terminal.ip_local;
-        break;
-      case 'ip_publico':
-        host = terminal.ip_publico;
-        break;
-      case 'dns':
-        host = terminal.dns;
-        break;
-      case 'p2s':
-        host = terminal.ip_local;
-        break;
-      case 'api':
-        host = terminal.api_endpoint;
-        break;
-    }
-
-    if (!host) {
-      toast.error('Host não configurado');
-      return;
-    }
-
-    const startTime = Date.now();
-    
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      const url = terminal.tipo_conexao === 'api' ? host : `http://${host}:${port}`;
-      
-      await fetch(url, {
-        method: 'GET',
-        mode: 'no-cors',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      // Atualizar terminal com status online
-      await base44.entities.Terminal.update(terminal.id, {
-        status: 'online',
-        latencia_ms: Date.now() - startTime,
-        ultimo_check: new Date().toISOString()
-      });
-      
-      queryClient.invalidateQueries(['terminals-manage']);
-      toast.success(`${terminal.nome} está ONLINE (${Date.now() - startTime}ms)`);
-      
-    } catch (error) {
-      // Atualizar terminal com status offline
-      await base44.entities.Terminal.update(terminal.id, {
-        status: 'offline',
-        ultimo_check: new Date().toISOString()
-      });
-      
-      queryClient.invalidateQueries(['terminals-manage']);
-      toast.error(`${terminal.nome} está OFFLINE`);
-    }
-  };
-
-  // Monitor mutation
+  // Monitor mutation (via backend - única forma confiável de acessar IPs locais)
   const monitorMutation = useMutation({
-    mutationFn: (terminal) => testTerminalLocal(terminal),
+    mutationFn: async (terminal) => {
+      const response = await base44.functions.invoke('monitorTerminal', { 
+        terminalId: terminal.id 
+      });
+      
+      if (response.data.success) {
+        toast.success(`${terminal.nome} está ${response.data.status === 'online' ? 'ONLINE' : 'OFFLINE'} (${response.data.latencia || 0}ms)`);
+      } else {
+        toast.error(`${terminal.nome}: ${response.data.error || 'Erro ao verificar'}`);
+      }
+      
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['terminals-manage']);
+    },
     onError: (error) => {
       toast.error(`Erro: ${error.message}`);
     }
@@ -243,20 +192,14 @@ export default function Terminais() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
-              <p className="text-sm text-slate-500">Verificação direta via navegador em rede local</p>
+              <p className="text-sm text-slate-500">Gerenciar terminais e configurações de monitoramento</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">
-              <Wifi className="h-3 w-3 mr-1" />
-              Acesso Local Habilitado
-            </Badge>
-            <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700">
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Terminal
-            </Button>
-          </div>
+          <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Terminal
+          </Button>
         </div>
 
         {/* Filters */}

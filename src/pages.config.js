@@ -54,7 +54,6 @@ import History from './pages/History';
 import Incidents from './pages/Incidents';
 import TVMode from './pages/TVMode';
 import Terminais from './pages/Terminais';
-import TestMonitor from './pages/TestMonitor';
 import __Layout from './Layout.jsx';
 
 
@@ -66,7 +65,6 @@ export const PAGES = {
     "Incidents": Incidents,
     "TVMode": TVMode,
     "Terminais": Terminais,
-    "TestMonitor": TestMonitor,
 }
 
 export const pagesConfig = {

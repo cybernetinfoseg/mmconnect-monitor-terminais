@@ -9,8 +9,7 @@ import {
   Tv,
   Menu,
   X,
-  Building2,
-  TestTube
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,6 @@ const navItems = [
   { name: 'Modo TV', page: 'TVMode', icon: Tv },
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
   { name: 'Clientes', page: 'Clientes', icon: Building2 },
-  { name: 'Testar Conexões', page: 'TestMonitor', icon: TestTube },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
 ];
