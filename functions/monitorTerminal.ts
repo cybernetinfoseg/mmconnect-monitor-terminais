@@ -78,44 +78,30 @@ Deno.serve(async (req) => {
                     errorMsg = fetchError.message;
                 }
             } 
-            // Para conexões baseadas em IP/porta, tentar HTTP primeiro, depois TCP
+            // Para conexões baseadas em IP/porta, fazer teste TCP socket (similar ao script Python)
             else if (host) {
-                // Método 1: Tentar HTTP (mais confiável para web services)
+                // Método direto: Conexão TCP socket na porta especificada
                 try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000);
-                    
-                    const httpUrl = `http://${host}:${port}`;
-                    const response = await fetch(httpUrl, {
-                        method: 'GET',
-                        signal: controller.signal
+                    const connectPromise = Deno.connect({ 
+                        hostname: host, 
+                        port: port 
                     });
                     
-                    clearTimeout(timeoutId);
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Timeout após 5 segundos')), 5000)
+                    );
                     
-                    // Qualquer resposta HTTP (mesmo erro 404) significa que está online
+                    const conn = await Promise.race([connectPromise, timeoutPromise]);
+                    
+                    // Se chegou aqui, a porta está aberta/acessível
+                    conn.close();
                     status = 'online';
                     latencia = Date.now() - startTime;
                     
-                } catch (httpError) {
-                    // Se HTTP falhar, tentar conexão TCP direta
-                    try {
-                        const conn = await Promise.race([
-                            Deno.connect({ hostname: host, port: port }),
-                            new Promise((_, reject) => 
-                                setTimeout(() => reject(new Error('TCP timeout')), 10000)
-                            )
-                        ]);
-                        
-                        conn.close();
-                        status = 'online';
-                        latencia = Date.now() - startTime;
-                        
-                    } catch (tcpError) {
-                        // Ambos falharam = offline
-                        status = 'offline';
-                        errorMsg = `HTTP: ${httpError.message}, TCP: ${tcpError.message}`;
-                    }
+                } catch (socketError) {
+                    // Falha na conexão = offline
+                    status = 'offline';
+                    errorMsg = socketError.message || 'Porta fechada ou inacessível';
                 }
             }
             

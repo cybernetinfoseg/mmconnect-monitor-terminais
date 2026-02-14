@@ -105,7 +105,9 @@ export default function Terminais() {
       });
       
       if (response.data.success) {
-        toast.success(`${terminal.nome} está ${response.data.status === 'online' ? 'ONLINE' : 'OFFLINE'} (${response.data.latencia || 0}ms)`);
+        const statusText = response.data.status === 'online' ? '✅ ONLINE' : '❌ OFFLINE';
+        const latenciaText = response.data.latencia ? ` (${response.data.latencia}ms)` : '';
+        toast.success(`${terminal.nome}: ${statusText}${latenciaText}`);
       } else {
         toast.error(`${terminal.nome}: ${response.data.error || 'Erro ao verificar'}`);
       }
@@ -119,6 +121,30 @@ export default function Terminais() {
       toast.error(`Erro: ${error.message}`);
     }
   });
+
+  // Verificar todos os terminais
+  const [verificandoTodos, setVerificandoTodos] = useState(false);
+  
+  const verificarTodos = async () => {
+    setVerificandoTodos(true);
+    toast.info('Verificando todos os terminais...');
+    
+    const terminaisAtivos = terminals.filter(t => t.ativo);
+    
+    for (const terminal of terminaisAtivos) {
+      try {
+        await base44.functions.invoke('monitorTerminal', { 
+          terminalId: terminal.id 
+        });
+      } catch (error) {
+        console.error(`Erro ao verificar ${terminal.nome}:`, error);
+      }
+    }
+    
+    queryClient.invalidateQueries(['terminals-manage']);
+    setVerificandoTodos(false);
+    toast.success('Verificação concluída!');
+  };
 
   const filteredTerminals = useMemo(() => {
     return terminals.filter(t => {
@@ -192,14 +218,28 @@ export default function Terminais() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
-              <p className="text-sm text-slate-500">Gerenciar terminais e configurações de monitoramento</p>
+              <p className="text-sm text-slate-500">Verificação TCP via backend em rede local e externa</p>
             </div>
           </div>
           
-          <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Terminal
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={verificarTodos} 
+              disabled={verificandoTodos || terminals.length === 0}
+              variant="outline"
+              className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+            >
+              <RefreshCw className={cn(
+                "h-4 w-4 mr-2",
+                verificandoTodos && "animate-spin"
+              )} />
+              {verificandoTodos ? 'Verificando...' : 'Verificar Todos'}
+            </Button>
+            <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Terminal
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
