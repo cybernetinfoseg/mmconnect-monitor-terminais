@@ -28,65 +28,79 @@ Deno.serve(async (req) => {
         const startTime = Date.now();
 
         try {
-            // Determinar endpoint baseado no tipo de conexão
-            let endpoint = '';
+            // Determinar host e porta baseado no tipo de conexão
+            let host = '';
+            let port = terminal.porta || 5005;
             
             switch (terminal.tipo_conexao) {
                 case 'ip_local':
-                    endpoint = `http://${terminal.ip_local}:${terminal.porta || 5005}`;
+                    host = terminal.ip_local;
                     break;
                 case 'ip_publico':
-                    endpoint = `http://${terminal.ip_publico}:${terminal.porta || 5005}`;
+                    host = terminal.ip_publico;
                     break;
                 case 'dns':
-                    endpoint = `http://${terminal.dns}:${terminal.porta || 5005}`;
+                    host = terminal.dns;
                     break;
                 case 'p2s':
-                    // Para P2S, usar IP local após conexão VPN
-                    endpoint = `http://${terminal.ip_local}:${terminal.porta || 5005}`;
+                    host = terminal.ip_local;
                     break;
                 case 'api':
-                    endpoint = terminal.api_endpoint;
+                    // Para API, fazer request HTTP
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+                    
+                    const response = await fetch(terminal.api_endpoint, {
+                        method: 'GET',
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (response.ok) {
+                        status = 'online';
+                        latencia = Date.now() - startTime;
+                    } else {
+                        status = 'offline';
+                        errorMsg = `HTTP ${response.status}`;
+                    }
                     break;
                 default:
                     throw new Error('Tipo de conexão não suportado');
             }
 
-            // Tentar conexão com timeout de 5 segundos
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-            
-            const response = await fetch(`${endpoint}/health`, {
-                method: 'GET',
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-                status = 'online';
-                latencia = Date.now() - startTime;
-            } else {
-                status = 'warning';
-                errorMsg = `HTTP ${response.status}`;
+            // Para conexões baseadas em IP/porta, tentar conexão TCP
+            if (terminal.tipo_conexao !== 'api' && host) {
+                try {
+                    // Tentar conectar via TCP com timeout
+                    const conn = await Promise.race([
+                        Deno.connect({ hostname: host, port: port }),
+                        new Promise((_, reject) => 
+                            setTimeout(() => reject(new Error('Connection timeout')), 5000)
+                        )
+                    ]);
+                    
+                    // Se conectou, está online
+                    conn.close();
+                    status = 'online';
+                    latencia = Date.now() - startTime;
+                    
+                } catch (connError) {
+                    // Erro de conexão = offline
+                    status = 'offline';
+                    errorMsg = connError.message;
+                }
             }
             
         } catch (error) {
             status = 'offline';
             errorMsg = error.message;
-            
-            // Se for timeout ou conexão recusada, é offline
-            if (error.name === 'AbortError') {
-                errorMsg = 'Timeout';
-            }
         }
 
         // Calcular segundos sem ping
         const agora = new Date();
-        const ultimoPing = terminal.ultimo_ping ? new Date(terminal.ultimo_ping) : null;
-        const segundosSemPing = ultimoPing 
-            ? Math.floor((agora - ultimoPing) / 1000)
-            : 999999;
+        const segundosSemPing = status === 'online' ? 0 : 
+            (terminal.ultimo_ping ? Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000) : 999999);
 
         // Atualizar terminal
         await base44.asServiceRole.entities.Terminal.update(terminalId, {
@@ -114,7 +128,7 @@ Deno.serve(async (req) => {
                 notificado: false
             });
         } else if (cache && cache.ultimo_status === 'offline' && status === 'online') {
-            // Terminal voltou online - criar incidente de restauração
+            // Terminal voltou online
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id: terminalId,
                 terminal_nome: terminal.nome,
@@ -156,7 +170,8 @@ Deno.serve(async (req) => {
             terminal: terminal.nome,
             status,
             latencia,
-            error: errorMsg
+            error: errorMsg,
+            host: terminal.tipo_conexao !== 'api' ? `${host}:${terminal.porta}` : terminal.api_endpoint
         });
 
     } catch (error) {

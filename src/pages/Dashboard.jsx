@@ -24,14 +24,28 @@ export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
   const [clienteFilter, setClienteFilter] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [isMonitoring, setIsMonitoring] = useState(false);
 
-  // Fetch terminals with auto-refresh every 5 seconds
+  // Fetch terminals with auto-refresh every 10 seconds
   const { data: terminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals'],
     queryFn: () => base44.entities.Terminal.list(),
-    refetchInterval: 5000,
-    onSuccess: () => setLastRefresh(new Date()),
+    refetchInterval: 10000,
   });
+
+  // Monitorar todos os terminais
+  const handleMonitorAll = async () => {
+    setIsMonitoring(true);
+    try {
+      await base44.functions.invoke('monitorAllTerminals', {});
+      setLastRefresh(new Date());
+      setTimeout(() => refetch(), 2000);
+    } catch (error) {
+      console.error('Erro ao monitorar:', error);
+    } finally {
+      setIsMonitoring(false);
+    }
+  };
 
   // Fetch alerts
   const { data: alerts = [] } = useQuery({
@@ -91,7 +105,7 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             <div className="text-right">
               <p className="text-xs text-slate-400">Última atualização</p>
               <p className="text-sm font-mono text-slate-200">
@@ -102,10 +116,20 @@ export default function Dashboard() {
               variant="outline"
               size="sm"
               onClick={() => refetch()}
+              disabled={isMonitoring}
               className="bg-white/10 border-white/20 text-white hover:bg-white/20"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className={cn("h-4 w-4 mr-2", isMonitoring && "animate-spin")} />
               Atualizar
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleMonitorAll}
+              disabled={isMonitoring}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <Activity className={cn("h-4 w-4 mr-2", isMonitoring && "animate-pulse")} />
+              Verificar Agora
             </Button>
           </div>
         </div>
@@ -206,7 +230,7 @@ export default function Dashboard() {
                 <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
                   <span>Terminais</span>
                   <span className="text-xs font-normal text-slate-400">
-                    Auto-refresh: 5s
+                    Auto-refresh: 10s
                   </span>
                 </CardTitle>
               </CardHeader>
