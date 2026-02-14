@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, MapPin, Building2, Clock, AlertTriangle } from 'lucide-react';
 import StatusBadge from './StatusBadge';
+import MonitorStatus from './MonitorStatus';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 
@@ -116,10 +117,9 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
                     {terminal.cliente}
                   </td>
                   <td className={cn(
-                    "text-center",
                     compact ? "px-4 py-3" : "px-6 py-4"
                   )}>
-                    <StatusBadge status={terminal.status} />
+                    <MonitorStatus terminal={terminal} />
                   </td>
                   <td className={cn(
                     "text-slate-500",
