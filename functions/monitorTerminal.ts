@@ -46,10 +46,18 @@ Deno.serve(async (req) => {
                     host = terminal.ip_local;
                     break;
                 case 'api':
-                    // Para API, fazer request HTTP
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 5000);
-                    
+                    host = null; // API usa endpoint direto
+                    break;
+                default:
+                    throw new Error('Tipo de conexão não suportado');
+            }
+
+            // Para API, fazer request HTTP
+            if (terminal.tipo_conexao === 'api') {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                try {
                     const response = await fetch(terminal.api_endpoint, {
                         method: 'GET',
                         signal: controller.signal
@@ -64,31 +72,50 @@ Deno.serve(async (req) => {
                         status = 'offline';
                         errorMsg = `HTTP ${response.status}`;
                     }
-                    break;
-                default:
-                    throw new Error('Tipo de conexão não suportado');
-            }
-
-            // Para conexões baseadas em IP/porta, tentar conexão TCP
-            if (terminal.tipo_conexao !== 'api' && host) {
+                } catch (fetchError) {
+                    clearTimeout(timeoutId);
+                    status = 'offline';
+                    errorMsg = fetchError.message;
+                }
+            } 
+            // Para conexões baseadas em IP/porta, tentar HTTP primeiro, depois TCP
+            else if (host) {
+                // Método 1: Tentar HTTP (mais confiável para web services)
                 try {
-                    // Tentar conectar via TCP com timeout
-                    const conn = await Promise.race([
-                        Deno.connect({ hostname: host, port: port }),
-                        new Promise((_, reject) => 
-                            setTimeout(() => reject(new Error('Connection timeout')), 5000)
-                        )
-                    ]);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
                     
-                    // Se conectou, está online
-                    conn.close();
+                    const httpUrl = `http://${host}:${port}`;
+                    const response = await fetch(httpUrl, {
+                        method: 'GET',
+                        signal: controller.signal
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    // Qualquer resposta HTTP (mesmo erro 404) significa que está online
                     status = 'online';
                     latencia = Date.now() - startTime;
                     
-                } catch (connError) {
-                    // Erro de conexão = offline
-                    status = 'offline';
-                    errorMsg = connError.message;
+                } catch (httpError) {
+                    // Se HTTP falhar, tentar conexão TCP direta
+                    try {
+                        const conn = await Promise.race([
+                            Deno.connect({ hostname: host, port: port }),
+                            new Promise((_, reject) => 
+                                setTimeout(() => reject(new Error('TCP timeout')), 10000)
+                            )
+                        ]);
+                        
+                        conn.close();
+                        status = 'online';
+                        latencia = Date.now() - startTime;
+                        
+                    } catch (tcpError) {
+                        // Ambos falharam = offline
+                        status = 'offline';
+                        errorMsg = `HTTP: ${httpError.message}, TCP: ${tcpError.message}`;
+                    }
                 }
             }
             
