@@ -97,12 +97,77 @@ export default function Terminais() {
     }
   });
 
+  // Test terminal directly from browser (for local network access)
+  const testTerminalLocal = async (terminal) => {
+    let host = '';
+    let port = terminal.porta || 5005;
+    
+    switch (terminal.tipo_conexao) {
+      case 'ip_local':
+        host = terminal.ip_local;
+        break;
+      case 'ip_publico':
+        host = terminal.ip_publico;
+        break;
+      case 'dns':
+        host = terminal.dns;
+        break;
+      case 'p2s':
+        host = terminal.ip_local;
+        break;
+      case 'api':
+        host = terminal.api_endpoint;
+        break;
+    }
+
+    if (!host) {
+      toast.error('Host não configurado');
+      return;
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const url = terminal.tipo_conexao === 'api' ? host : `http://${host}:${port}`;
+      
+      await fetch(url, {
+        method: 'GET',
+        mode: 'no-cors',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Atualizar terminal com status online
+      await base44.entities.Terminal.update(terminal.id, {
+        status: 'online',
+        latencia_ms: Date.now() - startTime,
+        ultimo_check: new Date().toISOString()
+      });
+      
+      queryClient.invalidateQueries(['terminals-manage']);
+      toast.success(`${terminal.nome} está ONLINE (${Date.now() - startTime}ms)`);
+      
+    } catch (error) {
+      // Atualizar terminal com status offline
+      await base44.entities.Terminal.update(terminal.id, {
+        status: 'offline',
+        ultimo_check: new Date().toISOString()
+      });
+      
+      queryClient.invalidateQueries(['terminals-manage']);
+      toast.error(`${terminal.nome} está OFFLINE`);
+    }
+  };
+
   // Monitor mutation
   const monitorMutation = useMutation({
-    mutationFn: (terminalId) => base44.functions.invoke('monitorTerminal', { terminalId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['terminals-manage']);
-      toast.success('Terminal monitorado');
+    mutationFn: (terminal) => testTerminalLocal(terminal),
+    onError: (error) => {
+      toast.error(`Erro: ${error.message}`);
     }
   });
 
@@ -171,21 +236,27 @@ export default function Terminais() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
       <div className="max-w-[1920px] mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-blue-100 rounded-xl">
               <Monitor className="h-6 w-6 text-blue-600" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
-              <p className="text-sm text-slate-500">Gerenciar terminais e configurações de monitoramento</p>
+              <p className="text-sm text-slate-500">Verificação direta via navegador em rede local</p>
             </div>
           </div>
           
-          <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Terminal
-          </Button>
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">
+              <Wifi className="h-3 w-3 mr-1" />
+              Acesso Local Habilitado
+            </Badge>
+            <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Terminal
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -277,7 +348,7 @@ export default function Terminais() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => monitorMutation.mutate(terminal.id)}
+                          onClick={() => monitorMutation.mutate(terminal)}
                           disabled={monitorMutation.isPending}
                           className="flex-1"
                         >
