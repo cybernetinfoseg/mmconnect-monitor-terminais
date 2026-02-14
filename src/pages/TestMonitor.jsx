@@ -56,6 +56,71 @@ export default function TestMonitor() {
     queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
   });
 
+  // Test terminal connection directly from browser (for local network access)
+  const testTerminalLocal = async (terminal) => {
+    let host = '';
+    let port = terminal.porta || 5005;
+    
+    switch (terminal.tipo_conexao) {
+      case 'ip_local':
+        host = terminal.ip_local;
+        break;
+      case 'ip_publico':
+        host = terminal.ip_publico;
+        break;
+      case 'dns':
+        host = terminal.dns;
+        break;
+      case 'p2s':
+        host = terminal.ip_local;
+        break;
+      case 'api':
+        host = terminal.api_endpoint;
+        break;
+    }
+
+    if (!host) {
+      return {
+        success: false,
+        status: 'offline',
+        error: 'Host não configurado'
+      };
+    }
+
+    const startTime = Date.now();
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const url = terminal.tipo_conexao === 'api' ? host : `http://${host}:${port}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'no-cors', // Permite requisições para IPs locais
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // Com no-cors, qualquer resposta (mesmo opaque) significa que está online
+      return {
+        success: true,
+        status: 'online',
+        latencia: Date.now() - startTime,
+        host: terminal.tipo_conexao === 'api' ? host : `${host}:${port}`
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        status: 'offline',
+        error: error.message,
+        host: terminal.tipo_conexao === 'api' ? host : `${host}:${port}`
+      };
+    }
+  };
+
   // Monitor All Terminals
   const testAllTerminals = async () => {
     setTesting(true);
@@ -68,30 +133,17 @@ export default function TestMonitor() {
     for (let i = 0; i < terminals.length; i++) {
       const terminal = terminals[i];
       
-      try {
-        const response = await base44.functions.invoke('monitorTerminal', {
-          terminalId: terminal.id
-        });
-
-        results.push({
-          terminal: terminal.nome,
-          tipo: terminal.tipo_conexao,
-          success: response.data.success,
-          status: response.data.status,
-          latencia: response.data.latencia,
-          error: response.data.error,
-          host: response.data.host
-        });
-
-      } catch (error) {
-        results.push({
-          terminal: terminal.nome,
-          tipo: terminal.tipo_conexao,
-          success: false,
-          status: 'error',
-          error: error.message
-        });
-      }
+      const result = await testTerminalLocal(terminal);
+      
+      results.push({
+        terminal: terminal.nome,
+        tipo: terminal.tipo_conexao,
+        success: result.success,
+        status: result.status,
+        latencia: result.latencia,
+        error: result.error,
+        host: result.host
+      });
 
       setProgress(Math.round(((i + 1) / total) * 100));
       setTestResults([...results]);
@@ -101,50 +153,146 @@ export default function TestMonitor() {
     toast.success('Teste concluído');
   };
 
-  // Network Scanner
+  // Network Scanner (runs in browser for local network access)
   const startScan = async () => {
     setScanning(true);
     setScanResults(null);
 
-    try {
-      const response = await base44.functions.invoke('scanNetwork', scanConfig);
-      setScanResults(response.data);
-      toast.success(`Scan concluído: ${response.data.found} dispositivos encontrados`);
-    } catch (error) {
-      toast.error(`Erro no scan: ${error.message}`);
-    } finally {
-      setScanning(false);
+    const results = [];
+    const ipBase = scanConfig.baseIp.substring(0, scanConfig.baseIp.lastIndexOf('.'));
+    const total = scanConfig.endHost - scanConfig.startHost + 1;
+    let found = 0;
+
+    toast.info(`Escaneando ${total} hosts na rede local...`);
+
+    for (let i = scanConfig.startHost; i <= scanConfig.endHost; i++) {
+      const host = `${ipBase}.${i}`;
+      const startTime = Date.now();
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), scanConfig.timeout);
+        
+        await fetch(`http://${host}:${scanConfig.port}`, {
+          method: 'GET',
+          mode: 'no-cors',
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        // Se não deu timeout/erro, o host respondeu
+        results.push({
+          host,
+          port: scanConfig.port,
+          status: 'online',
+          latencia: Date.now() - startTime
+        });
+        found++;
+        
+      } catch (error) {
+        // Host offline ou não respondeu
+      }
     }
+
+    setScanResults({
+      success: true,
+      scanned: total,
+      found,
+      results
+    });
+    
+    toast.success(`Scan concluído: ${found} dispositivos encontrados`);
+    setScanning(false);
   };
 
-  // Ping Test
+  // Ping Test (runs in browser for local network access)
   const startPing = async () => {
     setPinging(true);
     setPingResults(null);
 
-    try {
-      const response = await base44.functions.invoke('pingTest', pingConfig);
-      setPingResults(response.data);
-      toast.success('Ping test concluído');
-    } catch (error) {
-      toast.error(`Erro no ping: ${error.message}`);
-    } finally {
-      setPinging(false);
+    const results = [];
+    const latencias = [];
+
+    for (let i = 0; i < pingConfig.count; i++) {
+      const startTime = Date.now();
+      let success = false;
+      let latencia = null;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), pingConfig.timeout);
+        
+        await fetch(`http://${pingConfig.host}:${pingConfig.port}`, {
+          method: 'GET',
+          mode: 'no-cors',
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        success = true;
+        latencia = Date.now() - startTime;
+        latencias.push(latencia);
+        
+      } catch (error) {
+        success = false;
+      }
+
+      results.push({
+        attempt: i + 1,
+        success,
+        latencia,
+        timestamp: new Date().toISOString()
+      });
+
+      // Aguardar 1 segundo entre pings
+      if (i < pingConfig.count - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
+
+    const successful = results.filter(r => r.success).length;
+    
+    const stats = {
+      sent: pingConfig.count,
+      received: successful,
+      lost: pingConfig.count - successful,
+      lossPercent: ((pingConfig.count - successful) / pingConfig.count) * 100,
+      minLatency: latencias.length > 0 ? Math.min(...latencias) : null,
+      maxLatency: latencias.length > 0 ? Math.max(...latencias) : null,
+      avgLatency: latencias.length > 0 ? latencias.reduce((a, b) => a + b, 0) / latencias.length : null
+    };
+
+    setPingResults({
+      success: true,
+      host: pingConfig.host,
+      port: pingConfig.port,
+      stats,
+      results
+    });
+    
+    toast.success('Ping test concluído');
+    setPinging(false);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-blue-100 rounded-xl">
-            <Activity className="h-6 w-6 text-blue-600" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-100 rounded-xl">
+              <Activity className="h-6 w-6 text-blue-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Diagnóstico Avançado</h1>
+              <p className="text-sm text-slate-500">Ferramentas completas de teste e monitoramento</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Diagnóstico Avançado</h1>
-            <p className="text-sm text-slate-500">Ferramentas completas de teste e monitoramento</p>
-          </div>
+          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300">
+            <Wifi className="h-3 w-3 mr-1" />
+            Acesso à Rede Local
+          </Badge>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
