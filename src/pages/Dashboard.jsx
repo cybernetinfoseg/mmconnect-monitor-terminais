@@ -27,11 +27,11 @@ export default function Dashboard() {
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isMonitoring, setIsMonitoring] = useState(false);
 
-  // Fetch terminals with auto-refresh every 10 seconds
+  // Fetch terminals with auto-refresh every 5 seconds
   const { data: terminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals'],
     queryFn: () => base44.entities.Terminal.list(),
-    refetchInterval: 10000,
+    refetchInterval: 5000, // Atualização em tempo real
   });
 
   // Monitorar todos os terminais
@@ -52,7 +52,7 @@ export default function Dashboard() {
   const { data: alerts = [] } = useQuery({
     queryKey: ['alerts'],
     queryFn: () => base44.entities.AlertIncident.list('-created_date', 50),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   // Get unique values for filters
@@ -230,8 +230,9 @@ export default function Dashboard() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
                   <span>Terminais</span>
-                  <span className="text-xs font-normal text-slate-400">
-                    Auto-refresh: 10s
+                  <span className="text-xs font-normal text-emerald-600 flex items-center gap-1">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                    Tempo Real (5s)
                   </span>
                 </CardTitle>
               </CardHeader>
