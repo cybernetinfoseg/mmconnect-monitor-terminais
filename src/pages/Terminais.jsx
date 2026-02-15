@@ -116,39 +116,54 @@ export default function Terminais() {
 
     if (!host) return null;
 
+    const url = `http://${host}:${port}`;
+    let status = 'offline';
+    let latencia = null;
+
     try {
-      // Tentar acesso direto via fetch - navegador pedirá permissão de rede local
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-      await fetch(`http://${host}:${port}`, {
-        method: 'GET',
-        mode: 'no-cors', // Importante para rede local
-        signal: controller.signal
+      // Tentar fetch normal primeiro
+      const response = await fetch(url, {
+        method: 'HEAD', // Mais leve que GET
+        signal: controller.signal,
+        cache: 'no-store'
       });
 
       clearTimeout(timeoutId);
-      const latencia = Date.now() - startTime;
+      // Se chegou aqui, servidor respondeu (mesmo que seja erro 404, 500, etc)
+      status = 'online';
+      latencia = Date.now() - startTime;
 
-      // Atualizar status no banco
-      await base44.entities.Terminal.update(terminal.id, {
-        status: 'online',
-        latencia_ms: latencia,
-        ultimo_ping: new Date().toISOString(),
-        ultimo_check: new Date().toISOString(),
-        segundos_sem_ping: 0
-      });
-
-      return { success: true, status: 'online', latencia };
     } catch (error) {
-      // Se falhar, marcar como offline
-      await base44.entities.Terminal.update(terminal.id, {
-        status: 'offline',
-        ultimo_check: new Date().toISOString()
-      });
-
-      return { success: true, status: 'offline', error: error.message };
+      // Verificar tipo de erro
+      if (error.name === 'AbortError') {
+        // Timeout = servidor não respondeu
+        status = 'offline';
+      } else if (error.message?.includes('Failed to fetch') || 
+                 error.message?.includes('NetworkError') ||
+                 error.message?.includes('ERR_CONNECTION_REFUSED')) {
+        // Erro de conexão = servidor offline
+        status = 'offline';
+      } else {
+        // Erro CORS ou outro = servidor está online mas bloqueando
+        // Vamos considerar online pois respondeu
+        status = 'online';
+        latencia = Date.now() - startTime;
+      }
     }
+
+    // Atualizar status no banco
+    await base44.entities.Terminal.update(terminal.id, {
+      status,
+      latencia_ms: latencia,
+      ultimo_check: new Date().toISOString(),
+      segundos_sem_ping: status === 'online' ? 0 : terminal.segundos_sem_ping,
+      ...(status === 'online' && { ultimo_ping: new Date().toISOString() })
+    });
+
+    return { success: true, status, latencia, host: url };
   };
 
   // Monitor mutation - usa browser para IPs locais, backend para outros
