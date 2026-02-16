@@ -97,99 +97,27 @@ export default function Terminais() {
     }
   });
 
-  // Testar terminal diretamente do navegador (para IPs locais)
-  const testDirectFromBrowser = async (terminal) => {
-    const startTime = Date.now();
-    let host = '';
-    let port = terminal.porta || 5005;
-
-    switch (terminal.tipo_conexao) {
-      case 'ip_local':
-        host = terminal.ip_local;
-        break;
-      case 'p2s':
-        host = terminal.ip_local;
-        break;
-      default:
-        return null; // Outros tipos usam backend
-    }
-
-    if (!host) return null;
-
-    const url = `http://${host}:${port}`;
-    let status = 'offline';
-    let latencia = null;
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      // Tentar fetch normal primeiro
-      const response = await fetch(url, {
-        method: 'HEAD', // Mais leve que GET
-        signal: controller.signal,
-        cache: 'no-store'
-      });
-
-      clearTimeout(timeoutId);
-      // Se chegou aqui, servidor respondeu (mesmo que seja erro 404, 500, etc)
-      status = 'online';
-      latencia = Date.now() - startTime;
-
-    } catch (error) {
-      // Verificar tipo de erro
-      if (error.name === 'AbortError') {
-        // Timeout = servidor não respondeu
-        status = 'offline';
-      } else if (error.message?.includes('Failed to fetch') || 
-                 error.message?.includes('NetworkError') ||
-                 error.message?.includes('ERR_CONNECTION_REFUSED')) {
-        // Erro de conexão = servidor offline
-        status = 'offline';
-      } else {
-        // Erro CORS ou outro = servidor está online mas bloqueando
-        // Vamos considerar online pois respondeu
-        status = 'online';
-        latencia = Date.now() - startTime;
-      }
-    }
-
-    // Atualizar status no banco
-    await base44.entities.Terminal.update(terminal.id, {
-      status,
-      latencia_ms: latencia,
-      ultimo_check: new Date().toISOString(),
-      segundos_sem_ping: status === 'online' ? 0 : terminal.segundos_sem_ping,
-      ...(status === 'online' && { ultimo_ping: new Date().toISOString() })
-    });
-
-    return { success: true, status, latencia, host: url };
-  };
-
-  // Monitor mutation - usa browser para IPs locais, backend para outros
+  // Monitor mutation (via backend - teste TCP socket direto como script Python)
   const monitorMutation = useMutation({
     mutationFn: async (terminal) => {
-      // Para IPs locais, testar direto do navegador
-      if (terminal.tipo_conexao === 'ip_local' || terminal.tipo_conexao === 'p2s') {
-        const result = await testDirectFromBrowser(terminal);
-        if (result) return result;
-      }
-
-      // Para outros tipos (DNS, IP público, API), usar backend
       const response = await base44.functions.invoke('monitorTerminal', { 
         terminalId: terminal.id 
       });
-      
       return response.data;
     },
     onSuccess: (data, terminal) => {
       queryClient.invalidateQueries(['terminals-manage']);
       
-      if (data.success || data.status) {
-        const status = data.status || (data.success ? 'online' : 'offline');
-        const statusText = status === 'online' ? '✅ ONLINE' : '❌ OFFLINE';
+      if (data.success) {
+        const statusText = data.status === 'online' ? '✅ ONLINE' : '❌ OFFLINE';
         const latenciaText = data.latencia ? ` (${data.latencia}ms)` : '';
-        toast.success(`${terminal.nome}: ${statusText}${latenciaText}`);
+        const errorText = data.error ? ` - ${data.error}` : '';
+        
+        if (data.status === 'online') {
+          toast.success(`${terminal.nome}: ${statusText}${latenciaText} - ${data.host}`);
+        } else {
+          toast.error(`${terminal.nome}: ${statusText}${errorText}`);
+        }
       }
     },
     onError: (error) => {
@@ -202,21 +130,15 @@ export default function Terminais() {
   
   const verificarTodos = async () => {
     setVerificandoTodos(true);
-    toast.info('Verificando todos os terminais...');
+    toast.info('Verificando todos os terminais via TCP socket...');
     
     const terminaisAtivos = terminals.filter(t => t.ativo);
     
     for (const terminal of terminaisAtivos) {
       try {
-        // IPs locais: testar direto do navegador
-        if (terminal.tipo_conexao === 'ip_local' || terminal.tipo_conexao === 'p2s') {
-          await testDirectFromBrowser(terminal);
-        } else {
-          // Outros: usar backend
-          await base44.functions.invoke('monitorTerminal', { 
-            terminalId: terminal.id 
-          });
-        }
+        await base44.functions.invoke('monitorTerminal', { 
+          terminalId: terminal.id 
+        });
       } catch (error) {
         console.error(`Erro ao verificar ${terminal.nome}:`, error);
       }
@@ -301,7 +223,7 @@ export default function Terminais() {
               <h1 className="text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
               <p className="text-sm text-emerald-600 flex items-center gap-1">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                Acesso direto rede local via navegador + Auto-refresh 5s
+                Verificação TCP Socket (Rede Local + Externa) • Auto-refresh 5s
               </p>
             </div>
           </div>
