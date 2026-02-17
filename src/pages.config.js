@@ -68,7 +68,7 @@ export const PAGES = {
 }
 
 export const pagesConfig = {
-    mainPage: "Clientes",
+    mainPage: "TVMode",
     Pages: PAGES,
     Layout: __Layout,
 };
