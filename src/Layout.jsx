@@ -9,7 +9,8 @@ import {
   Tv,
   Menu,
   X,
-  Building2
+  Building2,
+  Bot
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
