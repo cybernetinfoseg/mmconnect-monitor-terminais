@@ -10,7 +10,10 @@ import {
   Building2, 
   RefreshCw,
   Activity,
-  AlertTriangle
+  AlertTriangle,
+  Key,
+  Copy,
+  CheckCircle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +29,21 @@ export default function Dashboard() {
   const [clienteFilter, setClienteFilter] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [user, setUser] = useState(null);
+  const [copiedField, setCopiedField] = useState(null);
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const currentUser = await base44.auth.me();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Erro ao buscar usuário:', error);
+      }
+    };
+    fetchUser();
+  }, []);
 
   // Fetch terminals with auto-refresh every 5 seconds
   const { data: terminals = [], isLoading, refetch } = useQuery({
@@ -46,6 +64,13 @@ export default function Dashboard() {
     } finally {
       setIsMonitoring(false);
     }
+  };
+
+  // Copy to clipboard
+  const handleCopy = (text, field) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   // Fetch alerts
@@ -138,6 +163,58 @@ export default function Dashboard() {
 
       {/* Main Content */}
       <div className="max-w-[1920px] mx-auto p-6 space-y-6">
+        {/* Admin Info */}
+        {user?.role === 'admin' && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Card className="bg-gradient-to-r from-slate-900 to-slate-800 border-slate-700 text-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <Key className="h-4 w-4 text-emerald-400" />
+                  Configurações de Integração (Admin)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400 uppercase tracking-wider">App ID</label>
+                    <div className="flex items-center gap-2 bg-slate-950/50 rounded-lg p-3 border border-slate-700">
+                      <code className="text-sm font-mono text-emerald-400 flex-1">697aa46c9998c30665e2e19a</code>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleCopy('697aa46c9998c30665e2e19a', 'appId')}
+                        className="h-8 w-8 p-0 hover:bg-slate-700"
+                      >
+                        {copiedField === 'appId' ? (
+                          <CheckCircle className="h-4 w-4 text-emerald-400" />
+                        ) : (
+                          <Copy className="h-4 w-4 text-slate-400" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs text-slate-400 uppercase tracking-wider">Monitor API Key</label>
+                    <div className="flex items-center gap-2 bg-slate-950/50 rounded-lg p-3 border border-slate-700">
+                      <code className="text-sm font-mono text-amber-400 flex-1">MONITOR_API_KEY</code>
+                      <span className="text-xs text-slate-500">(ver no Dashboard → Secrets)</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 p-3 bg-blue-950/30 border border-blue-800/30 rounded-lg">
+                  <p className="text-xs text-blue-300">
+                    💡 Use esses valores no script Python <code className="bg-slate-950/50 px-1.5 py-0.5 rounded">monitor_local.py</code> para monitoramento local
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Filters */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
