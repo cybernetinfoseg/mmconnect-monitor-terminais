@@ -176,24 +176,24 @@ export default function Layout({ children, currentPageName }) {
       >
         <div className="flex items-stretch">
           {bottomNavItems.map((item) => {
-            const isActive = currentPageName === item.page;
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.page}
-                to={createPageUrl(item.page)}
-                className={cn(
-                  "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
-                  isActive
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                )}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px] font-medium">{item.name}</span>
-              </Link>
-            );
-          })}
+                const isActive = currentPageName === item.page;
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.page}
+                    onClick={() => navigate(createPageUrl(item.page), { replace: isActive })}
+                    className={cn(
+                      "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
+                      isActive
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-[10px] font-medium">{item.name}</span>
+                  </button>
+                );
+              })}
         </div>
       </nav>
     </div>
