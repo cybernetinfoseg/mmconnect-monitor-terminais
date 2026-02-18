@@ -61,20 +61,31 @@ export default function Terminais() {
     queryFn: () => base44.entities.Cliente.list(),
   });
 
-  // Create/Update mutation
+  // Create/Update mutation with optimistic update
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      // Buscar nome do cliente
       const cliente = clientes.find(c => c.id === data.cliente_id);
-      const dataWithCliente = {
-        ...data,
-        cliente_nome: cliente?.nome || ''
-      };
-
+      const dataWithCliente = { ...data, cliente_nome: cliente?.nome || '' };
       if (editingTerminal) {
         return base44.entities.Terminal.update(editingTerminal.id, dataWithCliente);
       }
       return base44.entities.Terminal.create(dataWithCliente);
+    },
+    onMutate: async (data) => {
+      await queryClient.cancelQueries(['terminals-manage']);
+      const previous = queryClient.getQueryData(['terminals-manage']);
+      const cliente = clientes.find(c => c.id === data.cliente_id);
+      const optimistic = { ...data, cliente_nome: cliente?.nome || '', id: editingTerminal?.id || `temp-${Date.now()}` };
+      queryClient.setQueryData(['terminals-manage'], (old = []) =>
+        editingTerminal
+          ? old.map(t => t.id === editingTerminal.id ? optimistic : t)
+          : [optimistic, ...old]
+      );
+      return { previous };
+    },
+    onError: (error, _data, ctx) => {
+      queryClient.setQueryData(['terminals-manage'], ctx.previous);
+      toast.error(`Erro: ${error.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['terminals-manage']);
@@ -82,15 +93,22 @@ export default function Terminais() {
       setEditingTerminal(null);
       setFormData({});
       toast.success(editingTerminal ? 'Terminal atualizado' : 'Terminal criado');
-    },
-    onError: (error) => {
-      toast.error(`Erro: ${error.message}`);
     }
   });
 
-  // Delete mutation
+  // Delete mutation with optimistic update
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Terminal.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries(['terminals-manage']);
+      const previous = queryClient.getQueryData(['terminals-manage']);
+      queryClient.setQueryData(['terminals-manage'], (old = []) => old.filter(t => t.id !== id));
+      return { previous };
+    },
+    onError: (_err, _id, ctx) => {
+      queryClient.setQueryData(['terminals-manage'], ctx.previous);
+      toast.error('Erro ao excluir terminal');
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['terminals-manage']);
       toast.success('Terminal excluído');
