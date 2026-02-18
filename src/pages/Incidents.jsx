@@ -188,7 +188,7 @@ export default function Incidents() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3">
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList className="bg-white shadow-sm">
               <TabsTrigger value="all">Todos</TabsTrigger>
@@ -205,7 +205,7 @@ export default function Incidents() {
 
           <Tabs value={tipoFilter} onValueChange={setTipoFilter}>
             <TabsList className="bg-white shadow-sm">
-              <TabsTrigger value="all">Todos os Tipos</TabsTrigger>
+              <TabsTrigger value="all">Tipos</TabsTrigger>
               <TabsTrigger value="offline">Offline</TabsTrigger>
               <TabsTrigger value="restored">Restaurado</TabsTrigger>
             </TabsList>
