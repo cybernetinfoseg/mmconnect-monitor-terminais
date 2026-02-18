@@ -124,8 +124,8 @@ export default function TVMode() {
       </div>
 
       {/* KPI Strip */}
-      <div className="px-8 py-4 bg-slate-800/30 border-y border-slate-700/50">
-        <div className="flex items-center justify-center gap-16">
+      <div className="px-4 sm:px-8 py-4 bg-slate-800/30 border-y border-slate-700/50">
+        <div className="flex items-center justify-center gap-6 sm:gap-16 flex-wrap">
           <motion.div 
             className="flex items-center gap-4"
             initial={{ opacity: 0, y: 20 }}
