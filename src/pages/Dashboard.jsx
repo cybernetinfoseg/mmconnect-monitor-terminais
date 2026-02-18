@@ -20,6 +20,7 @@ import TerminalsTable from '../components/dashboard/TerminalsTable';
 import StatusPieChart from '../components/dashboard/StatusPieChart';
 import FilterDropdown from '../components/dashboard/FilterDropdown';
 import AlertsList from '../components/dashboard/AlertsList';
+import PullToRefresh from '../components/dashboard/PullToRefresh';
 
 export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
