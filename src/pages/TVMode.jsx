@@ -192,7 +192,7 @@ export default function TVMode() {
       </div>
 
       {/* Main Content */}
-      <div className="p-8">
+      <div className="p-4 sm:p-8">
         {/* Alert Banner */}
         <AnimatePresence>
           {hasActiveAlerts && (
