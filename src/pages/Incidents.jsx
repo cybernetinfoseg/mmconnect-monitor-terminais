@@ -238,8 +238,8 @@ export default function Incidents() {
                           : "bg-slate-50/50 border-slate-200"
                     )}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex items-start gap-3">
                         <div className={cn(
                           "rounded-xl p-3",
                           incident.tipo === 'offline' && !incident.resolvido
