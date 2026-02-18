@@ -271,8 +271,8 @@ export default function Dashboard() {
             </Card>
           </motion.div>
         </div>
+        </div>
       </div>
-    </div>
     </PullToRefresh>
   );
 }
