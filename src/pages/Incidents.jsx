@@ -275,13 +275,13 @@ export default function Incidents() {
                             )}
                           </div>
                           
-                          <div className="flex items-center gap-4 text-sm text-slate-500">
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
+                              <MapPin className="h-3 w-3" />
                               {incident.local}
                             </span>
                             <span className="flex items-center gap-1">
-                              <Building2 className="h-4 w-4" />
+                              <Building2 className="h-3 w-3" />
                               {incident.cliente}
                             </span>
                           </div>
