@@ -337,6 +337,64 @@ export default function Configuracoes() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* Delete Account */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="bg-white/80 backdrop-blur-sm border-red-200">
+            <CardHeader>
+              <CardTitle className="text-red-600 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5" />
+                Zona de Perigo
+              </CardTitle>
+              <CardDescription>
+                Estas ações são irreversíveis. Proceda com cautela.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg bg-red-50">
+                <div>
+                  <p className="font-medium text-slate-900">Excluir Conta</p>
+                  <p className="text-sm text-slate-500">Remove permanentemente todos os dados e configurações.</p>
+                </div>
+                <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="select-none shrink-0 ml-4">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Excluir Conta
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                        <AlertTriangle className="h-5 w-5" />
+                        Confirmar Exclusão de Conta
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta ação é <strong>permanente e irreversível</strong>. Todos os seus terminais, clientes, histórico e configurações serão excluídos. Tem certeza que deseja continuar?
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="select-none">Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-600 hover:bg-red-700 select-none"
+                        onClick={() => {
+                          toast.error('Funcionalidade disponível apenas via suporte. Contacte o administrador.');
+                          setDeleteConfirmOpen(false);
+                        }}
+                      >
+                        Sim, Excluir Tudo
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );
