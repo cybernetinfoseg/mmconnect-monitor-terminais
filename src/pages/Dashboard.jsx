@@ -196,7 +196,7 @@ export default function Dashboard() {
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
           {/* Chart */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
