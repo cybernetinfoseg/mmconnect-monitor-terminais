@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { 
   LayoutDashboard, 
@@ -8,8 +8,8 @@ import {
   AlertTriangle,
   Tv,
   Menu,
-  X,
-  Building2
+  Building2,
+  ChevronLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,103 +24,150 @@ const navItems = [
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
 ];
 
+// Pages shown in the bottom bar on mobile
+const bottomNavItems = [
+  { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
+  { name: 'Terminais', page: 'Terminais', icon: Monitor },
+  { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
+];
+
+// Root pages (no back button)
+const rootPages = ['Dashboard', 'TVMode'];
+
 export default function Layout({ children, currentPageName }) {
-  // TV Mode has its own full-screen layout
   if (currentPageName === 'TVMode') {
     return children;
   }
 
-  const NavLink = ({ item }) => {
+  const isRoot = rootPages.includes(currentPageName);
+
+  const NavLink = ({ item, onClick }) => {
     const isActive = currentPageName === item.page;
     const Icon = item.icon;
-    
     return (
       <Link
         to={createPageUrl(item.page)}
+        onClick={onClick}
         className={cn(
-          "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+          "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 select-none",
           "text-sm font-medium",
-          isActive 
-            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20" 
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+          isActive
+            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-emerald-600"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
         )}
       >
         <Icon className={cn(
           "h-5 w-5",
-          isActive ? "text-emerald-400" : "text-slate-400"
+          isActive ? "text-emerald-400 dark:text-white" : "text-slate-400"
         )} />
         {item.name}
       </Link>
     );
   };
 
-  const Sidebar = () => (
-    <div className="flex flex-col h-full">
-      {/* Logo */}
-      <div className="p-6 border-b border-slate-200">
+  const Sidebar = ({ onClose }) => (
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
+      <div className="p-6 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-900 rounded-xl">
-            <Monitor className="h-6 w-6 text-emerald-400" />
+          <div className="p-2 bg-slate-900 dark:bg-emerald-600 rounded-xl">
+            <Monitor className="h-6 w-6 text-emerald-400 dark:text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-slate-900">NOC Monitor</h1>
-            <p className="text-xs text-slate-500">Terminais Biométricos</p>
+            <h1 className="font-bold text-slate-900 dark:text-white">NOC Monitor</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Terminais Biométricos</p>
           </div>
         </div>
       </div>
-      
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
-          <NavLink key={item.page} item={item} />
+          <NavLink key={item.page} item={item} onClick={onClose} />
         ))}
       </nav>
-      
-      {/* Footer */}
-      <div className="p-4 border-t border-slate-200">
-        <p className="text-xs text-slate-400 text-center">
-          Enterprise NOC v1.0
-        </p>
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+        <p className="text-xs text-slate-400 text-center">Enterprise NOC v1.0</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-slate-200">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-slate-200 dark:lg:bg-slate-900 dark:lg:border-slate-700">
         <Sidebar />
       </aside>
-      
+
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-slate-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-900 rounded-xl">
-              <Monitor className="h-5 w-5 text-emerald-400" />
+      <header
+        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="flex items-center justify-between h-14">
+          <div className="flex items-center gap-2">
+            {!isRoot && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => window.history.back()}
+                className="select-none"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-slate-900 dark:bg-emerald-600 rounded-lg">
+                <Monitor className="h-4 w-4 text-emerald-400 dark:text-white" />
+              </div>
+              <h1 className="font-bold text-slate-900 dark:text-white text-sm">NOC Monitor</h1>
             </div>
-            <h1 className="font-bold text-slate-900">NOC Monitor</h1>
           </div>
-          
+
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="select-none">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
+            <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
               <Sidebar />
             </SheetContent>
           </Sheet>
         </div>
       </header>
-      
+
       {/* Main Content */}
       <main className="lg:pl-64 min-h-screen">
-        <div className="pt-16 lg:pt-0">
+        <div className="pt-14 lg:pt-0 pb-20 lg:pb-0">
           {children}
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="flex items-stretch">
+          {bottomNavItems.map((item) => {
+            const isActive = currentPageName === item.page;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.page}
+                to={createPageUrl(item.page)}
+                className={cn(
+                  "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
+                  isActive
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] font-medium">{item.name}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }
