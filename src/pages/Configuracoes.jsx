@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils';
 
 export default function Configuracoes() {
   const [formData, setFormData] = useState({});
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: configs = [] } = useQuery({

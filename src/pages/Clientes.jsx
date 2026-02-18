@@ -48,6 +48,21 @@ export default function Clientes() {
       }
       return base44.entities.Cliente.create(data);
     },
+    onMutate: async (data) => {
+      await queryClient.cancelQueries(['clientes-manage']);
+      const previous = queryClient.getQueryData(['clientes-manage']);
+      const optimistic = { ...data, id: editingCliente?.id || `temp-${Date.now()}` };
+      queryClient.setQueryData(['clientes-manage'], (old = []) =>
+        editingCliente
+          ? old.map(c => c.id === editingCliente.id ? optimistic : c)
+          : [optimistic, ...old]
+      );
+      return { previous };
+    },
+    onError: (_err, _data, ctx) => {
+      queryClient.setQueryData(['clientes-manage'], ctx.previous);
+      toast.error('Erro ao salvar cliente');
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['clientes-manage']);
       queryClient.invalidateQueries(['clientes']);
@@ -60,6 +75,16 @@ export default function Clientes() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Cliente.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries(['clientes-manage']);
+      const previous = queryClient.getQueryData(['clientes-manage']);
+      queryClient.setQueryData(['clientes-manage'], (old = []) => old.filter(c => c.id !== id));
+      return { previous };
+    },
+    onError: (_err, _id, ctx) => {
+      queryClient.setQueryData(['clientes-manage'], ctx.previous);
+      toast.error('Erro ao excluir cliente');
+    },
     onSuccess: () => {
       queryClient.invalidateQueries(['clientes-manage']);
       queryClient.invalidateQueries(['clientes']);
