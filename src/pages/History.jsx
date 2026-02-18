@@ -91,13 +91,13 @@ export default function History() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
       <div className="max-w-[1920px] mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-100 rounded-xl">
+            <div className="p-3 bg-purple-100 rounded-xl shrink-0">
               <BarChart3 className="h-6 w-6 text-purple-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Histórico de Uptime</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Histórico de Uptime</h1>
               <p className="text-sm text-slate-500">Análise de disponibilidade por período</p>
             </div>
           </div>
@@ -106,15 +106,18 @@ export default function History() {
             <TabsList className="bg-white shadow-sm">
               <TabsTrigger value="24h" className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4" />
-                24 horas
+                <span className="hidden sm:inline">24 horas</span>
+                <span className="sm:hidden">24h</span>
               </TabsTrigger>
               <TabsTrigger value="7d" className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                7 dias
+                <span className="hidden sm:inline">7 dias</span>
+                <span className="sm:hidden">7d</span>
               </TabsTrigger>
               <TabsTrigger value="30d" className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                30 dias
+                <span className="hidden sm:inline">30 dias</span>
+                <span className="sm:hidden">30d</span>
               </TabsTrigger>
             </TabsList>
           </Tabs>
