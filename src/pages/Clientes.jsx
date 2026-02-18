@@ -101,20 +101,20 @@ export default function Clientes() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
       <div className="max-w-[1920px] mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-100 rounded-xl">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-purple-100 rounded-xl shrink-0">
               <Building2 className="h-6 w-6 text-purple-600" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Gestão de Clientes</h1>
-              <p className="text-sm text-slate-500">Gerenciar cadastro de clientes</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Gestão de Clientes</h1>
+              <p className="text-sm text-slate-500 hidden sm:block">Gerenciar cadastro de clientes</p>
             </div>
           </div>
           
-          <Button onClick={handleNew} className="bg-purple-600 hover:bg-purple-700">
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Cliente
+          <Button onClick={handleNew} size="sm" className="bg-purple-600 hover:bg-purple-700 shrink-0">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Novo Cliente</span>
           </Button>
         </div>
 
