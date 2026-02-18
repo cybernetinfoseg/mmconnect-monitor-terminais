@@ -36,11 +36,22 @@ const bottomNavItems = [
 const rootPages = ['Dashboard', 'TVMode'];
 
 export default function Layout({ children, currentPageName }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const prevPageRef = useRef(currentPageName);
+
   if (currentPageName === 'TVMode') {
     return children;
   }
 
   const isRoot = rootPages.includes(currentPageName);
+
+  // Determine slide direction for page transitions
+  const pageOrder = ['Dashboard', 'Terminais', 'Clientes', 'History', 'Incidents', 'Configuracoes'];
+  const prevIndex = pageOrder.indexOf(prevPageRef.current);
+  const currIndex = pageOrder.indexOf(currentPageName);
+  const direction = currIndex >= prevIndex ? 1 : -1;
+  prevPageRef.current = currentPageName;
 
   const NavLink = ({ item, onClick }) => {
     const isActive = currentPageName === item.page;
