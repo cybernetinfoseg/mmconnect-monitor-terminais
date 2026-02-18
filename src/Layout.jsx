@@ -147,9 +147,25 @@ export default function Layout({ children, currentPageName }) {
       </header>
 
       {/* Main Content */}
-      <main className="lg:pl-64 min-h-screen">
-        <div className="pt-14 lg:pt-0 pb-20 lg:pb-0">
+      <main className="lg:pl-64 min-h-screen overflow-x-hidden">
+        {/* Desktop: no animation */}
+        <div className="hidden lg:block pt-0 pb-0">
           {children}
+        </div>
+        {/* Mobile: slide animation */}
+        <div className="lg:hidden pt-14 pb-20">
+          <AnimatePresence mode="wait" initial={false} custom={direction}>
+            <motion.div
+              key={currentPageName}
+              custom={direction}
+              initial={{ x: direction * 40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: direction * -40, opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 
