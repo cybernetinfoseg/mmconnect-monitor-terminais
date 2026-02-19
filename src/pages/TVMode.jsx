@@ -182,72 +182,40 @@ export default function TVMode() {
       </div>
 
       {/* KPI Strip */}
-      {tvSettings.showKPIs && <div className="px-4 sm:px-8 py-4 bg-slate-800/30 border-y border-slate-700/50">
-        <div className="flex items-center justify-center gap-6 sm:gap-16 flex-wrap">
-          <motion.div 
-            className="flex items-center gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <Monitor className="h-8 w-8 text-blue-400" />
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Total</p>
-              <p className="text-4xl font-bold text-blue-400 tabular-nums">{stats.total}</p>
-            </div>
-          </motion.div>
-          
-          <motion.div 
-            className="flex items-center gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <Wifi className="h-8 w-8 text-emerald-400" />
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Online</p>
-              <p className="text-4xl font-bold text-emerald-400 tabular-nums">{stats.online}</p>
-            </div>
-          </motion.div>
-          
-          <motion.div 
-            className="flex items-center gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <WifiOff className="h-8 w-8 text-red-400" />
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Offline</p>
-              <p className="text-4xl font-bold text-red-400 tabular-nums">{stats.offline}</p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            className="flex items-center gap-4 pl-8 border-l border-slate-700"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            {stats.offline === 0 ? (
-              <>
-                <CheckCircle className="h-8 w-8 text-emerald-400" />
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Status</p>
-                  <p className="text-lg font-bold text-emerald-400">OPERACIONAL</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <AlertTriangle className="h-8 w-8 text-red-400 animate-pulse" />
-                <div>
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Status</p>
-                  <p className="text-lg font-bold text-red-400">ALERTA</p>
-                </div>
-              </>
-            )}
-          </motion.div>
+      {tvSettings.showKPIs && (
+        <div className="px-4 sm:px-8 py-4 bg-slate-800/30 border-y border-slate-700/50">
+          <div className="flex items-center justify-center gap-6 sm:gap-16 flex-wrap">
+            <motion.div className="flex items-center gap-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <Monitor className="h-8 w-8 text-blue-400" />
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Total</p>
+                <p className="text-4xl font-bold text-blue-400 tabular-nums">{stats.total}</p>
+              </div>
+            </motion.div>
+            <motion.div className="flex items-center gap-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+              <Wifi className="h-8 w-8 text-emerald-400" />
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Online</p>
+                <p className="text-4xl font-bold text-emerald-400 tabular-nums">{stats.online}</p>
+              </div>
+            </motion.div>
+            <motion.div className="flex items-center gap-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <WifiOff className="h-8 w-8 text-red-400" />
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Offline</p>
+                <p className="text-4xl font-bold text-red-400 tabular-nums">{stats.offline}</p>
+              </div>
+            </motion.div>
+            <motion.div className="flex items-center gap-4 pl-8 border-l border-slate-700" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              {stats.offline === 0 ? (
+                <><CheckCircle className="h-8 w-8 text-emerald-400" /><div><p className="text-xs text-slate-400 uppercase tracking-wider">Status</p><p className="text-lg font-bold text-emerald-400">OPERACIONAL</p></div></>
+              ) : (
+                <><AlertTriangle className="h-8 w-8 text-red-400 animate-pulse" /><div><p className="text-xs text-slate-400 uppercase tracking-wider">Status</p><p className="text-lg font-bold text-red-400">ALERTA</p></div></>
+              )}
+            </motion.div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       <div className="p-4 sm:p-8">
