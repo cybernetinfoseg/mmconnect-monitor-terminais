@@ -20,6 +20,7 @@ import moment from 'moment';
 
 export default function TVMode() {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedTerminal, setSelectedTerminal] = useState(null);
 
   // Read filters from URL params
   const urlParams = new URLSearchParams(window.location.search);
