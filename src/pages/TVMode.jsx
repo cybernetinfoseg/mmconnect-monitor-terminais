@@ -48,10 +48,29 @@ export default function TVMode() {
     localStorage.setItem('tv-settings', JSON.stringify(newSettings));
   };
 
-  // Read filters from URL params
+  // Mirror filters from Dashboard via localStorage (updates every 2s)
+  const [mirrorFilters, setMirrorFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dashboard-filters');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) { return {}; }
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      try {
+        const saved = localStorage.getItem('dashboard-filters');
+        if (saved) setMirrorFilters(JSON.parse(saved));
+      } catch (e) {}
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // URL params override localStorage
   const urlParams = new URLSearchParams(window.location.search);
-  const localFilter = urlParams.get('local') || null;
-  const clienteFilter = urlParams.get('cliente') || null;
+  const localFilter = urlParams.get('local') || mirrorFilters.local || null;
+  const clienteFilter = urlParams.get('cliente') || mirrorFilters.cliente || null;
+  const statusFilterMirror = mirrorFilters.status || null;
 
   // Fetch terminals with auto-refresh every 5 seconds
   const { data: allTerminals = [], refetch } = useQuery({
