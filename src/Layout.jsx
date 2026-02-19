@@ -24,6 +24,7 @@ const navItems = [
   { name: 'Clientes', page: 'Clientes', icon: Building2 },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
+  { name: 'Alertas', page: 'Alertas', icon: Bell },
 ];
 
 // Pages shown in the bottom bar on mobile
