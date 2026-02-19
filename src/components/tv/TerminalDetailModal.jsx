@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -8,20 +8,22 @@ import {
   WifiOff,
   MapPin,
   Building2,
-  Globe,
   Server,
   Clock,
   Activity,
   AlertTriangle,
   CheckCircle,
   Network,
-  Hash,
+  FileText,
   Zap,
-  FileText
+  RefreshCw,
+  CalendarClock
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 import StatusBadge from '../dashboard/StatusBadge';
+import ScheduleCheckModal from './ScheduleCheckModal';
 
 const formatTimeSince = (seconds) => {
   if (!seconds || seconds < 0) return '—';
