@@ -44,6 +44,30 @@ const InfoRow = ({ icon: Icon, label, value, mono }) => (
 );
 
 export default function TerminalDetailModal({ terminal, onClose }) {
+  const queryClient = useQueryClient();
+  const [isPinging, setIsPinging] = useState(false);
+  const [pingResult, setPingResult] = useState(null);
+  const [showSchedule, setShowSchedule] = useState(false);
+
+  const handlePing = async () => {
+    setIsPinging(true);
+    setPingResult(null);
+    try {
+      const res = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
+      const data = res.data;
+      setPingResult({ success: data.success, status: data.status, latencia: data.latencia, error: data.error });
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ['terminals'] });
+      queryClient.invalidateQueries({ queryKey: ['terminals-tv'] });
+      queryClient.invalidateQueries({ queryKey: ['terminal-history', terminal.id] });
+      queryClient.invalidateQueries({ queryKey: ['terminal-incidents', terminal.id] });
+    } catch (e) {
+      setPingResult({ success: false, error: e.message });
+    } finally {
+      setIsPinging(false);
+    }
+  };
+
   // Fetch status history for this terminal
   const { data: history = [] } = useQuery({
     queryKey: ['terminal-history', terminal.id],
