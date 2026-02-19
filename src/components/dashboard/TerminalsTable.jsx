@@ -153,13 +153,31 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
                     }
                   </td>
                   <td className={cn(
-                    "text-right font-mono",
-                    compact ? "px-4 py-3 text-sm" : "px-6 py-4",
-                    terminal.status === 'offline' ? 'text-red-600 font-semibold' : 'text-slate-500'
+                   "text-right font-mono",
+                   compact ? "px-4 py-3 text-sm" : "px-6 py-4",
+                   terminal.status === 'offline' ? 'text-red-600 font-semibold' : 'text-slate-500'
                   )}>
-                    {formatTimeSince(terminal.segundos_sem_ping)}
+                   {formatTimeSince(terminal.segundos_sem_ping)}
                   </td>
-                </motion.tr>
+                  <td className={cn(
+                   "text-center",
+                   compact ? "px-4 py-3" : "px-6 py-4"
+                  )}>
+                   <button
+                     onClick={(e) => handlePing(e, terminal)}
+                     disabled={pingingId === terminal.id}
+                     title="Verificar agora"
+                     className={cn(
+                       "inline-flex items-center justify-center w-7 h-7 rounded-lg transition-colors",
+                       pingingId === terminal.id
+                         ? "bg-yellow-100 text-yellow-400 cursor-wait"
+                         : "bg-slate-100 hover:bg-yellow-100 text-slate-400 hover:text-yellow-600"
+                     )}
+                   >
+                     <Zap className={cn("h-3.5 w-3.5", pingingId === terminal.id && "animate-pulse")} />
+                   </button>
+                  </td>
+                  </motion.tr>
               ))}
             </AnimatePresence>
           </tbody>
