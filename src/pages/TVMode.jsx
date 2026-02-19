@@ -40,7 +40,7 @@ export default function TVMode() {
     try {
       const saved = localStorage.getItem('tv-settings');
       return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
-    } catch { return DEFAULT_SETTINGS; }
+    } catch (e) { return DEFAULT_SETTINGS; }
   });
 
   const handleSettingsChange = (newSettings) => {
