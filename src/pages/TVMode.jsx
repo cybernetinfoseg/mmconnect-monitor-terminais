@@ -50,6 +50,15 @@ export default function TVMode() {
     refetchInterval: 10000,
   });
 
+  // Apply filters
+  const terminals = useMemo(() => {
+    return allTerminals.filter(t => {
+      if (localFilter && t.local !== localFilter) return false;
+      if (clienteFilter && t.cliente_nome !== clienteFilter && t.cliente !== clienteFilter) return false;
+      return true;
+    });
+  }, [allTerminals, localFilter, clienteFilter]);
+
   // Sort terminals - offline first, then by time without ping
   const sortedTerminals = useMemo(() => {
     return [...terminals].sort((a, b) => {
