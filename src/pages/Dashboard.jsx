@@ -104,6 +104,12 @@ export default function Dashboard() {
     };
   }, [filteredTerminals]);
 
+  // Sync filters to localStorage so TV Mode mirrors them in real-time
+  useEffect(() => {
+    const filters = { local: localFilter, cliente: clienteFilter, status: statusFilter, sort: sortBy };
+    localStorage.setItem('dashboard-filters', JSON.stringify(filters));
+  }, [localFilter, clienteFilter, statusFilter, sortBy]);
+
   const handlePullRefresh = async () => {
     await refetch();
     setLastRefresh(new Date());
