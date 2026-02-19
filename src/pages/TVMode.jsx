@@ -168,6 +168,14 @@ export default function TVMode() {
               <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
               Atualizar
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSettings(true)}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
             <LiveClock />
           </div>
         </div>
