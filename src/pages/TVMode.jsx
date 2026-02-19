@@ -20,9 +20,33 @@ import TVSettingsPanel from '../components/tv/TVSettingsPanel';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 
+const DEFAULT_SETTINGS = {
+  gridCols: 'auto',
+  cardSize: 'md',
+  onlyOffline: false,
+  showLocal: true,
+  showCliente: true,
+  showLastPing: true,
+  showLatencia: false,
+  showKPIs: true,
+  showAlertBanner: true,
+};
+
 export default function TVMode() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTerminal, setSelectedTerminal] = useState(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [tvSettings, setTvSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('tv-settings');
+      return saved ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) } : DEFAULT_SETTINGS;
+    } catch { return DEFAULT_SETTINGS; }
+  });
+
+  const handleSettingsChange = (newSettings) => {
+    setTvSettings(newSettings);
+    localStorage.setItem('tv-settings', JSON.stringify(newSettings));
+  };
 
   // Read filters from URL params
   const urlParams = new URLSearchParams(window.location.search);
