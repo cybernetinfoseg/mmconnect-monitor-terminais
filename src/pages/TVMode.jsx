@@ -220,88 +220,108 @@ export default function TVMode() {
       {/* Main Content */}
       <div className="p-4 sm:p-8">
         {/* Alert Banner */}
-        <AnimatePresence>
-          {hasActiveAlerts && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-6"
-            >
-              <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
-                <div className="flex items-center gap-4">
-                  <AlertTriangle className="h-6 w-6 text-red-400 animate-pulse" />
-                  <div className="flex-1">
-                    <p className="text-red-400 font-semibold">Incidentes Ativos</p>
-                    <p className="text-sm text-red-400/70">
-                      {alerts.filter(a => !a.resolvido).length} terminal(is) offline requerem atenção
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Terminals Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
-          <AnimatePresence mode="popLayout">
-            {sortedTerminals.map((terminal, index) => (
+        {tvSettings.showAlertBanner && (
+          <AnimatePresence>
+            {hasActiveAlerts && (
               <motion.div
-                key={terminal.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ delay: index * 0.02 }}
-                onClick={() => setSelectedTerminal(terminal)}
-                className={cn(
-                  "cursor-pointer",
-                  "relative overflow-hidden rounded-2xl p-5 transition-all duration-300",
-                  terminal.status === 'offline'
-                    ? "bg-red-500/10 border border-red-500/30"
-                    : "bg-slate-800/50 border border-slate-700/50 hover:border-slate-600/50"
-                )}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-6"
               >
-                {/* Pulse effect for offline */}
-                {terminal.status === 'offline' && (
-                  <motion.div
-                    className="absolute inset-0 bg-red-500/5"
-                    animate={{ opacity: [0.5, 0, 0.5] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  />
-                )}
-                
-                <div className="relative">
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-lg font-bold text-white truncate flex-1 mr-2">
-                      {terminal.nome}
-                    </h3>
-                    <StatusBadge status={terminal.status} />
-                  </div>
-                  
-                  <div className="space-y-1.5 text-sm">
-                    <p className="text-slate-400 truncate">
-                      <span className="text-slate-500">Local:</span> {terminal.local}
-                    </p>
-                    <p className="text-slate-400 truncate">
-                      <span className="text-slate-500">Cliente:</span> {terminal.cliente}
-                    </p>
-                  </div>
-                  
-                  <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between">
-                    <span className="text-xs text-slate-500">Último ping</span>
-                    <span className={cn(
-                      "text-sm font-mono",
-                      terminal.status === 'offline' ? "text-red-400 font-semibold" : "text-slate-400"
-                    )}>
-                      {formatTimeSince(terminal.segundos_sem_ping)}
-                    </span>
+                <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
+                  <div className="flex items-center gap-4">
+                    <AlertTriangle className="h-6 w-6 text-red-400 animate-pulse" />
+                    <div className="flex-1">
+                      <p className="text-red-400 font-semibold">Incidentes Ativos</p>
+                      <p className="text-sm text-red-400/70">
+                        {alerts.filter(a => !a.resolvido).length} terminal(is) offline requerem atenção
+                      </p>
+                    </div>
                   </div>
                 </div>
               </motion.div>
-            ))}
+            )}
           </AnimatePresence>
-        </div>
+        )}
+
+        {/* Terminals Grid */}
+        {(() => {
+          const cols = tvSettings.gridCols;
+          const gridClass = cols === 'auto'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+            : `grid-cols-${cols}`;
+          const cardPad = tvSettings.cardSize === 'sm' ? 'p-3' : tvSettings.cardSize === 'lg' ? 'p-7' : 'p-5';
+          const titleSize = tvSettings.cardSize === 'sm' ? 'text-base' : tvSettings.cardSize === 'lg' ? 'text-2xl' : 'text-lg';
+
+          return (
+            <div className={cn('grid gap-3 sm:gap-4', gridClass)}>
+              <AnimatePresence mode="popLayout">
+                {sortedTerminals.map((terminal, index) => (
+                  <motion.div
+                    key={terminal.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ delay: index * 0.02 }}
+                    onClick={() => setSelectedTerminal(terminal)}
+                    className={cn(
+                      "cursor-pointer relative overflow-hidden rounded-2xl transition-all duration-300",
+                      cardPad,
+                      terminal.status === 'offline'
+                        ? "bg-red-500/10 border border-red-500/30"
+                        : "bg-slate-800/50 border border-slate-700/50 hover:border-slate-600/50"
+                    )}
+                  >
+                    {terminal.status === 'offline' && (
+                      <motion.div
+                        className="absolute inset-0 bg-red-500/5"
+                        animate={{ opacity: [0.5, 0, 0.5] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    )}
+                    <div className="relative">
+                      <div className="flex items-start justify-between mb-3">
+                        <h3 className={cn("font-bold text-white truncate flex-1 mr-2", titleSize)}>
+                          {terminal.nome}
+                        </h3>
+                        <StatusBadge status={terminal.status} />
+                      </div>
+                      <div className="space-y-1.5 text-sm">
+                        {tvSettings.showLocal !== false && (
+                          <p className="text-slate-400 truncate">
+                            <span className="text-slate-500">Local:</span> {terminal.local}
+                          </p>
+                        )}
+                        {tvSettings.showCliente !== false && (
+                          <p className="text-slate-400 truncate">
+                            <span className="text-slate-500">Cliente:</span> {terminal.cliente_nome || terminal.cliente}
+                          </p>
+                        )}
+                        {tvSettings.showLatencia && terminal.latencia_ms && (
+                          <p className="text-slate-400 truncate">
+                            <span className="text-slate-500">Latência:</span> {terminal.latencia_ms}ms
+                          </p>
+                        )}
+                      </div>
+                      {tvSettings.showLastPing !== false && (
+                        <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between">
+                          <span className="text-xs text-slate-500">Último ping</span>
+                          <span className={cn(
+                            "text-sm font-mono",
+                            terminal.status === 'offline' ? "text-red-400 font-semibold" : "text-slate-400"
+                          )}>
+                            {formatTimeSince(terminal.segundos_sem_ping)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          );
+        })()}
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500 text-sm">
@@ -314,6 +334,15 @@ export default function TVMode() {
         <TerminalDetailModal
           terminal={selectedTerminal}
           onClose={() => setSelectedTerminal(null)}
+        />
+      )}
+
+      {/* TV Settings Panel */}
+      {showSettings && (
+        <TVSettingsPanel
+          settings={tvSettings}
+          onChange={handleSettingsChange}
+          onClose={() => setShowSettings(false)}
         />
       )}
     </div>
