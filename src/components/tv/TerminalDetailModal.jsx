@@ -148,8 +148,30 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                 <p className="text-xs text-slate-400 truncate">{terminal.local}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <StatusBadge status={terminal.status} pulse />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handlePing}
+                disabled={isPinging}
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
+              >
+                {isPinging
+                  ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  : <Zap className="h-3.5 w-3.5 text-yellow-400" />
+                }
+                <span className="hidden sm:inline">{isPinging ? 'A verificar...' : 'Verificar'}</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowSchedule(true)}
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
+              >
+                <CalendarClock className="h-3.5 w-3.5 text-blue-400" />
+                <span className="hidden sm:inline">Agendar</span>
+              </Button>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
