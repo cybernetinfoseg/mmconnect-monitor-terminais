@@ -9,12 +9,14 @@ import {
   Activity,
   AlertTriangle,
   CheckCircle,
-  RefreshCw
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatusBadge from '../components/dashboard/StatusBadge';
 import LiveClock from '../components/dashboard/LiveClock';
 import TerminalDetailModal from '../components/tv/TerminalDetailModal';
+import TVSettingsPanel from '../components/tv/TVSettingsPanel';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 

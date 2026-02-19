@@ -27,6 +27,8 @@ import PullToRefresh from '../components/dashboard/PullToRefresh';
 export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
   const [clienteFilter, setClienteFilter] = useState(null);
+  const [statusFilter, setStatusFilter] = useState(null);
+  const [sortBy, setSortBy] = useState('status');
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isMonitoring, setIsMonitoring] = useState(false);
 
