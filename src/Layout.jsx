@@ -147,7 +147,7 @@ export default function Layout({ children, currentPageName }) {
       </header>
 
       {/* Main Content */}
-      <main className="lg:pl-64 min-h-screen overflow-x-hidden">
+      <main className="lg:pl-64 min-h-screen">
         {/* Desktop: no animation */}
         <div className="hidden lg:block pt-0 pb-0">
           {children}
