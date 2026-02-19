@@ -107,7 +107,14 @@ export default function TVMode() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">NOC Monitor</h1>
-                <p className="text-sm text-slate-400">Terminais Biométricos • Modo TV</p>
+                <p className="text-sm text-slate-400">
+                  Terminais Biométricos • Modo TV
+                  {(localFilter || clienteFilter) && (
+                    <span className="ml-2 text-emerald-400">
+                      {[localFilter, clienteFilter].filter(Boolean).join(' • ')}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
             
