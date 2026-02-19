@@ -1,12 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Monitor, MapPin, Building2, Clock, AlertTriangle } from 'lucide-react';
+import { Monitor, MapPin, Building2, Clock, AlertTriangle, Zap } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import MonitorStatus from './MonitorStatus';
 import { cn } from '@/lib/utils';
+import { base44 } from '@/api/base44Client';
+import { useQueryClient } from '@tanstack/react-query';
 import moment from 'moment';
 
 export default function TerminalsTable({ terminals, maxRows = 15, compact = false }) {
+  const queryClient = useQueryClient();
+  const [pingingId, setPingingId] = useState(null);
+
+  const handlePing = async (e, terminal) => {
+    e.stopPropagation();
+    if (pingingId) return;
+    setPingingId(terminal.id);
+    try {
+      await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
+      queryClient.invalidateQueries({ queryKey: ['terminals'] });
+    } finally {
+      setPingingId(null);
+    }
+  };
   const sortedTerminals = [...terminals].sort((a, b) => {
     if (a.status !== b.status) {
       return a.status === 'offline' ? -1 : 1;
