@@ -10,7 +10,8 @@ import {
   Tv,
   Menu,
   Building2,
-  ChevronLeft
+  ChevronLeft,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
