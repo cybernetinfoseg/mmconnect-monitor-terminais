@@ -184,6 +184,39 @@ export default function TerminalDetailModal({ terminal, onClose }) {
           {/* Body */}
           <div className="overflow-y-auto flex-1 p-5 space-y-5">
 
+            {/* Ping Result */}
+            <AnimatePresence>
+              {pingResult && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className={cn(
+                    "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium",
+                    pingResult.status === 'online'
+                      ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+                      : "bg-red-500/15 border border-red-500/30 text-red-300"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {pingResult.status === 'online'
+                      ? <CheckCircle className="h-4 w-4" />
+                      : <WifiOff className="h-4 w-4" />
+                    }
+                    <span>
+                      {pingResult.status === 'online'
+                        ? `Online • ${pingResult.latencia}ms de latência`
+                        : `Offline${pingResult.error ? ` • ${pingResult.error}` : ''}`
+                      }
+                    </span>
+                  </div>
+                  <button onClick={() => setPingResult(null)} className="text-slate-400 hover:text-white">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Quick Stats */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-slate-800/60 rounded-xl p-3 text-center">
