@@ -37,6 +37,7 @@ export default function Clientes() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState(null);
   const [formData, setFormData] = useState({});
+  const [viewingTerminaisCliente, setViewingTerminaisCliente] = useState(null);
   
   const queryClient = useQueryClient();
 
