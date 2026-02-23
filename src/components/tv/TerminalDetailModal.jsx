@@ -322,13 +322,7 @@ export default function TerminalDetailModal({ terminal, onClose }) {
         </motion.div>
       </motion.div>
 
-      {/* Schedule Modal */}
-      {showSchedule && (
-        <ScheduleCheckModal
-          terminal={terminal}
-          onClose={() => setShowSchedule(false)}
-        />
-      )}
+
     </AnimatePresence>
   );
 }
