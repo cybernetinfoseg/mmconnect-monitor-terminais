@@ -68,7 +68,7 @@ export default function Dashboard() {
   );
 
   const clientes = useMemo(() => 
-    [...new Set(terminals.map(t => t.cliente).filter(Boolean))].sort(),
+    [...new Set(terminals.map(t => t.cliente_nome || t.cliente).filter(Boolean))].sort(),
     [terminals]
   );
 
