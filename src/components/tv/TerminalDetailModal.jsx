@@ -46,8 +46,6 @@ export default function TerminalDetailModal({ terminal, onClose }) {
   const queryClient = useQueryClient();
   const [isPinging, setIsPinging] = useState(false);
   const [pingResult, setPingResult] = useState(null);
-  const [showSchedule, setShowSchedule] = useState(false);
-
   const handlePing = async () => {
     setIsPinging(true);
     setPingResult(null);
