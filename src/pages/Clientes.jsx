@@ -301,6 +301,11 @@ export default function Clientes() {
         )}
       </div>
 
+      <ClienteTerminaisModal
+        cliente={viewingTerminaisCliente}
+        onClose={() => setViewingTerminaisCliente(null)}
+      />
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
