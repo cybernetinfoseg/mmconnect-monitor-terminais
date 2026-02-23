@@ -10,8 +10,12 @@ import {
   Search,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  Monitor,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
+import ClienteTerminaisModal from '../components/clientes/ClienteTerminaisModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
