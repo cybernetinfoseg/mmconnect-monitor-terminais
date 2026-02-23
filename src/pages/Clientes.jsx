@@ -212,6 +212,32 @@ export default function Clientes() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-2">
+                    {/* Terminal counts */}
+                    {(() => {
+                      const counts = terminalCountsByCliente[cliente.nome] || { total: 0, online: 0, offline: 0 };
+                      return (
+                        <button
+                          onClick={() => setViewingTerminaisCliente(cliente)}
+                          className="w-full flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors border border-slate-100"
+                        >
+                          <Monitor className="h-4 w-4 text-blue-500 shrink-0" />
+                          <span className="text-xs font-semibold text-slate-600">{counts.total} terminais</span>
+                          {counts.total > 0 && (
+                            <>
+                              <span className="ml-auto flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                <Wifi className="h-3 w-3" />{counts.online}
+                              </span>
+                              {counts.offline > 0 && (
+                                <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
+                                  <WifiOff className="h-3 w-3" />{counts.offline}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </button>
+                      );
+                    })()}
+
                     {cliente.cnpj && (
                       <div className="text-sm text-slate-600">
                         <span className="text-slate-500">CNPJ:</span> {cliente.cnpj}
