@@ -160,15 +160,6 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                 }
                 <span className="hidden sm:inline">{isPinging ? 'A verificar...' : 'Verificar'}</span>
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowSchedule(true)}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
-              >
-                <CalendarClock className="h-3.5 w-3.5 text-blue-400" />
-                <span className="hidden sm:inline">Agendar</span>
-              </Button>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
