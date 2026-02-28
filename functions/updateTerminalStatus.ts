@@ -1,55 +1,47 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// Aceita requisições do monitor local Python via API Key
 Deno.serve(async (req) => {
     try {
+        // Validar API Key do script Python local
         const apiKey = req.headers.get('X-Monitor-API-Key');
-        const expectedKey = Deno.env.get('API_KEY');
-
+        const expectedKey = Deno.env.get('MONITOR_API_KEY');
+        
         if (!apiKey || apiKey !== expectedKey) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 });
+            return Response.json({ error: 'Unauthorized - Invalid API Key' }, { status: 401 });
         }
 
+        const base44 = createClientFromRequest(req);
         const { terminalId, status, latencia, errorMsg } = await req.json();
-
+        
         if (!terminalId || !status) {
             return Response.json({ error: 'terminalId e status são obrigatórios' }, { status: 400 });
         }
 
-        if (!['online', 'offline'].includes(status)) {
-            return Response.json({ error: 'status deve ser "online" ou "offline"' }, { status: 400 });
-        }
-
-        const base44 = createClientFromRequest(req);
+        // Buscar terminal
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminalId);
-
+        
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
         }
 
         const agora = new Date();
-
-        // Buscar cache para verificar mudanças de status
-        const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminalId });
-        const cache = cacheResults.length > 0 ? cacheResults[0] : null;
-        const statusAnterior = cache?.ultimo_status ?? null;
-
-        // Calcular segundos sem ping
-        const segundosSemPing = status === 'online' ? 0 :
+        const segundosSemPing = status === 'online' ? 0 : 
             (terminal.ultimo_ping ? Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000) : 999999);
 
-        // Atualizar terminal diretamente com o status reportado pelo Python
-        // (o anti-flap já está no script Python - não duplicar aqui)
+        // Atualizar terminal
         await base44.asServiceRole.entities.Terminal.update(terminalId, {
-            status: status,
+            status,
             ultimo_check: agora.toISOString(),
-            latencia_ms: latencia ?? null,
+            latencia_ms: latencia || null,
             segundos_sem_ping: segundosSemPing,
             ...(status === 'online' && { ultimo_ping: agora.toISOString() })
         });
 
-        // Criar incidente apenas quando há mudança real de status
-        if (statusAnterior === 'online' && status === 'offline') {
+        // Verificar mudança de status para criar alerta
+        const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminalId });
+        const cache = cacheResults.length > 0 ? cacheResults[0] : null;
+
+        if (cache && cache.ultimo_status === 'online' && status === 'offline') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id: terminalId,
                 terminal_nome: terminal.nome,
@@ -60,7 +52,7 @@ Deno.serve(async (req) => {
                 resolvido: false,
                 notificado: false
             });
-        } else if (statusAnterior === 'offline' && status === 'online') {
+        } else if (cache && cache.ultimo_status === 'offline' && status === 'online') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id: terminalId,
                 terminal_nome: terminal.nome,
@@ -77,15 +69,13 @@ Deno.serve(async (req) => {
         if (cache) {
             await base44.asServiceRole.entities.StatusCache.update(cache.id, {
                 ultimo_status: status,
-                atualizado_em: agora.toISOString(),
-                falhas_consecutivas: 0
+                atualizado_em: agora.toISOString()
             });
         } else {
             await base44.asServiceRole.entities.StatusCache.create({
                 terminal_id: terminalId,
                 ultimo_status: status,
-                atualizado_em: agora.toISOString(),
-                falhas_consecutivas: 0
+                atualizado_em: agora.toISOString()
             });
         }
 
@@ -99,17 +89,17 @@ Deno.serve(async (req) => {
             cliente: terminal.cliente_nome
         });
 
-        console.log(`[LocalMonitor] ${terminal.nome}: ${status.toUpperCase()}${latencia ? ` (${latencia}ms)` : ''}`);
-
         return Response.json({
             success: true,
             terminal: terminal.nome,
-            status,
-            latencia: latencia ?? null
+            status
         });
 
     } catch (error) {
-        console.error('Erro updateTerminalStatus:', error);
-        return Response.json({ success: false, error: error.message }, { status: 500 });
+        console.error('Erro ao atualizar status:', error);
+        return Response.json({ 
+            success: false, 
+            error: error.message 
+        }, { status: 500 });
     }
 });

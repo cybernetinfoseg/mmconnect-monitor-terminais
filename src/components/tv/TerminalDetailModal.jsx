@@ -55,15 +55,12 @@ export default function TerminalDetailModal({ terminal, onClose }) {
     try {
       const res = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
       const data = res.data;
-      if (data?.error === 'ip_local_only') {
-        setPingResult({ ip_local_only: true });
-      } else {
-        setPingResult({ success: data.success, status: data.status, latencia: data.latencia, error: data.error });
-        queryClient.invalidateQueries({ queryKey: ['terminals'] });
-        queryClient.invalidateQueries({ queryKey: ['terminals-tv'] });
-        queryClient.invalidateQueries({ queryKey: ['terminal-history', terminal.id] });
-        queryClient.invalidateQueries({ queryKey: ['terminal-incidents', terminal.id] });
-      }
+      setPingResult({ success: data.success, status: data.status, latencia: data.latencia, error: data.error });
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ['terminals'] });
+      queryClient.invalidateQueries({ queryKey: ['terminals-tv'] });
+      queryClient.invalidateQueries({ queryKey: ['terminal-history', terminal.id] });
+      queryClient.invalidateQueries({ queryKey: ['terminal-incidents', terminal.id] });
     } catch (e) {
       setPingResult({ success: false, error: e.message });
     } finally {
@@ -153,21 +150,19 @@ export default function TerminalDetailModal({ terminal, onClose }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <StatusBadge status={terminal.status} pulse />
-              {terminal.tipo_conexao !== 'ip_local' && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handlePing}
-                  disabled={isPinging}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
-                >
-                  {isPinging
-                    ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    : <Zap className="h-3.5 w-3.5 text-yellow-400" />
-                  }
-                  <span className="hidden sm:inline">{isPinging ? 'A verificar...' : 'Verificar'}</span>
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handlePing}
+                disabled={isPinging}
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
+              >
+                {isPinging
+                  ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  : <Zap className="h-3.5 w-3.5 text-yellow-400" />
+                }
+                <span className="hidden sm:inline">{isPinging ? 'A verificar...' : 'Verificar'}</span>
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -198,26 +193,20 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                   exit={{ opacity: 0, height: 0 }}
                   className={cn(
                     "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium",
-                    pingResult.ip_local_only
-                      ? "bg-yellow-500/15 border border-yellow-500/30 text-yellow-300"
-                      : pingResult.status === 'online'
-                        ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-                        : "bg-red-500/15 border border-red-500/30 text-red-300"
+                    pingResult.status === 'online'
+                      ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+                      : "bg-red-500/15 border border-red-500/30 text-red-300"
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    {pingResult.ip_local_only
-                      ? <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                      : pingResult.status === 'online'
-                        ? <CheckCircle className="h-4 w-4" />
-                        : <WifiOff className="h-4 w-4" />
+                    {pingResult.status === 'online'
+                      ? <CheckCircle className="h-4 w-4" />
+                      : <WifiOff className="h-4 w-4" />
                     }
                     <span>
-                      {pingResult.ip_local_only
-                        ? 'IP Local só pode ser verificado pelo Monitor Local (script Python na sua rede)'
-                        : pingResult.status === 'online'
-                          ? `Online • ${pingResult.latencia}ms de latência`
-                          : `Offline${pingResult.error ? ` • ${pingResult.error}` : ''}`
+                      {pingResult.status === 'online'
+                        ? `Online • ${pingResult.latencia}ms de latência`
+                        : `Offline${pingResult.error ? ` • ${pingResult.error}` : ''}`
                       }
                     </span>
                   </div>

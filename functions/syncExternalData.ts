@@ -3,6 +3,12 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
+        const user = await base44.auth.me();
+        
+        // Apenas admin pode executar sincronização
+        if (user?.role !== 'admin') {
+            return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+        }
 
         // Buscar configurações ativas
         const configs = await base44.asServiceRole.entities.MonitorConfig.filter({ ativo: true });

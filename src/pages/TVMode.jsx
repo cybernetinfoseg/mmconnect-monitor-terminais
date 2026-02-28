@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -48,29 +48,10 @@ export default function TVMode() {
     localStorage.setItem('tv-settings', JSON.stringify(newSettings));
   };
 
-  // Mirror filters from Dashboard via localStorage (updates every 2s)
-  const [mirrorFilters, setMirrorFilters] = useState(() => {
-    try {
-      const saved = localStorage.getItem('dashboard-filters');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) { return {}; }
-  });
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      try {
-        const saved = localStorage.getItem('dashboard-filters');
-        if (saved) setMirrorFilters(JSON.parse(saved));
-      } catch (e) {}
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // URL params override localStorage
+  // Read filters from URL params
   const urlParams = new URLSearchParams(window.location.search);
-  const localFilter = urlParams.get('local') || mirrorFilters.local || null;
-  const clienteFilter = urlParams.get('cliente') || mirrorFilters.cliente || null;
-  const statusFilterMirror = mirrorFilters.status || null;
+  const localFilter = urlParams.get('local') || null;
+  const clienteFilter = urlParams.get('cliente') || null;
 
   // Fetch terminals with auto-refresh every 5 seconds
   const { data: allTerminals = [], refetch } = useQuery({
@@ -102,7 +83,6 @@ export default function TVMode() {
     return allTerminals.filter(t => {
       if (localFilter && t.local !== localFilter) return false;
       if (clienteFilter && t.cliente_nome !== clienteFilter && t.cliente !== clienteFilter) return false;
-      if (statusFilterMirror && t.status !== statusFilterMirror) return false;
       if (tvSettings.onlyOffline && t.status !== 'offline') return false;
       return true;
     });
@@ -308,39 +288,17 @@ export default function TVMode() {
                         <StatusBadge status={terminal.status} />
                       </div>
                       <div className="space-y-1.5 text-sm">
-                        {tvSettings.showLocal !== false && terminal.local && (
+                        {tvSettings.showLocal !== false && (
                           <p className="text-slate-400 truncate">
                             <span className="text-slate-500">Local:</span> {terminal.local}
                           </p>
                         )}
-                        {tvSettings.showCliente !== false && (terminal.cliente_nome || terminal.cliente) && (
+                        {tvSettings.showCliente !== false && (
                           <p className="text-slate-400 truncate">
                             <span className="text-slate-500">Cliente:</span> {terminal.cliente_nome || terminal.cliente}
                           </p>
                         )}
-                        {/* Informação de conexão */}
-                        {terminal.tipo_conexao === 'ip_local' && terminal.ip_local && (
-                          <p className="text-slate-500 font-mono text-xs truncate mt-1">
-                            📡 {terminal.ip_local}:{terminal.porta || 5005}
-                            <span className="ml-1 text-blue-400/60 not-italic font-sans">(local)</span>
-                          </p>
-                        )}
-                        {terminal.tipo_conexao === 'ip_publico' && terminal.ip_publico && (
-                          <p className="text-slate-500 font-mono text-xs truncate mt-1">
-                            🌐 {terminal.ip_publico}:{terminal.porta || 5005}
-                          </p>
-                        )}
-                        {terminal.tipo_conexao === 'dns' && terminal.dns && (
-                          <p className="text-slate-500 font-mono text-xs truncate mt-1">
-                            🔗 {terminal.dns}:{terminal.porta || 5005}
-                          </p>
-                        )}
-                        {terminal.tipo_conexao === 'api' && terminal.api_endpoint && (
-                          <p className="text-slate-500 font-mono text-xs truncate mt-1">
-                            🔧 {terminal.api_endpoint}
-                          </p>
-                        )}
-                        {tvSettings.showLatencia && terminal.latencia_ms != null && (
+                        {tvSettings.showLatencia && terminal.latencia_ms && (
                           <p className="text-slate-400 truncate">
                             <span className="text-slate-500">Latência:</span> {terminal.latencia_ms}ms
                           </p>
@@ -353,10 +311,7 @@ export default function TVMode() {
                             "text-sm font-mono",
                             terminal.status === 'offline' ? "text-red-400 font-semibold" : "text-slate-400"
                           )}>
-                            {terminal.ultimo_ping ? moment(terminal.ultimo_ping).format('HH:mm:ss') : '—'}
-                            {terminal.segundos_sem_ping > 0 && (
-                              <span className="ml-1 text-xs text-slate-500">({formatTimeSince(terminal.segundos_sem_ping)})</span>
-                            )}
+                            {formatTimeSince(terminal.segundos_sem_ping)}
                           </span>
                         </div>
                       )}
