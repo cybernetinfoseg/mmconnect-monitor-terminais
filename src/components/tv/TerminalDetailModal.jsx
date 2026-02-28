@@ -202,14 +202,18 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    {pingResult.status === 'online'
-                      ? <CheckCircle className="h-4 w-4" />
-                      : <WifiOff className="h-4 w-4" />
+                    {pingResult.ip_local_only
+                      ? <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                      : pingResult.status === 'online'
+                        ? <CheckCircle className="h-4 w-4" />
+                        : <WifiOff className="h-4 w-4" />
                     }
                     <span>
-                      {pingResult.status === 'online'
-                        ? `Online • ${pingResult.latencia}ms de latência`
-                        : `Offline${pingResult.error ? ` • ${pingResult.error}` : ''}`
+                      {pingResult.ip_local_only
+                        ? 'IP Local só pode ser verificado pelo Monitor Local (script Python na sua rede)'
+                        : pingResult.status === 'online'
+                          ? `Online • ${pingResult.latencia}ms de latência`
+                          : `Offline${pingResult.error ? ` • ${pingResult.error}` : ''}`
                       }
                     </span>
                   </div>
