@@ -70,7 +70,7 @@ export const PAGES = {
 }
 
 export const pagesConfig = {
-    mainPage: "TVMode",
+    mainPage: "Alertas",
     Pages: PAGES,
     Layout: __Layout,
 };
