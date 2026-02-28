@@ -68,7 +68,6 @@ Deno.serve(async (req) => {
       }
 
       if (shouldFire) {
-        // Send email
         const emails = rule.destinatarios_email.split(',').map(e => e.trim()).filter(Boolean);
         for (const email of emails) {
           await base44.asServiceRole.integrations.Core.SendEmail({
