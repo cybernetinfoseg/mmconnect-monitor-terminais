@@ -55,12 +55,15 @@ export default function TerminalDetailModal({ terminal, onClose }) {
     try {
       const res = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
       const data = res.data;
-      setPingResult({ success: data.success, status: data.status, latencia: data.latencia, error: data.error });
-      // Refresh queries
-      queryClient.invalidateQueries({ queryKey: ['terminals'] });
-      queryClient.invalidateQueries({ queryKey: ['terminals-tv'] });
-      queryClient.invalidateQueries({ queryKey: ['terminal-history', terminal.id] });
-      queryClient.invalidateQueries({ queryKey: ['terminal-incidents', terminal.id] });
+      if (data?.error === 'ip_local_only') {
+        setPingResult({ ip_local_only: true });
+      } else {
+        setPingResult({ success: data.success, status: data.status, latencia: data.latencia, error: data.error });
+        queryClient.invalidateQueries({ queryKey: ['terminals'] });
+        queryClient.invalidateQueries({ queryKey: ['terminals-tv'] });
+        queryClient.invalidateQueries({ queryKey: ['terminal-history', terminal.id] });
+        queryClient.invalidateQueries({ queryKey: ['terminal-incidents', terminal.id] });
+      }
     } catch (e) {
       setPingResult({ success: false, error: e.message });
     } finally {
