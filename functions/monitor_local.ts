@@ -2,6 +2,11 @@
 """
 Monitor Local de Terminais - NOC Monitor Base44
 Roda na rede local e reporta o status dos terminais para o Base44.
+
+MELHORIAS ANTI-FLAP:
+- Um terminal só é marcado offline após N falhas consecutivas (OFFLINE_THRESHOLD)
+- Ao voltar online, reporta imediatamente
+- Retries na conexão TCP antes de considerar falha
 """
 
 import socket
@@ -15,8 +20,7 @@ APP_ID = "697aa46c9998c30665e2e19a"
 MONITOR_API_KEY = "!Uolcor20"  # Substitua pelo valor do secret API_KEY no Base44
 
 # URLs das funções backend
-APP_NAME = "terminais"  # ex: "noc-monitor"
-BASE_URL = f"https://app--{APP_NAME}.base44.app/api/apps/{APP_ID}/functions"
+BASE_URL = f"https://app--{APP_ID}.base44.app/api/apps/{APP_ID}/functions"
 GET_TERMINALS_URL = f"{BASE_URL}/getLocalTerminals"
 UPDATE_STATUS_URL = f"{BASE_URL}/updateTerminalStatus"
 
@@ -25,6 +29,13 @@ CHECK_INTERVAL = 30
 
 # Timeout TCP padrão (segundos)
 SOCKET_TIMEOUT = 5
+
+# Quantas falhas TCP consecutivas antes de reportar offline
+OFFLINE_THRESHOLD = 3
+
+# Quantas tentativas TCP por ciclo antes de considerar falha
+TCP_RETRIES = 2
+
 # ======================================================
 
 HEADERS = {
@@ -32,29 +43,39 @@ HEADERS = {
     "X-Monitor-API-Key": MONITOR_API_KEY
 }
 
+# Estado local de falhas por terminal { terminal_id: contagem_falhas }
+falhas_consecutivas = {}
 
-def test_tcp_connection(host: str, port: int, timeout: int = SOCKET_TIMEOUT):
+
+def test_tcp_connection(host: str, port: int, timeout: int = SOCKET_TIMEOUT, retries: int = TCP_RETRIES):
     """
-    Testa conexão TCP com host:porta.
+    Testa conexão TCP com host:porta, com múltiplas tentativas.
     Retorna: (sucesso, latencia_ms, erro)
     """
-    start = time.time()
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        result = sock.connect_ex((host, port))
-        sock.close()
-        latencia = int((time.time() - start) * 1000)
-        if result == 0:
-            return True, latencia, None
-        else:
-            return False, None, f"Porta {port} fechada ou inacessível"
-    except socket.timeout:
-        return False, None, f"Timeout após {timeout}s"
-    except socket.gaierror:
-        return False, None, "Erro DNS - host não encontrado"
-    except Exception as e:
-        return False, None, str(e)
+    last_error = None
+    for attempt in range(1, retries + 1):
+        start = time.time()
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            latencia = int((time.time() - start) * 1000)
+            if result == 0:
+                return True, latencia, None
+            else:
+                last_error = f"Porta {port} fechada (tentativa {attempt}/{retries})"
+        except socket.timeout:
+            last_error = f"Timeout após {timeout}s (tentativa {attempt}/{retries})"
+        except socket.gaierror:
+            return False, None, "Erro DNS - host não encontrado"
+        except Exception as e:
+            last_error = str(e)
+
+        if attempt < retries:
+            time.sleep(1)  # Aguarda 1s entre tentativas
+
+    return False, None, last_error
 
 
 def get_local_terminals():
@@ -88,8 +109,13 @@ def update_terminal_status(terminal_id: str, status: str, latencia: Optional[int
 
 
 def monitor_terminal(terminal: dict):
-    """Monitora um terminal e envia o resultado para o Base44."""
+    """
+    Monitora um terminal com lógica anti-flap:
+    - Online: reporta imediatamente e zera contador
+    - Offline: incrementa contador, só reporta após OFFLINE_THRESHOLD falhas seguidas
+    """
     nome    = terminal.get("nome", "Desconhecido")
+    tid     = terminal.get("id")
     ip      = terminal.get("ip_local")
     porta   = terminal.get("porta", 5005)
     timeout = terminal.get("timeout_segundos", SOCKET_TIMEOUT)
@@ -102,26 +128,42 @@ def monitor_terminal(terminal: dict):
         print(f"  ⚠️  {nome}: IP local não configurado")
         return
 
-    sucesso, latencia, erro = test_tcp_connection(ip, porta, timeout)
-    status = "online" if sucesso else "offline"
+    sucesso, latencia, erro = test_tcp_connection(ip, porta, timeout, TCP_RETRIES)
 
-    ok = update_terminal_status(terminal["id"], status, latencia, erro)
-    if ok:
-        if sucesso:
+    if sucesso:
+        # Online: zera contador e reporta imediatamente
+        falhas_consecutivas[tid] = 0
+        ok = update_terminal_status(tid, "online", latencia, None)
+        if ok:
             print(f"  ✅ {nome} ({ip}:{porta}): ONLINE - {latencia}ms")
         else:
-            print(f"  ❌ {nome} ({ip}:{porta}): OFFLINE - {erro}")
+            print(f"  ⚠️  {nome}: ONLINE localmente mas falha ao enviar para Base44")
     else:
-        print(f"  ⚠️  {nome}: falha ao enviar status para o Base44")
+        # Offline: incrementa e verifica threshold
+        falhas_consecutivas[tid] = falhas_consecutivas.get(tid, 0) + 1
+        contagem = falhas_consecutivas[tid]
+
+        if contagem >= OFFLINE_THRESHOLD:
+            # Confirma offline após N falhas seguidas
+            ok = update_terminal_status(tid, "offline", None, erro)
+            if ok:
+                print(f"  ❌ {nome} ({ip}:{porta}): OFFLINE confirmado após {contagem} falhas - {erro}")
+            else:
+                print(f"  ⚠️  {nome}: OFFLINE localmente mas falha ao enviar para Base44")
+        else:
+            # Ainda aguardando confirmação - não altera status no servidor
+            print(f"  ⚠️  {nome} ({ip}:{porta}): falha #{contagem}/{OFFLINE_THRESHOLD} - aguardando confirmação ({erro})")
 
 
 def main():
     print("=" * 60)
     print("🚀 Monitor Local - NOC Monitor Base44")
     print("=" * 60)
-    print(f"  App ID   : {APP_ID}")
-    print(f"  Intervalo: {CHECK_INTERVAL}s")
-    print(f"  Timeout  : {SOCKET_TIMEOUT}s")
+    print(f"  App ID        : {APP_ID}")
+    print(f"  Intervalo     : {CHECK_INTERVAL}s")
+    print(f"  Timeout TCP   : {SOCKET_TIMEOUT}s")
+    print(f"  Retries TCP   : {TCP_RETRIES}")
+    print(f"  Threshold OFF : {OFFLINE_THRESHOLD} falhas seguidas")
     print("=" * 60)
 
     if MONITOR_API_KEY == "SUA_CHAVE_AQUI":
