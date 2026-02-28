@@ -8,21 +8,26 @@ async function checkTerminal(base44, terminal) {
     const agora = new Date();
 
     try {
-        let host = '';
         const port = terminal.porta || 5005;
+        let host = '';
 
         switch (terminal.tipo_conexao) {
-            case 'ip_local': host = terminal.ip_local; break;
+            case 'ip_local':
+                // ip_local NUNCA é checado pelo servidor - gerenciado pelo script Python local
+                // Apenas atualiza segundos_sem_ping para manter o dashboard correto
+                const segundosSemPingLocal = terminal.status === 'online' ? 
+                    Math.floor((agora - new Date(terminal.ultimo_ping || agora)) / 1000) : 
+                    (terminal.ultimo_ping ? Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000) : 999999);
+                await base44.asServiceRole.entities.Terminal.update(terminal.id, {
+                    segundos_sem_ping: terminal.status === 'online' ? segundosSemPingLocal : (terminal.segundos_sem_ping || 0),
+                    ultimo_check: agora.toISOString()
+                });
+                return { terminal_id: terminal.id, terminal_nome: terminal.nome, status: 'skipped', reason: 'ip_local - gerenciado pelo Monitor Local' };
             case 'ip_publico': host = terminal.ip_publico; break;
             case 'dns': host = terminal.dns; break;
-            case 'p2s': host = terminal.ip_local; break;
             case 'api': host = null; break;
-            default: throw new Error('Tipo de conexão não suportado');
-        }
-
-        // ip_local só pode ser monitorado pelo script Python local - nunca pelo servidor
-        if (terminal.tipo_conexao === 'ip_local') {
-            return { terminal_id: terminal.id, terminal_nome: terminal.nome, status: 'skipped', reason: 'ip_local - gerenciado pelo Monitor Local' };
+            default:
+                return { terminal_id: terminal.id, terminal_nome: terminal.nome, status: 'skipped', reason: 'tipo de conexão não suportado' };
         }
 
         if (terminal.tipo_conexao === 'api') {
@@ -59,7 +64,7 @@ async function checkTerminal(base44, terminal) {
         errorMsg = error.message;
     }
 
-    // Buscar cache
+    // Buscar cache para anti-flap (apenas terminais não-locais)
     const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminal.id });
     const cache = cacheResults.length > 0 ? cacheResults[0] : null;
 
@@ -87,8 +92,9 @@ async function checkTerminal(base44, terminal) {
         ...(status === 'online' && { ultimo_ping: agora.toISOString() })
     });
 
-    // Verificar mudança de status para criar alerta
-    if (cache && cache.ultimo_status === 'online' && statusEfetivo === 'offline') {
+    const statusAnterior = cache?.ultimo_status ?? null;
+
+    if (statusAnterior === 'online' && statusEfetivo === 'offline') {
         await base44.asServiceRole.entities.AlertIncident.create({
             terminal_id: terminal.id,
             terminal_nome: terminal.nome,
@@ -99,7 +105,7 @@ async function checkTerminal(base44, terminal) {
             resolvido: false,
             notificado: false
         });
-    } else if (cache && cache.ultimo_status === 'offline' && statusEfetivo === 'online') {
+    } else if (statusAnterior === 'offline' && statusEfetivo === 'online') {
         await base44.asServiceRole.entities.AlertIncident.create({
             terminal_id: terminal.id,
             terminal_nome: terminal.nome,
@@ -130,19 +136,18 @@ async function checkTerminal(base44, terminal) {
     await base44.asServiceRole.entities.StatusHistory.create({
         terminal_id: terminal.id,
         terminal_nome: terminal.nome,
-        status,
+        status: statusEfetivo,
         timestamp: agora.toISOString(),
         local: terminal.local,
         cliente: terminal.cliente_nome
     });
 
-    return { terminal_id: terminal.id, terminal_nome: terminal.nome, status, latencia, error: errorMsg };
+    return { terminal_id: terminal.id, terminal_nome: terminal.nome, status: statusEfetivo, latencia, error: errorMsg };
 }
 
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-
         const terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
 
         const results = [];
@@ -162,12 +167,14 @@ Deno.serve(async (req) => {
 
         const onlineCount = results.filter(r => r.status === 'online').length;
         const offlineCount = results.filter(r => r.status === 'offline').length;
+        const skippedCount = results.filter(r => r.status === 'skipped').length;
 
         return Response.json({
             success: true,
             total: terminals.length,
             online: onlineCount,
             offline: offlineCount,
+            skipped: skippedCount,
             results
         });
 

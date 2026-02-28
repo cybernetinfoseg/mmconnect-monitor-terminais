@@ -3,7 +3,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 // Aceita requisições do monitor local Python via API Key
 Deno.serve(async (req) => {
     try {
-        // Validar API Key do monitor local
         const apiKey = req.headers.get('X-Monitor-API-Key');
         const expectedKey = Deno.env.get('API_KEY');
 
@@ -33,37 +32,24 @@ Deno.serve(async (req) => {
         // Buscar cache para verificar mudanças de status
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminalId });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
+        const statusAnterior = cache?.ultimo_status ?? null;
 
-        // LÓGICA ANTI-FLAP: só marca offline após 2 falhas consecutivas
-        // Se status=offline, incrementa contador; se online, zera o contador
-        let falhasConsecutivas = cache?.falhas_consecutivas ?? 0;
-        let statusEfetivo = status;
-
-        if (status === 'offline') {
-            falhasConsecutivas += 1;
-            // Só marca como offline de verdade após 2 falhas seguidas
-            if (falhasConsecutivas < 2) {
-                statusEfetivo = cache?.ultimo_status ?? 'offline'; // mantém status anterior
-                console.log(`[LocalMonitor] ${terminal.nome}: falha #${falhasConsecutivas} - aguardando confirmação antes de marcar offline`);
-            }
-        } else {
-            falhasConsecutivas = 0; // online: zera contador
-        }
-
-        const segundosSemPing = statusEfetivo === 'online' ? 0 :
+        // Calcular segundos sem ping
+        const segundosSemPing = status === 'online' ? 0 :
             (terminal.ultimo_ping ? Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000) : 999999);
 
-        // Atualizar terminal com status efetivo
+        // Atualizar terminal diretamente com o status reportado pelo Python
+        // (o anti-flap já está no script Python - não duplicar aqui)
         await base44.asServiceRole.entities.Terminal.update(terminalId, {
-            status: statusEfetivo,
+            status: status,
             ultimo_check: agora.toISOString(),
             latencia_ms: latencia ?? null,
             segundos_sem_ping: segundosSemPing,
             ...(status === 'online' && { ultimo_ping: agora.toISOString() })
         });
 
-        // Verificar mudança de status para criar alerta/incidente
-        if (cache && cache.ultimo_status === 'online' && statusEfetivo === 'offline') {
+        // Criar incidente apenas quando há mudança real de status
+        if (statusAnterior === 'online' && status === 'offline') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id: terminalId,
                 terminal_nome: terminal.nome,
@@ -74,7 +60,7 @@ Deno.serve(async (req) => {
                 resolvido: false,
                 notificado: false
             });
-        } else if (cache && cache.ultimo_status === 'offline' && statusEfetivo === 'online') {
+        } else if (statusAnterior === 'offline' && status === 'online') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id: terminalId,
                 terminal_nome: terminal.nome,
@@ -87,19 +73,19 @@ Deno.serve(async (req) => {
             });
         }
 
-        // Atualizar cache com contador de falhas
+        // Atualizar cache
         if (cache) {
             await base44.asServiceRole.entities.StatusCache.update(cache.id, {
-                ultimo_status: statusEfetivo,
+                ultimo_status: status,
                 atualizado_em: agora.toISOString(),
-                falhas_consecutivas: falhasConsecutivas
+                falhas_consecutivas: 0
             });
         } else {
             await base44.asServiceRole.entities.StatusCache.create({
                 terminal_id: terminalId,
-                ultimo_status: statusEfetivo,
+                ultimo_status: status,
                 atualizado_em: agora.toISOString(),
-                falhas_consecutivas: falhasConsecutivas
+                falhas_consecutivas: 0
             });
         }
 
