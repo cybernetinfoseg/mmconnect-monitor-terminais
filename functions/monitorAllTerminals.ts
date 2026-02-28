@@ -20,6 +20,11 @@ async function checkTerminal(base44, terminal) {
             default: throw new Error('Tipo de conexão não suportado');
         }
 
+        // ip_local só pode ser monitorado pelo script Python local - nunca pelo servidor
+        if (terminal.tipo_conexao === 'ip_local') {
+            return { terminal_id: terminal.id, terminal_nome: terminal.nome, status: 'skipped', reason: 'ip_local - gerenciado pelo Monitor Local' };
+        }
+
         if (terminal.tipo_conexao === 'api') {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -54,11 +59,28 @@ async function checkTerminal(base44, terminal) {
         errorMsg = error.message;
     }
 
-    const segundosSemPing = status === 'online' ? 0 :
+    // Buscar cache
+    const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminal.id });
+    const cache = cacheResults.length > 0 ? cacheResults[0] : null;
+
+    // Anti-flap: só marca offline após 3 falhas consecutivas
+    let falhasConsecutivas = cache?.falhas_consecutivas ?? 0;
+    let statusEfetivo = status;
+
+    if (status === 'offline') {
+        falhasConsecutivas += 1;
+        if (falhasConsecutivas < 3) {
+            statusEfetivo = cache?.ultimo_status ?? 'offline';
+        }
+    } else {
+        falhasConsecutivas = 0;
+    }
+
+    const segundosSemPing = statusEfetivo === 'online' ? 0 :
         (terminal.ultimo_ping ? Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000) : 999999);
 
     await base44.asServiceRole.entities.Terminal.update(terminal.id, {
-        status,
+        status: statusEfetivo,
         ultimo_check: agora.toISOString(),
         latencia_ms: latencia,
         segundos_sem_ping: segundosSemPing,
@@ -66,10 +88,7 @@ async function checkTerminal(base44, terminal) {
     });
 
     // Verificar mudança de status para criar alerta
-    const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminal.id });
-    const cache = cacheResults.length > 0 ? cacheResults[0] : null;
-
-    if (cache && cache.ultimo_status === 'online' && status === 'offline') {
+    if (cache && cache.ultimo_status === 'online' && statusEfetivo === 'offline') {
         await base44.asServiceRole.entities.AlertIncident.create({
             terminal_id: terminal.id,
             terminal_nome: terminal.nome,
@@ -80,7 +99,7 @@ async function checkTerminal(base44, terminal) {
             resolvido: false,
             notificado: false
         });
-    } else if (cache && cache.ultimo_status === 'offline' && status === 'online') {
+    } else if (cache && cache.ultimo_status === 'offline' && statusEfetivo === 'online') {
         await base44.asServiceRole.entities.AlertIncident.create({
             terminal_id: terminal.id,
             terminal_nome: terminal.nome,
@@ -95,14 +114,16 @@ async function checkTerminal(base44, terminal) {
 
     if (cache) {
         await base44.asServiceRole.entities.StatusCache.update(cache.id, {
-            ultimo_status: status,
-            atualizado_em: agora.toISOString()
+            ultimo_status: statusEfetivo,
+            atualizado_em: agora.toISOString(),
+            falhas_consecutivas: falhasConsecutivas
         });
     } else {
         await base44.asServiceRole.entities.StatusCache.create({
             terminal_id: terminal.id,
-            ultimo_status: status,
-            atualizado_em: agora.toISOString()
+            ultimo_status: statusEfetivo,
+            atualizado_em: agora.toISOString(),
+            falhas_consecutivas: falhasConsecutivas
         });
     }
 
