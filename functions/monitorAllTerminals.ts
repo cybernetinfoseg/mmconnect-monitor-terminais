@@ -5,16 +5,6 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        // Se há usuário logado, verificar se é admin
-        const isAuthenticated = await base44.auth.isAuthenticated();
-        if (isAuthenticated) {
-            const user = await base44.auth.me();
-            if (user?.role !== 'admin') {
-                return Response.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
-            }
-        }
-        // Se não há usuário (chamada do scheduler), continua com service role
-
         // Buscar todos os terminais ativos
         const terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
 
