@@ -196,9 +196,11 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                   exit={{ opacity: 0, height: 0 }}
                   className={cn(
                     "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium",
-                    pingResult.status === 'online'
-                      ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-                      : "bg-red-500/15 border border-red-500/30 text-red-300"
+                    pingResult.ip_local_only
+                      ? "bg-yellow-500/15 border border-yellow-500/30 text-yellow-300"
+                      : pingResult.status === 'online'
+                        ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
+                        : "bg-red-500/15 border border-red-500/30 text-red-300"
                   )}
                 >
                   <div className="flex items-center gap-2">
