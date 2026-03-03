@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, MapPin, Building2, Clock, AlertTriangle, Zap } from 'lucide-react';
 import StatusBadge from './StatusBadge';
-import MonitorStatus from './MonitorStatus';
 import { cn } from '@/lib/utils';
 import { base44 } from '@/api/base44Client';
 import { useQueryClient } from '@tanstack/react-query';
