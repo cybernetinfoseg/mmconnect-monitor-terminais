@@ -138,9 +138,10 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
                     {terminal.cliente}
                   </td>
                   <td className={cn(
+                    "text-center",
                     compact ? "px-4 py-3" : "px-6 py-4"
                   )}>
-                    <MonitorStatus terminal={terminal} />
+                    <StatusBadge status={terminal.status} />
                   </td>
                   <td className={cn(
                     "text-slate-500",
