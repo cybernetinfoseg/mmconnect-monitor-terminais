@@ -280,6 +280,20 @@ export default function Administracao() {
                     />
                     Pode Gerenciar Usuários
                   </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                    <Checkbox
+                      checked={form.pode_editar_terminais}
+                      onCheckedChange={v => setForm(prev => ({ ...prev, pode_editar_terminais: !!v }))}
+                    />
+                    Pode Editar Terminais
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                    <Checkbox
+                      checked={form.pode_editar_clientes}
+                      onCheckedChange={v => setForm(prev => ({ ...prev, pode_editar_clientes: !!v }))}
+                    />
+                    Pode Editar Clientes
+                  </label>
                 </div>
 
                 <div className="flex gap-2 pt-2">
