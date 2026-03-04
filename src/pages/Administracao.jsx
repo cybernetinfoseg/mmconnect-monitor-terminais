@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ROLE_DEFAULTS, ROLE_LABELS, ROLE_COLORS } from '../components/auth/usePermissions';
 
-const ALL_PAGES = ['Dashboard', 'Terminais', 'Clientes', 'History', 'Incidents', 'Alertas', 'Configuracoes', 'Administracao'];
+const ALL_PAGES = ['Dashboard', 'Terminais', 'Clientes', 'History', 'Incidents', 'Alertas', 'Configuracoes', 'Administracao', 'Auditoria'];
 
 const PAGE_LABELS = {
   Dashboard: 'Dashboard',
@@ -30,15 +30,18 @@ const PAGE_LABELS = {
   Alertas: 'Alertas',
   Configuracoes: 'Configurações',
   Administracao: 'Administração',
+  Auditoria: 'Auditoria',
 };
 
 const EMPTY_FORM = {
   email: '',
-  role: 'user',
-  paginas_permitidas: ['Dashboard', 'Terminais', 'Incidents'],
+  role: 'viewer',
+  paginas_permitidas: ROLE_DEFAULTS.viewer.paginas_permitidas,
   pode_configurar_alertas: false,
   pode_gerenciar_usuarios: false,
-  limite_terminais: 10,
+  pode_editar_terminais: false,
+  pode_editar_clientes: false,
+  limite_terminais: 0,
 };
 
 export default function Administracao() {
