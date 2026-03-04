@@ -339,13 +339,9 @@ export default function Administracao() {
                       <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 font-medium text-slate-900 max-w-[160px] truncate">{user.email}</td>
                         <td className="px-4 py-3">
-                          <Badge className={cn(
-                            "text-xs",
-                            user.role === 'admin'
-                              ? "bg-purple-100 text-purple-700 border-purple-200"
-                              : "bg-slate-100 text-slate-700 border-slate-200"
-                          )}>
-                            {user.role === 'admin' ? '⊙ Admin' : 'Usuário'}
+                          <Badge className={cn("text-xs", ROLE_COLORS[user.role] || ROLE_COLORS.viewer)}>
+                            {user.role === 'admin' ? '⊙ ' : user.role === 'editor' ? '✏️ ' : '👁 '}
+                            {ROLE_LABELS[user.role] || user.role || 'Visualizador'}
                           </Badge>
                         </td>
                         <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs max-w-[180px] truncate">
