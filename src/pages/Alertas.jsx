@@ -176,28 +176,32 @@ export default function Alertas() {
                         </div>
 
                         <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            onClick={() => toggleMutation.mutate({ id: rule.id, ativo: !rule.ativo })}
-                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
-                            title={rule.ativo ? 'Desativar' : 'Ativar'}
-                          >
-                            {rule.ativo
-                              ? <ToggleRight className="h-5 w-5 text-emerald-500" />
-                              : <ToggleLeft className="h-5 w-5" />
-                            }
-                          </button>
-                          <button
-                            onClick={() => handleEdit(rule)}
-                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteMutation.mutate(rule.id)}
-                            className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {perms.pode_configurar_alertas && (
+                            <>
+                              <button
+                                onClick={() => toggleMutation.mutate({ id: rule.id, ativo: !rule.ativo })}
+                                className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors"
+                                title={rule.ativo ? 'Desativar' : 'Ativar'}
+                              >
+                                {rule.ativo
+                                  ? <ToggleRight className="h-5 w-5 text-emerald-500" />
+                                  : <ToggleLeft className="h-5 w-5" />
+                                }
+                              </button>
+                              <button
+                                onClick={() => handleEdit(rule)}
+                                className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-colors"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteMutation.mutate(rule.id)}
+                                className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </CardContent>
