@@ -53,8 +53,9 @@ export default function Terminais() {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const isAdmin = currentUser?.role === 'admin';
-  const limiteTerminais = currentUser?.limite_terminais ?? 10;
+  const perms = resolvePermissions(currentUser);
+  const isAdmin = perms.isAdmin;
+  const limiteTerminais = perms.limite_terminais;
 
   // Fetch terminals with auto-refresh every 5 seconds
   const { data: allTerminals = [], isLoading } = useQuery({
