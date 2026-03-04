@@ -178,6 +178,15 @@ export default function Dashboard() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setShowWidgetConfig(v => !v)}
+              className={cn("bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5", showWidgetConfig && "bg-white/20")}
+            >
+              <Settings2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Widgets</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => refetch()}
               disabled={isMonitoring}
               className="bg-white/10 border-white/20 text-white hover:bg-white/20"
