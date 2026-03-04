@@ -11,10 +11,13 @@ import {
   RefreshCw,
   Activity,
   AlertTriangle,
-  ArrowUpDown
+  ArrowUpDown,
+  LayoutDashboard,
+  Settings2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { Tv } from 'lucide-react';
@@ -24,6 +27,10 @@ import StatusPieChart from '../components/dashboard/StatusPieChart';
 import FilterDropdown from '../components/dashboard/FilterDropdown';
 import AlertsList from '../components/dashboard/AlertsList';
 import PullToRefresh from '../components/dashboard/PullToRefresh';
+import TerminalStatusWidget from '../components/dashboard/TerminalStatusWidget';
+import AlertRulesWidget from '../components/dashboard/AlertRulesWidget';
+import RecentAuditWidget from '../components/dashboard/RecentAuditWidget';
+import ApiKeyStatsWidget from '../components/dashboard/ApiKeyStatsWidget';
 
 export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
