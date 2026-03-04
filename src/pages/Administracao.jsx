@@ -109,14 +109,30 @@ export default function Administracao() {
     }
   };
 
+  const applyRoleDefaults = (role) => {
+    const defaults = ROLE_DEFAULTS[role] || ROLE_DEFAULTS.viewer;
+    setForm(prev => ({
+      ...prev,
+      role,
+      paginas_permitidas: defaults.paginas_permitidas,
+      pode_configurar_alertas: defaults.pode_configurar_alertas,
+      pode_gerenciar_usuarios: defaults.pode_gerenciar_usuarios,
+      pode_editar_terminais: defaults.pode_editar_terminais,
+      pode_editar_clientes: defaults.pode_editar_clientes,
+      limite_terminais: defaults.limite_terminais === 9999 ? 9999 : defaults.limite_terminais,
+    }));
+  };
+
   const handleEdit = (user) => {
     setEditingUser(user);
     setForm({
       email: user.email,
-      role: user.role || 'user',
-      paginas_permitidas: user.paginas_permitidas || ['Dashboard', 'Terminais'],
+      role: user.role || 'viewer',
+      paginas_permitidas: user.paginas_permitidas || ROLE_DEFAULTS.viewer.paginas_permitidas,
       pode_configurar_alertas: user.pode_configurar_alertas || false,
       pode_gerenciar_usuarios: user.pode_gerenciar_usuarios || false,
+      pode_editar_terminais: user.pode_editar_terminais || false,
+      pode_editar_clientes: user.pode_editar_clientes || false,
       limite_terminais: user.limite_terminais ?? 10,
     });
     setShowForm(true);
