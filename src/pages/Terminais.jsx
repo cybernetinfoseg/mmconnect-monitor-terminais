@@ -37,6 +37,7 @@ import { Switch } from '@/components/ui/switch';
 import StatusBadge from '../components/dashboard/StatusBadge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { resolvePermissions } from '../components/auth/usePermissions';
 
 export default function Terminais() {
   const [searchTerm, setSearchTerm] = useState('');
