@@ -9,7 +9,6 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // Only admin can generate for other users; users can regenerate their own
         const { targetUserId } = await req.json();
 
         if (targetUserId && targetUserId !== user.id && user.role !== 'admin') {
@@ -18,12 +17,25 @@ Deno.serve(async (req) => {
 
         const userId = targetUserId || user.id;
 
+        // Fetch target user info for audit
+        const targetUser = await base44.asServiceRole.entities.User.get(userId);
+
         // Generate a secure random API key
         const array = new Uint8Array(32);
         crypto.getRandomValues(array);
         const apiKey = 'noc_' + Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
 
         await base44.asServiceRole.entities.User.update(userId, { api_key: apiKey });
+
+        // Audit log
+        await base44.asServiceRole.entities.AuditLog.create({
+            usuario_email: user.email,
+            acao: 'api_key_gerada',
+            entidade: 'User',
+            entidade_id: userId,
+            descricao: `API Key gerada para ${targetUser?.email || userId}`,
+            timestamp: new Date().toISOString(),
+        });
 
         return Response.json({ success: true, api_key: apiKey });
     } catch (error) {
