@@ -81,10 +81,12 @@ export default function Alertas() {
           </div>
           <div className="flex items-center gap-2">
             <BrowserNotificationToggle />
-            <Button onClick={handleNew} className="bg-slate-900 hover:bg-slate-800 text-white gap-2">
-              <Plus className="h-4 w-4" />
-              Nova Regra
-            </Button>
+            {perms.pode_configurar_alertas && (
+              <Button onClick={handleNew} className="bg-slate-900 hover:bg-slate-800 text-white gap-2">
+                <Plus className="h-4 w-4" />
+                Nova Regra
+              </Button>
+            )}
           </div>
         </div>
 
