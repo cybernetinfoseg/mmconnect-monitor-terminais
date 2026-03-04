@@ -356,17 +356,23 @@ export default function Administracao() {
                           </span>
                         </td>
                         <td className="px-4 py-3 hidden sm:table-cell">
-                          <div className="flex gap-1 flex-wrap">
-                            {user.pode_configurar_alertas && (
-                              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">Alertas</Badge>
-                            )}
-                            {user.pode_gerenciar_usuarios && (
-                              <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">Usuários</Badge>
-                            )}
-                            {!user.pode_configurar_alertas && !user.pode_gerenciar_usuarios && (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </div>
+                         <div className="flex gap-1 flex-wrap">
+                           {user.pode_configurar_alertas && (
+                             <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">Alertas</Badge>
+                           )}
+                           {user.pode_gerenciar_usuarios && (
+                             <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">Usuários</Badge>
+                           )}
+                           {user.pode_editar_terminais && (
+                             <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs">Terminais</Badge>
+                           )}
+                           {user.pode_editar_clientes && (
+                             <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">Clientes</Badge>
+                           )}
+                           {!user.pode_configurar_alertas && !user.pode_gerenciar_usuarios && !user.pode_editar_terminais && !user.pode_editar_clientes && (
+                             <span className="text-slate-400 text-xs">—</span>
+                           )}
+                         </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1">
