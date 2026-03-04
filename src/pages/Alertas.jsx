@@ -137,10 +137,17 @@ export default function Alertas() {
                               {rule.gatilho === 'multiplos_offline' && rule.condicao_valor && ` (≥ ${rule.condicao_valor} terminais)`}
                             </p>
                             <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-400">
-                              <span className="flex items-center gap-1">
-                                <Mail className="h-3 w-3" />
-                                {rule.destinatarios_email}
-                              </span>
+                              {(rule.canal === 'email' || rule.canal === 'ambos') && rule.destinatarios_email && (
+                                <span className="flex items-center gap-1">
+                                  <Mail className="h-3 w-3" />
+                                  {rule.destinatarios_email}
+                                </span>
+                              )}
+                              {(rule.canal === 'slack' || rule.canal === 'ambos') && (
+                                <span className="flex items-center gap-1">
+                                  💬 Slack webhook
+                                </span>
+                              )}
                               {rule.filtro_local && <span>📍 {rule.filtro_local}</span>}
                               {rule.filtro_cliente && <span>🏢 {rule.filtro_cliente}</span>}
                               {rule.ultima_disparada && (
