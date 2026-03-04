@@ -159,11 +159,13 @@ export default function Administracao() {
           paginas_permitidas: form.paginas_permitidas,
           pode_configurar_alertas: form.pode_configurar_alertas,
           pode_gerenciar_usuarios: form.pode_gerenciar_usuarios,
+          pode_editar_terminais: form.pode_editar_terminais,
+          pode_editar_clientes: form.pode_editar_clientes,
           limite_terminais: Number(form.limite_terminais),
         },
       });
     } else {
-      inviteMutation.mutate({ email: form.email, role: form.role });
+      inviteMutation.mutate({ email: form.email, role: form.role === 'admin' ? 'admin' : 'user' });
     }
   };
 
