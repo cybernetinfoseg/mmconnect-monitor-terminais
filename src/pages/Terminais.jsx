@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,11 +8,11 @@ import {
   Pencil, 
   Trash2, 
   Search,
-  Filter,
   RefreshCw,
   Wifi,
   Globe,
-  Server
+  Server,
+  AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Select,
@@ -45,15 +44,32 @@ export default function Terminais() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTerminal, setEditingTerminal] = useState(null);
   const [formData, setFormData] = useState({});
+  const [currentUser, setCurrentUser] = useState(null);
   
   const queryClient = useQueryClient();
 
-  // Fetch terminals with auto-refresh every 5 seconds (tempo real)
-  const { data: terminals = [], isLoading } = useQuery({
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const isAdmin = currentUser?.role === 'admin';
+  const limiteTerminais = currentUser?.limite_terminais ?? 10;
+
+  // Fetch terminals with auto-refresh every 5 seconds
+  const { data: allTerminals = [], isLoading } = useQuery({
     queryKey: ['terminals-manage'],
     queryFn: () => base44.entities.Terminal.list('-created_date'),
-    refetchInterval: 5000, // Auto-refresh em tempo real
+    refetchInterval: 5000,
   });
+
+  // Filter: admin sees all, user sees only their own
+  const terminals = useMemo(() => {
+    if (isAdmin) return allTerminals;
+    return allTerminals.filter(t => t.created_by === currentUser?.email);
+  }, [allTerminals, isAdmin, currentUser]);
+
+  const terminalCount = terminals.length;
+  const atLimit = !isAdmin && terminalCount >= limiteTerminais;
 
   // Fetch clientes
   const { data: clientes = [] } = useQuery({
@@ -61,7 +77,6 @@ export default function Terminais() {
     queryFn: () => base44.entities.Cliente.list(),
   });
 
-  // Create/Update mutation with optimistic update
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       const cliente = clientes.find(c => c.id === data.cliente_id);
@@ -71,97 +86,50 @@ export default function Terminais() {
       }
       return base44.entities.Terminal.create(dataWithCliente);
     },
-    onMutate: async (data) => {
-      await queryClient.cancelQueries(['terminals-manage']);
-      const previous = queryClient.getQueryData(['terminals-manage']);
-      const cliente = clientes.find(c => c.id === data.cliente_id);
-      const optimistic = { ...data, cliente_nome: cliente?.nome || '', id: editingTerminal?.id || `temp-${Date.now()}` };
-      queryClient.setQueryData(['terminals-manage'], (old = []) =>
-        editingTerminal
-          ? old.map(t => t.id === editingTerminal.id ? optimistic : t)
-          : [optimistic, ...old]
-      );
-      return { previous };
-    },
-    onError: (error, _data, ctx) => {
-      queryClient.setQueryData(['terminals-manage'], ctx.previous);
-      toast.error(`Erro: ${error.message}`);
-    },
     onSuccess: () => {
       queryClient.invalidateQueries(['terminals-manage']);
       setDialogOpen(false);
       setEditingTerminal(null);
       setFormData({});
       toast.success(editingTerminal ? 'Terminal atualizado' : 'Terminal criado');
-    }
+    },
+    onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
-  // Delete mutation with optimistic update
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Terminal.delete(id),
-    onMutate: async (id) => {
-      await queryClient.cancelQueries(['terminals-manage']);
-      const previous = queryClient.getQueryData(['terminals-manage']);
-      queryClient.setQueryData(['terminals-manage'], (old = []) => old.filter(t => t.id !== id));
-      return { previous };
-    },
-    onError: (_err, _id, ctx) => {
-      queryClient.setQueryData(['terminals-manage'], ctx.previous);
-      toast.error('Erro ao excluir terminal');
-    },
     onSuccess: () => {
       queryClient.invalidateQueries(['terminals-manage']);
       toast.success('Terminal excluído');
-    }
+    },
+    onError: () => toast.error('Erro ao excluir terminal'),
   });
 
-  // Monitor mutation (via backend - teste TCP socket direto como script Python)
   const monitorMutation = useMutation({
     mutationFn: async (terminal) => {
-      const response = await base44.functions.invoke('monitorTerminal', { 
-        terminalId: terminal.id 
-      });
+      const response = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
       return response.data;
     },
     onSuccess: (data, terminal) => {
       queryClient.invalidateQueries(['terminals-manage']);
-      
       if (data.success) {
-        const statusText = data.status === 'online' ? '✅ ONLINE' : '❌ OFFLINE';
-        const latenciaText = data.latencia ? ` (${data.latencia}ms)` : '';
-        const errorText = data.error ? ` - ${data.error}` : '';
-        
         if (data.status === 'online') {
-          toast.success(`${terminal.nome}: ${statusText}${latenciaText} - ${data.host}`);
+          toast.success(`${terminal.nome}: ✅ ONLINE (${data.latencia}ms)`);
         } else {
-          toast.error(`${terminal.nome}: ${statusText}${errorText}`);
+          toast.error(`${terminal.nome}: ❌ OFFLINE${data.error ? ' - ' + data.error : ''}`);
         }
       }
     },
-    onError: (error) => {
-      toast.error(`Erro: ${error.message}`);
-    }
+    onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
-  // Verificar todos os terminais
   const [verificandoTodos, setVerificandoTodos] = useState(false);
-  
   const verificarTodos = async () => {
     setVerificandoTodos(true);
-    toast.info('Verificando todos os terminais via TCP socket...');
-    
     const terminaisAtivos = terminals.filter(t => t.ativo);
-    
     for (const terminal of terminaisAtivos) {
-      try {
-        await base44.functions.invoke('monitorTerminal', { 
-          terminalId: terminal.id 
-        });
-      } catch (error) {
-        console.error(`Erro ao verificar ${terminal.nome}:`, error);
-      }
+      await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id }).catch(() => {});
     }
-    
     queryClient.invalidateQueries(['terminals-manage']);
     setVerificandoTodos(false);
     toast.success('Verificação concluída!');
@@ -173,9 +141,7 @@ export default function Terminais() {
         t.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.local?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase());
-      
       const matchTipo = tipoFilter === 'all' || t.tipo_conexao === tipoFilter;
-      
       return matchSearch && matchTipo;
     });
   }, [terminals, searchTerm, tipoFilter]);
@@ -187,17 +153,13 @@ export default function Terminais() {
   };
 
   const handleNew = () => {
+    if (atLimit) {
+      toast.error(`Limite de ${limiteTerminais} terminais atingido. Contate o administrador.`);
+      return;
+    }
     setEditingTerminal(null);
-    setFormData({
-      tipo_conexao: 'ip_local',
-      porta: 5005,
-      ativo: true
-    });
+    setFormData({ tipo_conexao: 'ip_local', porta: 5005, ativo: true });
     setDialogOpen(true);
-  };
-
-  const handleSave = () => {
-    saveMutation.mutate(formData);
   };
 
   const handleDelete = (id) => {
@@ -210,21 +172,12 @@ export default function Terminais() {
     switch (tipo) {
       case 'ip_local': return Wifi;
       case 'ip_publico': return Globe;
-      case 'dns': return Server;
-      case 'p2s': return Server;
-      case 'api': return Server;
-      default: return Monitor;
+      default: return Server;
     }
   };
 
   const getTipoLabel = (tipo) => {
-    const labels = {
-      ip_local: 'IP Local',
-      ip_publico: 'IP Público',
-      dns: 'DNS/No-IP',
-      p2s: 'P2S VPN',
-      api: 'API'
-    };
+    const labels = { ip_local: 'IP Local', ip_publico: 'IP Público', dns: 'DNS/No-IP', p2s: 'P2S VPN', api: 'API' };
     return labels[tipo] || tipo;
   };
 
@@ -240,49 +193,60 @@ export default function Terminais() {
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
               <p className="text-xs sm:text-sm text-emerald-600 flex items-center gap-1">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shrink-0"></div>
-                <span className="hidden sm:inline">TCP Socket • </span>Auto-refresh 5s
+                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shrink-0 inline-block"></span>
+                Auto-refresh 5s
+                {!isAdmin && (
+                  <span className={cn("ml-2 font-semibold", atLimit ? "text-red-600" : "text-slate-500")}>
+                    • {terminalCount}/{limiteTerminais} terminais
+                  </span>
+                )}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button 
-              onClick={verificarTodos} 
+            <Button
+              onClick={verificarTodos}
               disabled={verificandoTodos || terminals.length === 0}
               variant="outline"
               size="sm"
               className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
             >
-              <RefreshCw className={cn(
-                "h-4 w-4 sm:mr-2",
-                verificandoTodos && "animate-spin"
-              )} />
+              <RefreshCw className={cn("h-4 w-4 sm:mr-2", verificandoTodos && "animate-spin")} />
               <span className="hidden sm:inline">{verificandoTodos ? 'Verificando...' : 'Verificar Todos'}</span>
             </Button>
-            <Button onClick={handleNew} size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Button
+              onClick={handleNew}
+              size="sm"
+              className={cn("bg-blue-600 hover:bg-blue-700", atLimit && "opacity-50 cursor-not-allowed")}
+            >
               <Plus className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Novo Terminal</span>
             </Button>
           </div>
         </div>
 
+        {/* Limit warning */}
+        {atLimit && (
+          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            Você atingiu o limite de {limiteTerminais} terminais. Contate o administrador para aumentar seu limite.
+          </div>
+        )}
+
         {/* Filters */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Buscar por nome, local ou cliente..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+              <div className="flex-1 min-w-[200px] relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar por nome, local ou cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-              
               <Select value={tipoFilter} onValueChange={setTipoFilter}>
                 <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Tipo de conexão" />
@@ -305,7 +269,6 @@ export default function Terminais() {
           <AnimatePresence mode="popLayout">
             {filteredTerminals.map((terminal, index) => {
               const TipoIcon = getTipoIcon(terminal.tipo_conexao);
-              
               return (
                 <motion.div
                   key={terminal.id}
@@ -314,20 +277,18 @@ export default function Terminais() {
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ delay: index * 0.02 }}
                 >
-                  <Card className={cn(
-                    "bg-white/80 backdrop-blur-sm border-slate-200/50 hover:shadow-lg transition-all",
-                    !terminal.ativo && "opacity-60"
-                  )}>
+                  <Card className={cn("bg-white/80 backdrop-blur-sm border-slate-200/50 hover:shadow-lg transition-all", !terminal.ativo && "opacity-60")}>
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <CardTitle className="text-lg flex items-center gap-2">
                             {terminal.nome}
-                            {!terminal.ativo && (
-                              <Badge variant="outline" className="text-xs">Inativo</Badge>
-                            )}
+                            {!terminal.ativo && <Badge variant="outline" className="text-xs">Inativo</Badge>}
                           </CardTitle>
                           <p className="text-sm text-slate-500 mt-1">{terminal.local}</p>
+                          {isAdmin && terminal.created_by && (
+                            <p className="text-xs text-slate-400 mt-0.5">{terminal.created_by}</p>
+                          )}
                         </div>
                         <StatusBadge status={terminal.status} pulse={false} />
                       </div>
@@ -339,46 +300,25 @@ export default function Terminais() {
                         <span className="text-slate-400">•</span>
                         <span className="text-slate-600 font-mono text-xs">:{terminal.porta || 5005}</span>
                       </div>
-                      
                       {terminal.cliente_nome && (
                         <div className="text-sm text-slate-600">
                           <span className="text-slate-500">Cliente:</span> {terminal.cliente_nome}
                         </div>
                       )}
-
                       {terminal.latencia_ms && (
                         <div className="text-sm text-slate-600">
                           <span className="text-slate-500">Latência:</span> {terminal.latencia_ms}ms
                         </div>
                       )}
-                      
                       <div className="flex gap-2 pt-2 border-t border-slate-100">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => monitorMutation.mutate(terminal)}
-                          disabled={monitorMutation.isPending}
-                          className="flex-1"
-                        >
-                          <RefreshCw className={cn(
-                            "h-3 w-3 mr-1",
-                            monitorMutation.isPending && "animate-spin"
-                          )} />
+                        <Button size="sm" variant="outline" onClick={() => monitorMutation.mutate(terminal)} disabled={monitorMutation.isPending} className="flex-1">
+                          <RefreshCw className={cn("h-3 w-3 mr-1", monitorMutation.isPending && "animate-spin")} />
                           Verificar
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEdit(terminal)}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => handleEdit(terminal)}>
                           <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDelete(terminal.id)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
+                        <Button size="sm" variant="outline" onClick={() => handleDelete(terminal.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
@@ -404,45 +344,26 @@ export default function Terminais() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingTerminal ? 'Editar Terminal' : 'Novo Terminal'}
-            </DialogTitle>
+            <DialogTitle>{editingTerminal ? 'Editar Terminal' : 'Novo Terminal'}</DialogTitle>
           </DialogHeader>
-          
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Nome *</Label>
-                <Input
-                  value={formData.nome || ''}
-                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                  placeholder="BIO-001"
-                />
+                <Input value={formData.nome || ''} onChange={(e) => setFormData({...formData, nome: e.target.value})} placeholder="BIO-001" />
               </div>
-              
               <div className="space-y-2">
                 <Label>Local *</Label>
-                <Input
-                  value={formData.local || ''}
-                  onChange={(e) => setFormData({...formData, local: e.target.value})}
-                  placeholder="Matriz - Recepção"
-                />
+                <Input value={formData.local || ''} onChange={(e) => setFormData({...formData, local: e.target.value})} placeholder="Matriz - Recepção" />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select
-                value={formData.cliente_id || ''}
-                onValueChange={(v) => setFormData({...formData, cliente_id: v})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione um cliente" />
-                </SelectTrigger>
+              <Select value={formData.cliente_id || ''} onValueChange={(v) => setFormData({...formData, cliente_id: v})}>
+                <SelectTrigger><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
                 <SelectContent>
-                  {clientes.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
-                  ))}
+                  {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -450,13 +371,8 @@ export default function Terminais() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tipo de Conexão *</Label>
-                <Select
-                  value={formData.tipo_conexao || 'ip_local'}
-                  onValueChange={(v) => setFormData({...formData, tipo_conexao: v})}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                <Select value={formData.tipo_conexao || 'ip_local'} onValueChange={(v) => setFormData({...formData, tipo_conexao: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ip_local">IP Local</SelectItem>
                     <SelectItem value="ip_publico">IP Público</SelectItem>
@@ -466,91 +382,50 @@ export default function Terminais() {
                   </SelectContent>
                 </Select>
               </div>
-              
               <div className="space-y-2">
                 <Label>Porta</Label>
-                <Input
-                  type="number"
-                  value={formData.porta || 5005}
-                  onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})}
-                />
+                <Input type="number" value={formData.porta || 5005} onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})} />
               </div>
             </div>
 
             {(formData.tipo_conexao === 'ip_local' || formData.tipo_conexao === 'p2s') && (
               <div className="space-y-2">
                 <Label>IP Local</Label>
-                <Input
-                  value={formData.ip_local || ''}
-                  onChange={(e) => setFormData({...formData, ip_local: e.target.value})}
-                  placeholder="192.168.1.100"
-                />
+                <Input value={formData.ip_local || ''} onChange={(e) => setFormData({...formData, ip_local: e.target.value})} placeholder="192.168.1.100" />
               </div>
             )}
-
             {formData.tipo_conexao === 'ip_publico' && (
               <div className="space-y-2">
                 <Label>IP Público</Label>
-                <Input
-                  value={formData.ip_publico || ''}
-                  onChange={(e) => setFormData({...formData, ip_publico: e.target.value})}
-                  placeholder="203.0.113.1"
-                />
+                <Input value={formData.ip_publico || ''} onChange={(e) => setFormData({...formData, ip_publico: e.target.value})} placeholder="203.0.113.1" />
               </div>
             )}
-
             {formData.tipo_conexao === 'dns' && (
               <div className="space-y-2">
                 <Label>DNS/Hostname</Label>
-                <Input
-                  value={formData.dns || ''}
-                  onChange={(e) => setFormData({...formData, dns: e.target.value})}
-                  placeholder="meuhost.no-ip.org"
-                />
+                <Input value={formData.dns || ''} onChange={(e) => setFormData({...formData, dns: e.target.value})} placeholder="meuhost.no-ip.org" />
               </div>
             )}
-
             {formData.tipo_conexao === 'api' && (
               <div className="space-y-2">
                 <Label>API Endpoint</Label>
-                <Input
-                  value={formData.api_endpoint || ''}
-                  onChange={(e) => setFormData({...formData, api_endpoint: e.target.value})}
-                  placeholder="https://api.exemplo.com/terminal/status"
-                />
+                <Input value={formData.api_endpoint || ''} onChange={(e) => setFormData({...formData, api_endpoint: e.target.value})} placeholder="https://api.exemplo.com/terminal/status" />
               </div>
             )}
 
             <div className="space-y-2">
               <Label>Observações</Label>
-              <Textarea
-                value={formData.observacoes || ''}
-                onChange={(e) => setFormData({...formData, observacoes: e.target.value})}
-                rows={3}
-              />
+              <Textarea value={formData.observacoes || ''} onChange={(e) => setFormData({...formData, observacoes: e.target.value})} rows={3} />
             </div>
 
             <div className="flex items-center gap-2">
-              <Switch
-                checked={formData.ativo !== false}
-                onCheckedChange={(checked) => setFormData({...formData, ativo: checked})}
-              />
+              <Switch checked={formData.ativo !== false} onCheckedChange={(checked) => setFormData({...formData, ativo: checked})} />
               <Label>Terminal ativo para monitoramento</Label>
             </div>
 
             <div className="flex gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setDialogOpen(false)}
-                className="flex-1"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saveMutation.isPending}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-              >
+              <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1">Cancelar</Button>
+              <Button onClick={() => saveMutation.mutate(formData)} disabled={saveMutation.isPending} className="flex-1 bg-blue-600 hover:bg-blue-700">
                 {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
               </Button>
             </div>
