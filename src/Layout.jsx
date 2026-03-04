@@ -94,6 +94,12 @@ export default function Layout({ children, currentPageName }) {
     );
   };
 
+  // Filter nav items based on user permissions
+  const navItems = ALL_NAV_ITEMS.filter(item => {
+    if (!currentUser) return item.page === 'Dashboard'; // show only Dashboard until loaded
+    return perms.paginas_permitidas.includes(item.page) || item.page === 'TVMode';
+  });
+
   const Sidebar = ({ onClose }) => (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900">
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
