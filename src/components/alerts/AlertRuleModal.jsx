@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { X, Bell, Mail, Save } from 'lucide-react';
+import { X, Bell, Mail, Save, Slack } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -28,6 +28,7 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
     filtro_cliente: '',
     canal: 'email',
     destinatarios_email: '',
+    slack_webhook_url: '',
     cooldown_minutos: 30,
   });
 
@@ -42,6 +43,7 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
         filtro_cliente: rule.filtro_cliente || '',
         canal: rule.canal || 'email',
         destinatarios_email: rule.destinatarios_email || '',
+        slack_webhook_url: rule.slack_webhook_url || '',
         cooldown_minutos: rule.cooldown_minutos || 30,
       });
     }
@@ -56,9 +58,15 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
   const clientes = [...new Set(terminals.map(t => t.cliente_nome || t.cliente).filter(Boolean))].sort();
 
   const needsValue = form.gatilho === 'sem_ping_minutos' || form.gatilho === 'multiplos_offline';
+  const needsEmail = form.canal === 'email' || form.canal === 'ambos';
+  const needsSlack = form.canal === 'slack' || form.canal === 'ambos';
+
+  const isValid = form.nome &&
+    (needsEmail ? form.destinatarios_email : true) &&
+    (needsSlack ? form.slack_webhook_url : true);
 
   const handleSave = async () => {
-    if (!form.nome || !form.destinatarios_email) return;
+    if (!isValid) return;
     setSaving(true);
     const data = {
       ...form,
@@ -117,9 +125,7 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
           <div className="space-y-1.5">
             <Label>Gatilho *</Label>
             <Select value={form.gatilho} onValueChange={v => set('gatilho', v)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {GATILHOS.map(g => (
                   <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
@@ -147,11 +153,9 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
           {/* Filtros */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Filtrar por local (opcional)</Label>
+              <Label>Filtrar por local</Label>
               <Select value={form.filtro_local || 'todos'} onValueChange={v => set('filtro_local', v === 'todos' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os locais" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Todos os locais" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os locais</SelectItem>
                   {locais.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
@@ -159,11 +163,9 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Filtrar por cliente (opcional)</Label>
+              <Label>Filtrar por cliente</Label>
               <Select value={form.filtro_cliente || 'todos'} onValueChange={v => set('filtro_cliente', v === 'todos' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos os clientes" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Todos os clientes" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">Todos os clientes</SelectItem>
                   {clientes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -172,19 +174,69 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
             </div>
           </div>
 
-          {/* Canal + email */}
+          {/* Canal */}
           <div className="space-y-1.5">
-            <Label className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-slate-400" />
-              Destinatários de e-mail *
-            </Label>
-            <Input
-              placeholder="email@empresa.com, outro@empresa.com"
-              value={form.destinatarios_email}
-              onChange={e => set('destinatarios_email', e.target.value)}
-            />
-            <p className="text-xs text-slate-400">Separe múltiplos e-mails por vírgula</p>
+            <Label>Canal de notificação *</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'email', label: 'E-mail', icon: '📧' },
+                { value: 'slack', label: 'Slack', icon: '💬' },
+                { value: 'ambos', label: 'Ambos', icon: '📡' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => set('canal', opt.value)}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-3 rounded-xl border-2 text-sm font-medium transition-all",
+                    form.canal === opt.value
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "border-slate-200 hover:border-slate-300 text-slate-600"
+                  )}
+                >
+                  <span className="text-lg">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Email */}
+          {needsEmail && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-slate-400" />
+                Destinatários de e-mail *
+              </Label>
+              <Input
+                placeholder="email@empresa.com, outro@empresa.com"
+                value={form.destinatarios_email}
+                onChange={e => set('destinatarios_email', e.target.value)}
+              />
+              <p className="text-xs text-slate-400">Separe múltiplos e-mails por vírgula</p>
+            </div>
+          )}
+
+          {/* Slack webhook */}
+          {needsSlack && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2">
+                <span className="text-sm">💬</span>
+                Slack Webhook URL *
+              </Label>
+              <Input
+                placeholder="https://hooks.slack.com/services/..."
+                value={form.slack_webhook_url}
+                onChange={e => set('slack_webhook_url', e.target.value)}
+              />
+              <p className="text-xs text-slate-400">
+                Crie um Incoming Webhook em{' '}
+                <a href="https://api.slack.com/apps" target="_blank" rel="noreferrer" className="text-blue-500 underline">
+                  api.slack.com/apps
+                </a>
+              </p>
+            </div>
+          )}
 
           {/* Cooldown */}
           <div className="space-y-1.5">
@@ -204,7 +256,7 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             onClick={handleSave}
-            disabled={saving || !form.nome || !form.destinatarios_email}
+            disabled={saving || !isValid}
             className="bg-slate-900 hover:bg-slate-800 text-white gap-2"
           >
             <Save className="h-4 w-4" />
