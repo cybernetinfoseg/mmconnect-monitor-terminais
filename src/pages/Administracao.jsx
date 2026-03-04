@@ -66,7 +66,9 @@ export default function Administracao() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
-    onSuccess: () => {
+    onSuccess: (_, { id, data }) => {
+      const u = users.find(u => u.id === id);
+      logAudit('permissao_atualizada', id, `Permissões de ${u?.email || id} atualizadas (role: ${data.role}, limite: ${data.limite_terminais})`);
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Permissões atualizadas');
       handleCancel();
