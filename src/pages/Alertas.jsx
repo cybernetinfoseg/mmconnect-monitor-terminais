@@ -29,7 +29,14 @@ const GATILHO_ICONS = {
 export default function Alertas() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const perms = resolvePermissions(currentUser);
 
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['alert-rules'],
