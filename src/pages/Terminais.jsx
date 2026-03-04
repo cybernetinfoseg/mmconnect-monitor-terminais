@@ -64,14 +64,14 @@ export default function Terminais() {
     refetchInterval: 5000,
   });
 
-  // Filter: admin sees all, user sees only their own
+  // Filter: admin/editor sees all, viewer sees only their own
   const terminals = useMemo(() => {
-    if (isAdmin) return allTerminals;
+    if (perms.canEdit) return allTerminals;
     return allTerminals.filter(t => t.created_by === currentUser?.email);
-  }, [allTerminals, isAdmin, currentUser]);
+  }, [allTerminals, perms.canEdit, currentUser]);
 
   const terminalCount = terminals.length;
-  const atLimit = !isAdmin && terminalCount >= limiteTerminais;
+  const atLimit = !isAdmin && limiteTerminais > 0 && terminalCount >= limiteTerminais;
 
   // Fetch clientes
   const { data: clientes = [] } = useQuery({
