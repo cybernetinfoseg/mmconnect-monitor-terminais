@@ -71,10 +71,13 @@ export default function Alertas() {
               <p className="text-sm text-slate-500">{activeRules} regra(s) ativa(s)</p>
             </div>
           </div>
-          <Button onClick={handleNew} className="bg-slate-900 hover:bg-slate-800 text-white gap-2">
-            <Plus className="h-4 w-4" />
-            Nova Regra
-          </Button>
+          <div className="flex items-center gap-2">
+            <BrowserNotificationToggle />
+            <Button onClick={handleNew} className="bg-slate-900 hover:bg-slate-800 text-white gap-2">
+              <Plus className="h-4 w-4" />
+              Nova Regra
+            </Button>
+          </div>
         </div>
 
         {/* Empty state */}
