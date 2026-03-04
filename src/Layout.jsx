@@ -12,7 +12,8 @@ import {
   Building2,
   ChevronLeft,
   Bell,
-  Shield
+  Shield,
+  Settings
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
