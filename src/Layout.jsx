@@ -27,6 +27,7 @@ const navItems = [
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
   { name: 'Alertas', page: 'Alertas', icon: Bell },
+  { name: 'Configurações', page: 'Configuracoes', icon: Settings },
   { name: 'Administração', page: 'Administracao', icon: Shield },
 ];
 
