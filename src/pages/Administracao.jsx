@@ -105,11 +105,30 @@ export default function Administracao() {
     setGeneratingKeyFor(null);
     if (res.data?.api_key) {
       setRevealedKeys(prev => ({ ...prev, [user.id]: res.data.api_key }));
+      setVisibleKeys(prev => ({ ...prev, [user.id]: true }));
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('API Key gerada!');
     } else {
       toast.error('Erro ao gerar API Key');
     }
+  };
+
+  const handleSetCustomKey = async (user) => {
+    const key = customKeyValue.trim();
+    if (!key) return;
+    setGeneratingKeyFor(user.id);
+    try {
+      await base44.entities.User.update(user.id, { api_key: key });
+      setRevealedKeys(prev => ({ ...prev, [user.id]: key }));
+      setVisibleKeys(prev => ({ ...prev, [user.id]: true }));
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('API Key definida!');
+    } catch {
+      toast.error('Erro ao definir API Key');
+    }
+    setGeneratingKeyFor(null);
+    setCustomKeyUser(null);
+    setCustomKeyValue('');
   };
 
   const applyRoleDefaults = (role) => {
