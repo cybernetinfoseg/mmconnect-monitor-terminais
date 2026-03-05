@@ -55,7 +55,7 @@ export default function Administracao() {
   const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
 
-  React.useEffect(() => {
+  useEffect(() => {
     base44.auth.me().then(u => { setCurrentUser(u); setMyApiKey(u?.api_key || null); }).catch(() => {});
   }, []);
 
