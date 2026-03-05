@@ -384,36 +384,17 @@ export default function Terminais() {
 
             <div className="space-y-2">
               <Label>Cliente</Label>
-              {!showNovoCliente ? (
-                <div className="flex gap-2">
-                  <Select value={formData.cliente_id || ''} onValueChange={(v) => setFormData({...formData, cliente_id: v})}>
-                    <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
-                    <SelectContent>
-                      {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setShowNovoCliente(true)} title="Cadastrar novo cliente">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <Input
-                    autoFocus
-                    placeholder="Nome do novo cliente"
-                    value={novoClienteNome}
-                    onChange={e => setNovoClienteNome(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && novoClienteNome.trim()) criarClienteMutation.mutate(novoClienteNome.trim()); }}
-                    className="flex-1"
-                  />
-                  <Button type="button" size="sm" onClick={() => criarClienteMutation.mutate(novoClienteNome.trim())} disabled={!novoClienteNome.trim() || criarClienteMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
-                    {criarClienteMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : 'Criar'}
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => { setShowNovoCliente(false); setNovoClienteNome(''); }}>
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <Select value={formData.cliente_id || ''} onValueChange={(v) => setFormData({...formData, cliente_id: v})}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger>
+                  <SelectContent>
+                    {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowNovoClienteModal(true)} title="Cadastrar novo cliente">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
