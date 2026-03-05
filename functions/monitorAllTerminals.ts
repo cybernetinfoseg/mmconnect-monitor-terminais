@@ -29,11 +29,34 @@ Deno.serve(async (req) => {
                     const monitorResult = await base44.asServiceRole.functions.invoke('monitorTerminal', {
                         terminalId: terminal.id
                     });
+                    const status = monitorResult.data?.status;
+
+                    // If terminal went offline, trigger push notification
+                    if (status === 'offline') {
+                        await base44.asServiceRole.functions.invoke('pushNotify', {
+                            action: 'notify_offline',
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || terminal.cliente || '',
+                            owner_email: terminal.created_by || '',
+                        }).catch(() => {});
+                    } else if (status === 'online') {
+                        // Mark any open escalation alerts as resolved
+                        const openAlerts = await base44.asServiceRole.entities.EscalationAlert.filter({
+                            terminal_id: terminal.id,
+                            resolvido: false,
+                        }).catch(() => []);
+                        for (const alert of openAlerts) {
+                            await base44.asServiceRole.entities.EscalationAlert.update(alert.id, { resolvido: true }).catch(() => {});
+                        }
+                    }
+
                     return {
                         terminal_id: terminal.id,
                         terminal_nome: terminal.nome,
                         success: true,
-                        status: monitorResult.data?.status
+                        status,
                     };
                 } catch (error) {
                     return {
