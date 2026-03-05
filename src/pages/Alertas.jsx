@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '../components/auth/usePermissions';
@@ -38,10 +38,19 @@ export default function Alertas() {
 
   const perms = resolvePermissions(currentUser);
 
-  const { data: rules = [], isLoading } = useQuery({
+  const canSeeAll = perms.isAdmin;
+
+  const { data: allRules = [], isLoading } = useQuery({
     queryKey: ['alert-rules'],
     queryFn: () => base44.entities.AlertRule.list('-created_date', 100),
+    enabled: !!currentUser,
   });
+
+  const rules = useMemo(() => {
+    if (!currentUser) return [];
+    if (canSeeAll) return allRules;
+    return allRules.filter(r => r.created_by === currentUser.email);
+  }, [allRules, currentUser, canSeeAll]);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.AlertRule.delete(id),
