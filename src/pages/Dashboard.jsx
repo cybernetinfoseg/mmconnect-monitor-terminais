@@ -69,12 +69,23 @@ export default function Dashboard() {
 
   const isAdmin = currentUser?.role === 'admin';
 
+  const perms = currentUser ? (() => { const { resolvePermissions } = require('../components/auth/usePermissions'); return resolvePermissions(currentUser); })() : null;
+  const isAdmin = currentUser?.role === 'admin';
+  const canSeeAll = currentUser?.role === 'admin' || currentUser?.role === 'editor';
+
   // Fetch terminals with auto-refresh every 5 seconds
-  const { data: terminals = [], isLoading, refetch } = useQuery({
+  const { data: allTerminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals'],
     queryFn: () => base44.entities.Terminal.list(),
-    refetchInterval: 5000, // Atualização em tempo real
+    refetchInterval: 5000,
+    enabled: !!currentUser,
   });
+
+  const terminals = useMemo(() => {
+    if (!currentUser) return [];
+    if (canSeeAll) return allTerminals;
+    return allTerminals.filter(t => t.created_by === currentUser.email);
+  }, [allTerminals, currentUser, canSeeAll]);
 
   // Monitorar todos os terminais
   const handleMonitorAll = async () => {
