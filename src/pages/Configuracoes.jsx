@@ -18,7 +18,9 @@ import {
   Download,
   Terminal,
   Copy,
-  Info
+  Info,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import {
   AlertDialog,
