@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { resolvePermissions } from '../components/auth/usePermissions';
 import { ClipboardList, Search, Filter, User, Calendar, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,12 +33,26 @@ export default function Auditoria() {
   const [usuarioFilter, setUsuarioFilter] = useState('all');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const { data: logs = [], isLoading, refetch } = useQuery({
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const perms = resolvePermissions(currentUser);
+
+  const { data: allLogs = [], isLoading, refetch } = useQuery({
     queryKey: ['audit-logs'],
     queryFn: () => base44.entities.AuditLog.list('-timestamp', 500),
     refetchInterval: 15000,
+    enabled: !!currentUser,
   });
+
+  const logs = useMemo(() => {
+    if (!currentUser) return [];
+    if (perms.isAdmin) return allLogs;
+    return allLogs.filter(l => l.usuario_email === currentUser.email);
+  }, [allLogs, currentUser, perms.isAdmin]);
 
   const usuarios = useMemo(() =>
     [...new Set(logs.map(l => l.usuario_email).filter(Boolean))].sort(),
