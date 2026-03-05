@@ -27,10 +27,11 @@ Deno.serve(async (req) => {
         let errorMsg = null;
         const startTime = Date.now();
 
+        // Determinar host e porta baseado no tipo de conexão (fora do try para evitar ReferenceError)
+        let host = '';
+        let port = terminal.porta || 5005;
+
         try {
-            // Determinar host e porta baseado no tipo de conexão
-            let host = '';
-            let port = terminal.porta || 5005;
             
             switch (terminal.tipo_conexao) {
                 case 'ip_local':
