@@ -36,6 +36,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import StatusBadge from '../components/dashboard/StatusBadge';
+import NovoClienteModal from '../components/clientes/NovoClienteModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { resolvePermissions } from '../components/auth/usePermissions';
