@@ -52,6 +52,7 @@ export default function Configuracoes() {
   const [formData, setFormData] = useState({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showApiKey, setShowApiKey] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
