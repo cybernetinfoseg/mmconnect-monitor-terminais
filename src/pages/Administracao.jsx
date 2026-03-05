@@ -101,15 +101,21 @@ export default function Administracao() {
 
   const handleGenerateApiKey = async (user) => {
     setGeneratingKeyFor(user.id);
-    const res = await base44.functions.invoke('generateUserApiKey', { targetUserId: user.id });
-    setGeneratingKeyFor(null);
-    if (res.data?.api_key) {
-      setRevealedKeys(prev => ({ ...prev, [user.id]: res.data.api_key }));
-      setVisibleKeys(prev => ({ ...prev, [user.id]: true }));
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('API Key gerada!');
-    } else {
+    try {
+      const res = await base44.functions.invoke('generateUserApiKey', { targetUserId: user.id });
+      if (res.data?.api_key) {
+        const key = res.data.api_key;
+        setRevealedKeys(prev => ({ ...prev, [user.id]: key }));
+        setVisibleKeys(prev => ({ ...prev, [user.id]: true }));
+        await queryClient.refetchQueries({ queryKey: ['users'] });
+        toast.success('API Key gerada!');
+      } else {
+        toast.error('Erro ao gerar API Key');
+      }
+    } catch {
       toast.error('Erro ao gerar API Key');
+    } finally {
+      setGeneratingKeyFor(null);
     }
   };
 
