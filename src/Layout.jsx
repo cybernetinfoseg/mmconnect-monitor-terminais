@@ -98,7 +98,8 @@ export default function Layout({ children, currentPageName }) {
 
   // Filter nav items based on user permissions
   const navItems = ALL_NAV_ITEMS.filter(item => {
-    if (!currentUser) return item.page === 'Dashboard'; // show only Dashboard until loaded
+    if (!currentUser) return false;
+    if (perms.isAdmin) return true; // admins see everything
     return perms.paginas_permitidas.includes(item.page) || item.page === 'TVMode';
   });
 
