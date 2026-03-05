@@ -364,6 +364,12 @@ export default function Terminais() {
         )}
       </div>
 
+      <NovoClienteModal
+        open={showNovoClienteModal}
+        onClose={() => setShowNovoClienteModal(false)}
+        onCreated={(novoCliente) => setFormData(prev => ({ ...prev, cliente_id: novoCliente.id, cliente_nome: novoCliente.nome }))}
+      />
+
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
