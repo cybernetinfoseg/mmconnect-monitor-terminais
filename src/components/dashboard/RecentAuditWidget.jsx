@@ -28,10 +28,15 @@ const ACAO_SHORT = {
   permissao_atualizada: 'Permissão',
 };
 
-export default function RecentAuditWidget() {
+export default function RecentAuditWidget({ currentUser }) {
+  const isAdmin = currentUser?.role === 'admin';
+
   const { data: logs = [] } = useQuery({
-    queryKey: ['audit-widget'],
-    queryFn: () => base44.entities.AuditLog.list('-timestamp', 10),
+    queryKey: ['audit-widget', currentUser?.email],
+    queryFn: () => isAdmin
+      ? base44.entities.AuditLog.list('-timestamp', 10)
+      : base44.entities.AuditLog.filter({ usuario_email: currentUser?.email }, '-timestamp', 10),
+    enabled: !!currentUser,
     refetchInterval: 15000,
   });
 
