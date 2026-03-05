@@ -289,25 +289,27 @@ export default function Clientes() {
                       </div>
                     )}
                     
-                    <div className="flex gap-2 pt-2 border-t border-slate-100">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleEdit(cliente)}
-                        className="flex-1"
-                      >
-                        <Pencil className="h-3 w-3 mr-1" />
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDelete(cliente.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    {perms.pode_editar_clientes && (
+                      <div className="flex gap-2 pt-2 border-t border-slate-100">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleEdit(cliente)}
+                          className="flex-1"
+                        >
+                          <Pencil className="h-3 w-3 mr-1" />
+                          Editar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDelete(cliente.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
