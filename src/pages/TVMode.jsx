@@ -83,11 +83,18 @@ export default function TVMode() {
   const statusFilterMirror = mirrorFilters.status || null;
 
   // Fetch terminals with auto-refresh every 5 seconds
-  const { data: allTerminals = [], refetch } = useQuery({
+  const { data: allTerminalsRaw = [], refetch } = useQuery({
     queryKey: ['terminals-tv'],
     queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
     refetchInterval: 5000,
+    enabled: !!currentUser,
   });
+
+  const allTerminals = useMemo(() => {
+    if (!currentUser) return [];
+    if (canSeeAll) return allTerminalsRaw;
+    return allTerminalsRaw.filter(t => t.created_by === currentUser.email);
+  }, [allTerminalsRaw, currentUser, canSeeAll]);
 
   // Manual refresh
   const handleManualRefresh = async () => {
