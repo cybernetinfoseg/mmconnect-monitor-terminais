@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, UserPlus, Pencil, X, Check, RefreshCw, Copy, Key } from 'lucide-react';
@@ -50,14 +50,7 @@ export default function Administracao() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [generatingKeyFor, setGeneratingKeyFor] = useState(null);
   const [revealedKeys, setRevealedKeys] = useState({});
-  const [myApiKey, setMyApiKey] = useState(null);
-  const [generatingMyKey, setGeneratingMyKey] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    base44.auth.me().then(u => { setCurrentUser(u); setMyApiKey(u?.api_key || null); }).catch(() => {});
-  }, []);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -111,18 +104,6 @@ export default function Administracao() {
       setRevealedKeys(prev => ({ ...prev, [user.id]: res.data.api_key }));
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('API Key gerada!');
-    } else {
-      toast.error('Erro ao gerar API Key');
-    }
-  };
-
-  const handleGenerateMyApiKey = async () => {
-    setGeneratingMyKey(true);
-    const res = await base44.functions.invoke('generateUserApiKey', {});
-    setGeneratingMyKey(false);
-    if (res.data?.api_key) {
-      setMyApiKey(res.data.api_key);
-      toast.success('Sua API Key foi gerada!');
     } else {
       toast.error('Erro ao gerar API Key');
     }
@@ -211,49 +192,6 @@ export default function Administracao() {
             <p className="text-sm text-slate-500">Gerencie usuários e permissões do sistema</p>
           </div>
         </div>
-
-        {/* My API Key Card */}
-        <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="p-2 bg-amber-100 rounded-lg">
-                <Key className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Minha API Key</p>
-                <p className="text-xs text-slate-400">Use para integrar terminais via API</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {myApiKey ? (
-                <>
-                  <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono text-slate-700 max-w-[200px] sm:max-w-xs truncate block border border-slate-200">
-                    {myApiKey}
-                  </code>
-                  <Button
-                    variant="ghost" size="icon"
-                    className="h-8 w-8 text-slate-400 hover:text-slate-700 shrink-0"
-                    onClick={() => { navigator.clipboard.writeText(myApiKey); toast.success('Copiado!'); }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <span className="text-sm text-slate-400">Não gerada</span>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={generatingMyKey}
-                onClick={handleGenerateMyApiKey}
-                className="gap-2 shrink-0"
-              >
-                {generatingMyKey ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
-                {myApiKey ? 'Regenerar' : 'Gerar API Key'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* User Management Card */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
