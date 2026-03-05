@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueryClient as useQC } from '@tanstack/react-query';
+import { Eye, EyeOff } from 'lucide-react';
 import { resolvePermissions } from '../components/auth/usePermissions';
 import { motion } from 'framer-motion';
 import { 
