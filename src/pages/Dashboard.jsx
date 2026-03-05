@@ -70,7 +70,7 @@ export default function Dashboard() {
 
   const isAdmin = currentUser?.role === 'admin';
 
-  const perms = currentUser ? (() => { const { resolvePermissions } = require('../components/auth/usePermissions'); return resolvePermissions(currentUser); })() : null;
+  const perms = resolvePermissions(currentUser);
   const isAdmin = currentUser?.role === 'admin';
   const canSeeAll = currentUser?.role === 'admin' || currentUser?.role === 'editor';
 
