@@ -189,6 +189,12 @@ export default function Dashboard() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
+            {currentUser && (
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300">
+                <User className="h-4 w-4 text-slate-400" />
+                <span>{currentUser.full_name || currentUser.email}</span>
+              </div>
+            )}
             <div className="text-right hidden sm:block">
               <p className="text-xs text-slate-400">Última atualização</p>
               <p className="text-sm font-mono text-slate-200">
