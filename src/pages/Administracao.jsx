@@ -50,6 +50,9 @@ export default function Administracao() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [generatingKeyFor, setGeneratingKeyFor] = useState(null);
   const [revealedKeys, setRevealedKeys] = useState({});
+  const [visibleKeys, setVisibleKeys] = useState({});
+  const [customKeyUser, setCustomKeyUser] = useState(null); // user for whom we're entering a custom key
+  const [customKeyValue, setCustomKeyValue] = useState('');
   const queryClient = useQueryClient();
 
   const { data: users = [], isLoading } = useQuery({
