@@ -397,36 +397,50 @@ export default function Administracao() {
                          </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1">
-                            {apiKey ? (
-                              <>
-                                <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600 max-w-[120px] truncate block">
-                                  {apiKey}
-                                </code>
-                                <Button
-                                  variant="ghost" size="icon"
-                                  className="h-6 w-6 text-slate-400 hover:text-slate-700"
-                                  onClick={() => { navigator.clipboard.writeText(apiKey); toast.success('Copiado!'); }}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </Button>
-                              </>
-                            ) : (
-                              <span className="text-slate-400 text-xs">Não gerada</span>
-                            )}
-                            <Button
-                              variant="ghost" size="icon"
-                              className="h-6 w-6 text-slate-400 hover:text-amber-600"
-                              title="Gerar nova API Key"
-                              disabled={generatingKeyFor === user.id}
-                              onClick={() => handleGenerateApiKey(user)}
-                            >
-                              {generatingKeyFor === user.id
-                                ? <RefreshCw className="h-3 w-3 animate-spin" />
-                                : <Key className="h-3 w-3" />
-                              }
-                            </Button>
-                          </div>
+                          {customKeyUser === user.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                autoFocus
+                                value={customKeyValue}
+                                onChange={e => setCustomKeyValue(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleSetCustomKey(user); if (e.key === 'Escape') { setCustomKeyUser(null); setCustomKeyValue(''); } }}
+                                placeholder="Cole ou digite a API Key"
+                                className="h-7 text-xs font-mono w-44"
+                              />
+                              <Button size="icon" className="h-6 w-6 bg-emerald-600 hover:bg-emerald-700" onClick={() => handleSetCustomKey(user)} disabled={!customKeyValue.trim() || generatingKeyFor === user.id}>
+                                <Check className="h-3 w-3" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setCustomKeyUser(null); setCustomKeyValue(''); }}>
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1">
+                              {apiKey ? (
+                                <>
+                                  <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600 max-w-[100px] truncate block">
+                                    {visibleKeys[user.id] ? apiKey : '••••••••••••'}
+                                  </code>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" onClick={() => setVisibleKeys(prev => ({ ...prev, [user.id]: !prev[user.id] }))}>
+                                    {visibleKeys[user.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-700" onClick={() => { navigator.clipboard.writeText(apiKey); toast.success('Copiado!'); }}>
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <span className="text-slate-400 text-xs">Não gerada</span>
+                              )}
+                              {/* Manual key entry */}
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-blue-600" title="Definir API Key manualmente" onClick={() => { setCustomKeyUser(user.id); setCustomKeyValue(apiKey || ''); }}>
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              {/* Auto-generate */}
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-amber-600" title="Gerar nova API Key automaticamente" disabled={generatingKeyFor === user.id} onClick={() => handleGenerateApiKey(user)}>
+                                {generatingKeyFor === user.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Key className="h-3 w-3" />}
+                              </Button>
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <Button
