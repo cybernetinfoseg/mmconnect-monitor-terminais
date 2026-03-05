@@ -120,7 +120,23 @@ export default function Layout({ children, currentPageName }) {
           <NavLink key={item.page} item={item} onClick={onClose} />
         ))}
       </nav>
-      <div className="p-4 border-t border-slate-200 dark:border-slate-700">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+        {currentUser && (
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
+            <User className="h-4 w-4 text-slate-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{currentUser.full_name || currentUser.email}</p>
+              <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => base44.auth.logout()}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          Sair
+        </button>
         <p className="text-xs text-slate-400 text-center">Enterprise NOC v1.0</p>
       </div>
     </div>
