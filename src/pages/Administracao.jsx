@@ -50,7 +50,14 @@ export default function Administracao() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [generatingKeyFor, setGeneratingKeyFor] = useState(null);
   const [revealedKeys, setRevealedKeys] = useState({});
+  const [myApiKey, setMyApiKey] = useState(null);
+  const [generatingMyKey, setGeneratingMyKey] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
+
+  React.useEffect(() => {
+    base44.auth.me().then(u => { setCurrentUser(u); setMyApiKey(u?.api_key || null); }).catch(() => {});
+  }, []);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
