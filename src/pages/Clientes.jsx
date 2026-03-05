@@ -184,10 +184,12 @@ export default function Clientes() {
             </div>
           </div>
           
-          <Button onClick={handleNew} size="sm" className="bg-purple-600 hover:bg-purple-700 shrink-0">
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Novo Cliente</span>
-          </Button>
+          {perms.pode_editar_clientes && (
+            <Button onClick={handleNew} size="sm" className="bg-purple-600 hover:bg-purple-700 shrink-0">
+              <Plus className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Novo Cliente</span>
+            </Button>
+          )}
         </div>
 
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
