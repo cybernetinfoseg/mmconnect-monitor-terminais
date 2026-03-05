@@ -16,7 +16,10 @@ Deno.serve(async (req) => {
         // Se não há usuário (chamada do scheduler), continua com service role
 
         // Buscar todos os terminais ativos
-        const terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
+        const allTerminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
+
+        // Terminais ip_local e p2s são geridos pelo Agente Local — não monitorar pelo cloud
+        const terminals = allTerminals.filter(t => t.tipo_conexao !== 'ip_local' && t.tipo_conexao !== 'p2s');
 
         const results = [];
 
