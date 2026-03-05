@@ -39,13 +39,34 @@ export default function Clientes() {
   const [editingCliente, setEditingCliente] = useState(null);
   const [formData, setFormData] = useState({});
   const [viewingTerminaisCliente, setViewingTerminaisCliente] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   
   const queryClient = useQueryClient();
 
-  const { data: clientes = [] } = useQuery({
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const perms = resolvePermissions(currentUser);
+  const canSeeAll = perms.isAdmin || perms.isEditor;
+
+  const { data: allClientes = [] } = useQuery({
     queryKey: ['clientes-manage'],
     queryFn: () => base44.entities.Cliente.list('-created_date'),
   });
+
+  // Viewers only see clients linked to their own terminals
+  const { data: myTerminals = [] } = useQuery({
+    queryKey: ['my-terminals-for-clientes'],
+    queryFn: () => base44.entities.Terminal.list(),
+    enabled: !canSeeAll && !!currentUser,
+  });
+
+  const clientes = useMemo(() => {
+    if (canSeeAll) return allClientes;
+    const myClienteNomes = new Set(myTerminals.map(t => t.cliente_nome).filter(Boolean));
+    return allClientes.filter(c => myClienteNomes.has(c.nome));
+  }, [allClientes, canSeeAll, myTerminals]);
 
   const { data: allTerminals = [] } = useQuery({
     queryKey: ['terminals-all'],
