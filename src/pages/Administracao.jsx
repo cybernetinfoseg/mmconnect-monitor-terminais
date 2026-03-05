@@ -57,7 +57,7 @@ export default function Administracao() {
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: () => base44.entities.User.list(),
+    queryFn: () => base44.entities.User.list('-created_date', 200),
   });
 
   // Count terminals per user
