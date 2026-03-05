@@ -212,6 +212,49 @@ export default function Administracao() {
           </div>
         </div>
 
+        {/* My API Key Card */}
+        <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+          <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Key className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Minha API Key</p>
+                <p className="text-xs text-slate-400">Use para integrar terminais via API</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {myApiKey ? (
+                <>
+                  <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono text-slate-700 max-w-[200px] sm:max-w-xs truncate block border border-slate-200">
+                    {myApiKey}
+                  </code>
+                  <Button
+                    variant="ghost" size="icon"
+                    className="h-8 w-8 text-slate-400 hover:text-slate-700 shrink-0"
+                    onClick={() => { navigator.clipboard.writeText(myApiKey); toast.success('Copiado!'); }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <span className="text-sm text-slate-400">Não gerada</span>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={generatingMyKey}
+                onClick={handleGenerateMyApiKey}
+                className="gap-2 shrink-0"
+              >
+                {generatingMyKey ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Key className="h-4 w-4" />}
+                {myApiKey ? 'Regenerar' : 'Gerar API Key'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* User Management Card */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
