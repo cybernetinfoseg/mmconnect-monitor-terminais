@@ -137,6 +137,21 @@ export default function Terminais() {
     onError: (error) => toast.error(`Erro: ${error.message}`),
   });
 
+  const [showNovoCliente, setShowNovoCliente] = useState(false);
+  const [novoClienteNome, setNovoClienteNome] = useState('');
+
+  const criarClienteMutation = useMutation({
+    mutationFn: (nome) => base44.entities.Cliente.create({ nome, ativo: true }),
+    onSuccess: (novoCliente) => {
+      queryClient.invalidateQueries(['clientes']);
+      setFormData(prev => ({ ...prev, cliente_id: novoCliente.id, cliente_nome: novoCliente.nome }));
+      setShowNovoCliente(false);
+      setNovoClienteNome('');
+      toast.success(`Cliente "${novoCliente.nome}" criado!`);
+    },
+    onError: () => toast.error('Erro ao criar cliente'),
+  });
+
   const [verificandoTodos, setVerificandoTodos] = useState(false);
   const verificarTodos = async () => {
     setVerificandoTodos(true);
