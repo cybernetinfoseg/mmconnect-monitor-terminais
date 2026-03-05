@@ -36,7 +36,7 @@ const PAGE_LABELS = {
 const EMPTY_FORM = {
   email: '',
   role: 'viewer',
-  paginas_permitidas: ROLE_DEFAULTS.viewer.paginas_permitidas,
+  paginas_permitidas: [], // new users start fully locked - admin must grant access
   pode_configurar_alertas: false,
   pode_gerenciar_usuarios: false,
   pode_editar_terminais: false,
