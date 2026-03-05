@@ -124,11 +124,15 @@ export default function Administracao() {
     if (!key) return;
     setGeneratingKeyFor(user.id);
     try {
-      await base44.entities.User.update(user.id, { api_key: key });
-      setRevealedKeys(prev => ({ ...prev, [user.id]: key }));
-      setVisibleKeys(prev => ({ ...prev, [user.id]: true }));
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('API Key definida!');
+      const res = await base44.functions.invoke('generateUserApiKey', { targetUserId: user.id, customKey: key });
+      if (res.data?.api_key) {
+        setRevealedKeys(prev => ({ ...prev, [user.id]: res.data.api_key }));
+        setVisibleKeys(prev => ({ ...prev, [user.id]: true }));
+        await queryClient.refetchQueries({ queryKey: ['users'] });
+        toast.success('API Key definida!');
+      } else {
+        toast.error('Erro ao definir API Key');
+      }
     } catch {
       toast.error('Erro ao definir API Key');
     }
