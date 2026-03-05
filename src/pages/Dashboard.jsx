@@ -229,6 +229,16 @@ export default function Dashboard() {
               <Activity className={cn("h-4 w-4 sm:mr-2", isMonitoring && "animate-pulse")} />
               <span className="hidden sm:inline">Verificar Agora</span>
             </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => base44.auth.logout()}
+              className="text-slate-300 hover:text-white hover:bg-white/10"
+              title="Sair"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline ml-1">Sair</span>
+            </Button>
           </div>
         </div>
       </div>
