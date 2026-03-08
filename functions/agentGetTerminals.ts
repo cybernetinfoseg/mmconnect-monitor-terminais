@@ -17,8 +17,8 @@ Deno.serve(async (req) => {
         }
 
         const apiKey = req.headers.get('X-Api-Key');
-        if (!apiKey || !apiKey.startsWith('noc_')) {
-            return Response.json({ error: 'API Key inválida ou ausente' }, { status: 401 });
+        if (!apiKey || apiKey.trim() === '' || !apiKey.startsWith('noc_')) {
+            return Response.json({ error: 'API Key inválida ou ausente. Ambos X-Api-Key e X-App-Id são obrigatórios.' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
@@ -28,6 +28,9 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'API Key não reconhecida' }, { status: 401 });
         }
         const owner = allUsers[0];
+        if (owner.api_key !== apiKey) {
+            return Response.json({ error: 'API Key inválida' }, { status: 401 });
+        }
 
         // Admins veem todos, utilizadores normais só os seus
         let terminals;
