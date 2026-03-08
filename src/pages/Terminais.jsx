@@ -117,7 +117,7 @@ export default function Terminais() {
       const terminal = terminals.find(t => t.id === id);
       logAudit('terminal_excluido', id, `Terminal "${terminal?.nome || id}" excluído`);
       queryClient.invalidateQueries(['terminals-manage']);
-      toast.success('Terminal excluído');
+      toast.success('Terminal eliminado');
     },
     onError: () => toast.error('Erro ao excluir terminal'),
   });
