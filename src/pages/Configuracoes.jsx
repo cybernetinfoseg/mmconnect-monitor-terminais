@@ -528,6 +528,9 @@ nssm start Base44Agent`}</pre>
                 <pre className="text-xs text-blue-800 font-mono">{`python agent_cli.py --once --log-level DEBUG`}</pre>
               </div>
 
+              {/* Código fonte do agente */}
+              <AgentSourceCode />
+
             </CardContent>
           </Card>
         </motion.div>
