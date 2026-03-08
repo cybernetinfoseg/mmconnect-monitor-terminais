@@ -472,7 +472,8 @@ export default function Configuracoes() {
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Configure as credenciais (CMD como Administrador):</p>
                       <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto">{`cd C:\\Base44Agent
-python agent_config.py --api-key SEU_API_KEY --app-id 697aa46c9998c30665e2e19a --yes`}</pre>
+python agent_config.py --api-key NOC_SUA_API_KEY --app-id 697aa46c9998c30665e2e19a --yes`}</pre>
+                      <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">O agente envia X-Api-Key e X-App-Id em cada pedido. Sem ambos, os pedidos são rejeitados.</p>
                     </div>
                   </div>
 
