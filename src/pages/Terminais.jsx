@@ -174,7 +174,7 @@ export default function Terminais() {
 
   const handleNew = () => {
     if (!perms.pode_editar_terminais && !isAdmin) {
-      toast.error('Você não tem permissão para criar terminais.');
+      toast.error('Não tem permissão para criar terminais.');
       return;
     }
     if (atLimit) {
