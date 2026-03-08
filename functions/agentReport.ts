@@ -20,10 +20,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'APP ID inválido ou ausente' }, { status: 403 });
         }
 
-        // 2. Validar API Key do utilizador
+        // 2. Validar API Key do utilizador — obrigatório, sem excepções
         const apiKey = req.headers.get('X-Api-Key');
-        if (!apiKey || !apiKey.startsWith('noc_')) {
-            return Response.json({ error: 'API Key inválida ou ausente' }, { status: 401 });
+        if (!apiKey || apiKey.trim() === '' || !apiKey.startsWith('noc_')) {
+            return Response.json({ error: 'API Key inválida ou ausente. Ambos X-Api-Key e X-App-Id são obrigatórios.' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
@@ -34,6 +34,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'API Key não reconhecida' }, { status: 401 });
         }
         const owner = allUsers[0];
+        // Garantir que a API Key guardada corresponde exactamente (sem variações de espaços)
+        if (owner.api_key !== apiKey) {
+            return Response.json({ error: 'API Key inválida' }, { status: 401 });
+        }
 
         // 3. Ler payload
         const body = await req.json();
