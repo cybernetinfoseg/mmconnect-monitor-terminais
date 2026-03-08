@@ -178,7 +178,7 @@ export default function Terminais() {
       return;
     }
     if (atLimit) {
-      toast.error(`Limite de ${limiteTerminais} terminais atingido. Contate o administrador.`);
+      toast.error(`Limite de ${limiteTerminais} terminais atingido. Contacte o administrador.`);
       return;
     }
     setEditingTerminal(null);
