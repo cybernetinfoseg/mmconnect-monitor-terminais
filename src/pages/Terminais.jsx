@@ -143,6 +143,7 @@ export default function Terminais() {
   });
 
   const [showNovoClienteModal, setShowNovoClienteModal] = useState(false);
+  const [selectedTerminal, setSelectedTerminal] = useState(null);
 
   const [verificandoTodos, setVerificandoTodos] = useState(false);
   const verificarTodos = async () => {
