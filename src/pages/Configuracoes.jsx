@@ -393,15 +393,18 @@ export default function Configuracoes() {
               {/* Credenciais */}
               <div className="space-y-3">
                 <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Key className="h-4 w-4" /> Suas Credenciais para o Agente
+                  <Key className="h-4 w-4" /> Credenciais do Agente
                 </p>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                  <strong>Segurança:</strong> O agente autentica-se enviando obrigatoriamente a <strong>API Key do utilizador</strong> e o <strong>APP ID</strong> em cada pedido. Sem ambos, o pedido é rejeitado.
+                </div>
                 <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs text-slate-500">API KEY (configure em Configurações → Secrets como <code className="bg-slate-100 px-1 rounded">BASE44_API_KEY</code>)</Label>
+                    <Label className="text-xs text-slate-500">API KEY — obtida em <strong>Administração → utilizador → Gerar API Key</strong></Label>
                     <div className="flex gap-2">
                       <Input 
                         readOnly 
-                        value="Seu API_KEY configurado nos Secrets do app" 
+                        value="noc_xxxx... (gerada na página Administração para cada utilizador)"
                         className="bg-slate-50 text-sm font-mono text-slate-500 cursor-not-allowed"
                       />
                     </div>
@@ -417,10 +420,24 @@ export default function Configuracoes() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => { navigator.clipboard.writeText('697aa46c9998c30665e2e19a'); }}
+                        onClick={() => { navigator.clipboard.writeText('697aa46c9998c30665e2e19a'); toast.success('Copiado!'); }}
                       >
                         <Copy className="h-4 w-4" />
                       </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">Endpoint — Obter Terminais</Label>
+                    <div className="flex gap-2">
+                      <Input readOnly value="/api/functions/agentGetTerminals" className="bg-slate-50 text-xs font-mono" />
+                      <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText('/api/functions/agentGetTerminals'); toast.success('Copiado!'); }}><Copy className="h-4 w-4" /></Button>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-slate-500">Endpoint — Reportar Status</Label>
+                    <div className="flex gap-2">
+                      <Input readOnly value="/api/functions/agentReport" className="bg-slate-50 text-xs font-mono" />
+                      <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText('/api/functions/agentReport'); toast.success('Copiado!'); }}><Copy className="h-4 w-4" /></Button>
                     </div>
                   </div>
                 </div>
