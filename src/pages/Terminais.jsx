@@ -367,6 +367,13 @@ export default function Terminais() {
         )}
       </div>
 
+      {selectedTerminal && (
+        <TerminalDetailModal
+          terminal={selectedTerminal}
+          onClose={() => setSelectedTerminal(null)}
+        />
+      )}
+
       <NovoClienteModal
         open={showNovoClienteModal}
         onClose={() => setShowNovoClienteModal(false)}
