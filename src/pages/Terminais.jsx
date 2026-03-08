@@ -254,7 +254,7 @@ export default function Terminais() {
         {atLimit && (
           <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            Você atingiu o limite de {limiteTerminais} terminais. Contate o administrador para aumentar seu limite.
+            Atingiu o limite de {limiteTerminais} terminais. Contacte o administrador para aumentar o seu limite.
           </div>
         )}
 
