@@ -335,9 +335,12 @@ export default function Terminais() {
                         </div>
                       )}
                       <div className="flex gap-2 pt-2 border-t border-slate-100">
-                        <Button size="sm" variant="outline" onClick={() => monitorMutation.mutate(terminal)} disabled={monitorMutation.isPending} className="flex-1">
-                          <RefreshCw className={cn("h-3 w-3 mr-1", monitorMutation.isPending && "animate-spin")} />
-                          Verificar
+                        <Button size="sm" variant="outline" onClick={() => setSelectedTerminal(terminal)} className="flex-1">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Detalhes
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => monitorMutation.mutate(terminal)} disabled={monitorMutation.isPending}>
+                          <RefreshCw className={cn("h-3 w-3", monitorMutation.isPending && "animate-spin")} />
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => handleEdit(terminal)}>
                           <Pencil className="h-3 w-3" />
