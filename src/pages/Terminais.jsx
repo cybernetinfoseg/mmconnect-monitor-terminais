@@ -119,7 +119,7 @@ export default function Terminais() {
       queryClient.invalidateQueries(['terminals-manage']);
       toast.success('Terminal eliminado');
     },
-    onError: () => toast.error('Erro ao excluir terminal'),
+    onError: () => toast.error('Erro ao eliminar terminal'),
   });
 
   const monitorMutation = useMutation({
