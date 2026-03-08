@@ -1,7 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 // Tempo máximo (em segundos) sem receber ping do agente antes de marcar Offline
-const AGENT_TIMEOUT_SECONDS = 180; // 3 minutos
+const AGENT_TIMEOUT_SECONDS = 60; // 1 minuto
 
 Deno.serve(async (req) => {
     try {
