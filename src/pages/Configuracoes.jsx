@@ -47,6 +47,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
 
 export default function Configuracoes() {
   const [formData, setFormData] = useState({});
