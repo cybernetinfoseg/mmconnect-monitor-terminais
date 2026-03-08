@@ -16,7 +16,6 @@ import {
 import { Button } from '@/components/ui/button';
 import StatusBadge from '../components/dashboard/StatusBadge';
 import LiveClock from '../components/dashboard/LiveClock';
-import TerminalDetailModal from '../components/tv/TerminalDetailModal';
 import TVSettingsPanel from '../components/tv/TVSettingsPanel';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
@@ -44,7 +43,6 @@ export default function TVMode() {
   const canSeeAll = perms.isAdmin || perms.isEditor;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedTerminal, setSelectedTerminal] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [tvSettings, setTvSettings] = useState(() => {
     try {
@@ -300,9 +298,8 @@ export default function TVMode() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ delay: index * 0.02 }}
-                    onClick={() => setSelectedTerminal(terminal)}
-                    className={cn(
-                      "cursor-pointer relative overflow-hidden rounded-2xl transition-all duration-300",
+                     className={cn(
+                      "relative overflow-hidden rounded-2xl transition-all duration-300",
                       cardPad,
                       terminal.status === 'offline'
                         ? "bg-red-500/10 border border-red-500/30"
@@ -364,14 +361,6 @@ export default function TVMode() {
           <p>Auto-refresh a cada 5 segundos • Modo NOC 24/7 • Clique num terminal para detalhes</p>
         </div>
       </div>
-
-      {/* Terminal Detail Modal */}
-      {selectedTerminal && (
-        <TerminalDetailModal
-          terminal={selectedTerminal}
-          onClose={() => setSelectedTerminal(null)}
-        />
-      )}
 
       {/* TV Settings Panel */}
       {showSettings && (
