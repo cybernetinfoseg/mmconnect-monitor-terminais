@@ -471,7 +471,7 @@ export default function Terminais() {
             <div className="flex gap-2 pt-4">
               <Button variant="outline" onClick={() => setDialogOpen(false)} className="flex-1">Cancelar</Button>
               <Button onClick={() => saveMutation.mutate(formData)} disabled={saveMutation.isPending} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                {saveMutation.isPending ? 'Salvando...' : 'Salvar'}
+                {saveMutation.isPending ? 'A guardar...' : 'Guardar'}
               </Button>
             </div>
           </div>
