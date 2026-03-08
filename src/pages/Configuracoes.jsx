@@ -138,7 +138,7 @@ export default function Configuracoes() {
                       <p className="text-sm text-slate-500">Última Sincronização</p>
                       <p className="text-lg font-semibold text-slate-900">
                         {config.ultima_sync 
-                          ? new Date(config.ultima_sync).toLocaleString('pt-BR')
+                          ? new Date(config.ultima_sync).toLocaleString('pt-PT')
                           : 'Nunca'
                         }
                       </p>
