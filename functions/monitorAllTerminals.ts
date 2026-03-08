@@ -81,8 +81,12 @@ Deno.serve(async (req) => {
                                     });
                                 }
                             } else {
-                                // Agente está ativo, manter status conforme último reporte
+                                // Agente está ativo, atualizar segundos_sem_ping no ecrã
                                 status = terminal.status || 'online';
+                                await base44.asServiceRole.entities.Terminal.update(terminal.id, {
+                                    segundos_sem_ping: segundosSemPing,
+                                    ultimo_check: agora.toISOString(),
+                                });
                             }
                         } else {
                             // Nunca recebeu ping → offline
