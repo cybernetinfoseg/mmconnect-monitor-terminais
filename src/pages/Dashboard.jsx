@@ -184,7 +184,7 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2">
             {currentUser && (
               <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300">
                 <User className="h-4 w-4 text-slate-400" />
@@ -197,43 +197,44 @@ export default function Dashboard() {
                 {lastRefresh.toLocaleTimeString('pt-BR')}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowWidgetConfig(v => !v)}
-              className={cn("bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5", showWidgetConfig && "bg-white/20")}
-            >
-              <Settings2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Widgets</span>
-            </Button>
+            {/* Mobile: single refresh button + menu; Desktop: full buttons */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
               disabled={isMonitoring}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
             >
-              <RefreshCw className={cn("h-4 w-4 sm:mr-2", isMonitoring && "animate-spin")} />
+              <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
               <span className="hidden sm:inline">Atualizar</span>
             </Button>
             <Button
               size="sm"
               onClick={handleMonitorAll}
               disabled={isMonitoring}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
             >
-              <Activity className={cn("h-4 w-4 sm:mr-2", isMonitoring && "animate-pulse")} />
+              <Activity className={cn("h-4 w-4", isMonitoring && "animate-pulse")} />
               <span className="hidden sm:inline">Verificar Agora</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowWidgetConfig(v => !v)}
+              className={cn("hidden sm:flex bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5", showWidgetConfig && "bg-white/20")}
+            >
+              <Settings2 className="h-4 w-4" />
+              Widgets
             </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => base44.auth.logout()}
-              className="text-slate-300 hover:text-white hover:bg-white/10"
+              className="hidden sm:flex text-slate-300 hover:text-white hover:bg-white/10 gap-1"
               title="Sair"
             >
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline ml-1">Sair</span>
+              Sair
             </Button>
           </div>
         </div>
