@@ -67,7 +67,7 @@ export function resolvePermissions(user) {
 
   const role = user.role || 'user';
 
-  // Admins always have full access
+  // Admins always have full access (no approval needed)
   if (role === 'admin') {
     return {
       role: 'admin',
