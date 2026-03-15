@@ -150,11 +150,11 @@ Deno.serve(async (req) => {
                         }
                     }
 
-                    // Gravar histórico de status
+                    // Gravar histórico de status (normalizar: warning → online, pois agente ainda responde)
                     await base44.asServiceRole.entities.StatusHistory.create({
                         terminal_id: terminal.id,
                         terminal_nome: terminal.nome,
-                        status: novoStatus === 'warning' ? 'offline' : novoStatus,
+                        status: novoStatus === 'warning' ? 'online' : (novoStatus || 'offline'),
                         timestamp: agora.toISOString(),
                         local: terminal.local || '',
                         cliente: terminal.cliente_nome || '',
