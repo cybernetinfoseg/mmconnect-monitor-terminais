@@ -53,11 +53,16 @@ Deno.serve(async (req) => {
             ...(statusValido === 'online' && { ultimo_ping: agora }),
         });
 
-        // 6. Verificar mudança de status para criar incidentes/alertas
+        // 6. Verificar se terminal está em janela de manutenção
+        const agora2 = new Date().toISOString();
+        const janelasManu = await base44.asServiceRole.entities.MaintenanceWindow.filter({ terminal_id, ativo: true });
+        const emManutencao = janelasManu.some(j => j.inicio <= agora2 && j.fim >= agora2);
+
+        // 7. Verificar mudança de status para criar incidentes/alertas
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
 
-        if (cache && cache.ultimo_status === 'online' && statusValido === 'offline') {
+        if (!emManutencao && cache && cache.ultimo_status === 'online' && statusValido === 'offline') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id,
                 terminal_nome: terminal.nome,
