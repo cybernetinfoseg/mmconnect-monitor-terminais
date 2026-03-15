@@ -175,9 +175,9 @@ export default function Configuracoes() {
                     <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">4</span>
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Instale como serviço Windows com NSSM:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto">{`nssm install Base44Agent python "C:\\Base44Agent\\agent.py"
+                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto">{`nssm install Base44Agent python "C:\\Program Files\\Base44Agent\\core_agent.py"
 nssm set Base44Agent AppParameters "--interval 30"
-nssm set Base44Agent AppDirectory "C:\\Base44Agent"
+nssm set Base44Agent AppDirectory "C:\\Program Files\\Base44Agent"
 nssm start Base44Agent`}</pre>
                     </div>
                   </div>
