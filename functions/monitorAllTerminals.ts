@@ -102,23 +102,25 @@ Deno.serve(async (req) => {
                                     });
                                 }
 
-                                // Reabrir incidentes resolvidos manualmente se o terminal voltou a ficar offline
+                                // Reabrir incidentes resolvidos manualmente se o terminal continua offline
+                                // Condição: resolvido há mais de 5 minutos e menos de 24h
                                 const resolvedIncidents = await base44.asServiceRole.entities.AlertIncident.filter({
                                     terminal_id: terminal.id,
                                     resolvido: true,
                                     tipo: 'offline',
                                 }).catch(() => []);
-                                // Reabrir apenas o mais recente (se existir)
                                 if (resolvedIncidents.length > 0) {
                                     const latest = resolvedIncidents.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
-                                    // Só reabre se foi resolvido há menos de 24h (para não reabrir histórico antigo)
-                                    const resolvidoHa = (agora - new Date(latest.resolvido_em)) / 60000;
-                                    if (latest.resolvido_em && resolvidoHa < 1440) {
-                                        await base44.asServiceRole.entities.AlertIncident.update(latest.id, {
-                                            resolvido: false,
-                                            resolvido_em: null,
-                                            duracao_minutos: null,
-                                        }).catch(() => {});
+                                    if (latest.resolvido_em) {
+                                        const resolvidoHaMinutos = (agora - new Date(latest.resolvido_em)) / 60000;
+                                        // Só reabre se: foi resolvido há mais de 5 min (terminal ainda offline) e menos de 24h (não histórico antigo)
+                                        if (resolvidoHaMinutos >= 5 && resolvidoHaMinutos < 1440) {
+                                            await base44.asServiceRole.entities.AlertIncident.update(latest.id, {
+                                                resolvido: false,
+                                                resolvido_em: null,
+                                                duracao_minutos: null,
+                                            }).catch(() => {});
+                                        }
                                     }
                                 }
                             }
