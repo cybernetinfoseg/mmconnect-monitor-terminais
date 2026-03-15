@@ -325,11 +325,11 @@ export default function Dashboard() {
             )}
             <Link
               to={`/TVMode${localFilter || clienteFilter ? `?${new URLSearchParams([...(localFilter ? [['local', localFilter]] : []), ...(clienteFilter ? [['cliente', clienteFilter]] : [])]).toString()}` : ''}`}
-              className="ml-auto"
+              className="col-span-2 sm:ml-auto sm:col-span-1"
             >
-              <Button variant="outline" size="sm" className="gap-1.5 text-slate-600">
+              <Button variant="outline" size="sm" className="gap-1.5 text-slate-600 w-full sm:w-auto">
                 <Tv className="h-4 w-4" />
-                <span className="hidden sm:inline">Modo TV</span>
+                Modo TV
               </Button>
             </Link>
         </motion.div>
