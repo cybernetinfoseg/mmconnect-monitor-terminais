@@ -1,13 +1,14 @@
 /**
- * agentGetTerminals — devolve os terminais do utilizador ao Agente Local
+ * agentGetTerminals — devolve os terminais ao Agente Local
  *
  * Headers obrigatórios:
- *   X-Api-Key: <api_key do utilizador>
+ *   X-Api-Key: <valor do segredo API_KEY configurado no painel>
  *   X-App-Id:  <app_id>
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-const APP_ID = Deno.env.get('BASE44_APP_ID') || '697aa46c9998c30665e2e19a';
+const APP_ID = Deno.env.get('BASE44_APP_ID');
+const API_KEY = Deno.env.get('API_KEY');
 
 Deno.serve(async (req) => {
     try {
@@ -17,30 +18,13 @@ Deno.serve(async (req) => {
         }
 
         const apiKey = req.headers.get('X-Api-Key');
-        if (!apiKey || apiKey.trim() === '' || !apiKey.startsWith('noc_')) {
-            return Response.json({ error: 'API Key inválida ou ausente. Ambos X-Api-Key e X-App-Id são obrigatórios.' }, { status: 401 });
+        if (!apiKey || !API_KEY || apiKey !== API_KEY) {
+            return Response.json({ error: 'API Key inválida ou ausente' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
+        const terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
 
-        const allUsers = await base44.asServiceRole.entities.User.filter({ api_key: apiKey });
-        if (!allUsers || allUsers.length === 0) {
-            return Response.json({ error: 'API Key não reconhecida' }, { status: 401 });
-        }
-        const owner = allUsers[0];
-        if (owner.api_key !== apiKey) {
-            return Response.json({ error: 'API Key inválida' }, { status: 401 });
-        }
-
-        // Admins veem todos, utilizadores normais só os seus
-        let terminals;
-        if (owner.role === 'admin') {
-            terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
-        } else {
-            terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true, created_by: owner.email });
-        }
-
-        // Devolver apenas os campos necessários ao agente
         const result = terminals.map(t => ({
             id: t.id,
             nome: t.nome,

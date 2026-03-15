@@ -1,16 +1,15 @@
 /**
  * agentReport — endpoint seguro para o Agente Local
  *
- * O agente DEVE enviar obrigatoriamente:
- *   Header:  X-Api-Key: <api_key do utilizador>
- *   Header:  X-App-Id:  <app_id>
- *   Body:    { terminal_id, status, latencia_ms, ultimo_ping, segundos_sem_ping }
- *
- * Sem estes dois headers a resposta é 401 / 403.
+ * Headers obrigatórios:
+ *   X-Api-Key: <valor do segredo API_KEY configurado no painel>
+ *   X-App-Id:  <app_id>
+ *   Body: { terminal_id, status, latencia_ms, segundos_sem_ping }
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-const APP_ID = Deno.env.get('BASE44_APP_ID') || '697aa46c9998c30665e2e19a';
+const APP_ID = Deno.env.get('BASE44_APP_ID');
+const API_KEY = Deno.env.get('API_KEY');
 
 Deno.serve(async (req) => {
     try {
@@ -20,24 +19,13 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'APP ID inválido ou ausente' }, { status: 403 });
         }
 
-        // 2. Validar API Key do utilizador — obrigatório, sem excepções
+        // 2. Validar API Key contra o segredo do painel
         const apiKey = req.headers.get('X-Api-Key');
-        if (!apiKey || apiKey.trim() === '' || !apiKey.startsWith('noc_')) {
-            return Response.json({ error: 'API Key inválida ou ausente. Ambos X-Api-Key e X-App-Id são obrigatórios.' }, { status: 401 });
+        if (!apiKey || !API_KEY || apiKey !== API_KEY) {
+            return Response.json({ error: 'API Key inválida ou ausente' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
-
-        // Procurar o utilizador que tem esta API Key
-        const allUsers = await base44.asServiceRole.entities.User.filter({ api_key: apiKey });
-        if (!allUsers || allUsers.length === 0) {
-            return Response.json({ error: 'API Key não reconhecida' }, { status: 401 });
-        }
-        const owner = allUsers[0];
-        // Garantir que a API Key guardada corresponde exactamente (sem variações de espaços)
-        if (owner.api_key !== apiKey) {
-            return Response.json({ error: 'API Key inválida' }, { status: 401 });
-        }
 
         // 3. Ler payload
         const body = await req.json();
@@ -47,13 +35,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'terminal_id e status são obrigatórios' }, { status: 400 });
         }
 
-        // 4. Verificar que o terminal pertence ao utilizador (ou é admin)
+        // 4. Verificar que o terminal existe
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id);
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
-        }
-        if (owner.role !== 'admin' && terminal.created_by !== owner.email) {
-            return Response.json({ error: 'Sem permissão para este terminal' }, { status: 403 });
         }
 
         const agora = new Date().toISOString();
@@ -83,7 +68,6 @@ Deno.serve(async (req) => {
                 resolvido: false,
                 notificado: false,
             });
-            // Push notification
             await base44.asServiceRole.functions.invoke('pushNotify', {
                 action: 'notify_offline',
                 terminal_id,
@@ -103,7 +87,6 @@ Deno.serve(async (req) => {
                 resolvido: true,
                 notificado: false,
             });
-            // Resolver escalações
             const openAlerts = await base44.asServiceRole.entities.EscalationAlert.filter({
                 terminal_id, resolvido: false,
             }).catch(() => []);
