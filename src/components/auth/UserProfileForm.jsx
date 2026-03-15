@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCircle, Phone, MessageSquare } from 'lucide-react';
+import { UserCircle, Phone, MessageSquare, Loader } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UserProfileForm({ user, onSuccess }) {
@@ -129,9 +128,16 @@ export default function UserProfileForm({ user, onSuccess }) {
       <Button
         type="submit"
         disabled={loading}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium gap-2"
       >
-        {loading ? 'Salvando...' : 'Preencher Perfil e Solicitar Acesso'}
+        {loading ? (
+          <>
+            <Loader className="h-4 w-4 animate-spin" />
+            Salvando...
+          </>
+        ) : (
+          'Preencher Perfil e Solicitar Acesso'
+        )}
       </Button>
     </form>
   );
