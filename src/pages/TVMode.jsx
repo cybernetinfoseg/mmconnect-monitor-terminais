@@ -374,7 +374,7 @@ export default function TVMode() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-slate-500 text-sm">
-          <p>Auto-refresh a cada {(refreshInterval / 1000).toFixed(0)} segundos • Modo NOC 24/7</p>
+          <p>Auto-refresh a cada {refreshInterval >= 60000 ? (refreshInterval / 60000).toFixed(0) + ' minuto(s)' : (refreshInterval / 1000).toFixed(0) + ' segundo(s)'} • Modo NOC 24/7</p>
         </div>
       </div>
 
