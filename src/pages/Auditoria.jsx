@@ -99,9 +99,9 @@ export default function Auditoria() {
 
         {/* Filters */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap gap-3">
-              <div className="flex-1 min-w-[200px] relative">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col gap-2 sm:flex-wrap sm:flex-row sm:gap-3">
+              <div className="relative w-full sm:flex-1 sm:min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Buscar por usuário, descrição..."
@@ -112,8 +112,8 @@ export default function Auditoria() {
               </div>
 
               <Select value={acaoFilter} onValueChange={setAcaoFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <Filter className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
                   <SelectValue placeholder="Tipo de ação" />
                 </SelectTrigger>
                 <SelectContent>
@@ -125,8 +125,8 @@ export default function Auditoria() {
               </Select>
 
               <Select value={usuarioFilter} onValueChange={setUsuarioFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <User className="h-4 w-4 mr-2 text-slate-400" />
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <User className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
                   <SelectValue placeholder="Usuário" />
                 </SelectTrigger>
                 <SelectContent>
@@ -137,22 +137,20 @@ export default function Auditoria() {
                 </SelectContent>
               </Select>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
                 <Input
                   type="date"
                   value={dataInicio}
                   onChange={e => setDataInicio(e.target.value)}
-                  className="w-[140px]"
-                  placeholder="De"
+                  className="flex-1 sm:w-[130px] text-sm"
                 />
-                <span className="text-slate-400 text-sm">–</span>
+                <span className="text-slate-400 text-sm shrink-0">–</span>
                 <Input
                   type="date"
                   value={dataFim}
                   onChange={e => setDataFim(e.target.value)}
-                  className="w-[140px]"
-                  placeholder="Até"
+                  className="flex-1 sm:w-[130px] text-sm"
                 />
               </div>
 
@@ -160,7 +158,7 @@ export default function Auditoria() {
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSearch(''); setAcaoFilter('all'); setUsuarioFilter('all');
                   setDataInicio(''); setDataFim('');
-                }} className="text-slate-500">
+                }} className="text-slate-500 w-full sm:w-auto">
                   Limpar filtros
                 </Button>
               )}
