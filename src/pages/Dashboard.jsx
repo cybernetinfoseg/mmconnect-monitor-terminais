@@ -429,8 +429,8 @@ export default function Dashboard() {
         </div>
 
         {/* Custom Widgets Row */}
-        {(widgets.terminalStatus || widgets.alertRules || widgets.recentAudit || (isAdmin && widgets.apiKeyStats)) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {(widgets.terminalStatus || widgets.alertRules || widgets.recentAudit) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {widgets.terminalStatus && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
                 <TerminalStatusWidget total={stats.total} online={stats.online} offline={stats.offline} />
@@ -444,11 +444,6 @@ export default function Dashboard() {
             {widgets.recentAudit && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                 <RecentAuditWidget currentUser={currentUser} />
-              </motion.div>
-            )}
-            {isAdmin && widgets.apiKeyStats && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-                <ApiKeyStatsWidget />
               </motion.div>
             )}
           </div>
