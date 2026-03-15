@@ -34,9 +34,22 @@ const DEFAULT_SETTINGS = {
 
 export default function TVMode() {
   const [currentUser, setCurrentUser] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState(5000);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  // Fetch monitor config to get actual refresh interval
+  useEffect(() => {
+    base44.entities.MonitorConfig.list()
+      .then((configs) => {
+        const config = configs[0];
+        if (config?.intervalo_sync_minutos) {
+          setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
+        }
+      })
+      .catch(() => setRefreshInterval(5000));
   }, []);
 
   const perms = resolvePermissions(currentUser);
