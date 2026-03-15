@@ -2,22 +2,22 @@ import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
 /**
- * Hook that checks if the user is authenticated and optionally if they are admin.
- * Redirects to login if not authenticated.
+ * Hook that checks if the user is authenticated.
+ * Redirects to login if not authenticated (unless skip=true).
  * Returns { user, loading }
  */
-export function useRequireAuth({ adminOnly = false } = {}) {
-  const [user, setUser] = useState(undefined); // undefined = loading
-  const [loading, setLoading] = useState(true);
+export function useRequireAuth({ skip = false } = {}) {
+  const [user, setUser] = useState(undefined);
+  const [loading, setLoading] = useState(!skip);
 
   useEffect(() => {
+    if (skip) return;
+
     base44.auth.me()
       .then(u => {
         setUser(u);
         setLoading(false);
         if (!u) {
-          base44.auth.redirectToLogin(window.location.href);
-        } else if (adminOnly && u.role !== 'admin') {
           base44.auth.redirectToLogin(window.location.href);
         }
       })
@@ -26,7 +26,7 @@ export function useRequireAuth({ adminOnly = false } = {}) {
         setLoading(false);
         base44.auth.redirectToLogin(window.location.href);
       });
-  }, [adminOnly]);
+  }, [skip]);
 
   return { user, loading };
 }
