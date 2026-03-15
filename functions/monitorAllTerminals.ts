@@ -60,22 +60,33 @@ Deno.serve(async (req) => {
                                     resolvido: false,
                                     notificado: false,
                                 });
-                                await Promise.all([
-                                    base44.asServiceRole.functions.invoke('pushNotify', {
-                                        action: 'notify_offline',
-                                        terminal_id: terminal.id,
-                                        terminal_nome: terminal.nome,
-                                        local: terminal.local || '',
-                                        cliente: terminal.cliente_nome || '',
-                                        owner_email: terminal.created_by || '',
-                                    }).catch(() => {}),
-                                    base44.asServiceRole.functions.invoke('telegramNotify', {
-                                        action: 'notify_offline',
-                                        terminal_nome: terminal.nome,
-                                        local: terminal.local || '',
-                                        cliente: terminal.cliente_nome || '',
-                                    }).catch(() => {}),
-                                ]);
+                                await base44.asServiceRole.functions.invoke('pushNotify', {
+                                    action: 'notify_offline',
+                                    terminal_id: terminal.id,
+                                    terminal_nome: terminal.nome,
+                                    local: terminal.local || '',
+                                    cliente: terminal.cliente_nome || '',
+                                    owner_email: terminal.created_by || '',
+                                }).catch(() => {});
+
+                                // Telegram: notificar utilizadores com bot configurado
+                                const users = await base44.asServiceRole.entities.User.list().catch(() => []);
+                                const admins = users.filter(u => u.role === 'admin' || u.email === terminal.created_by);
+                                for (const u of admins) {
+                                    if (u.telegram_bot_token && u.telegram_chat_id) {
+                                        const msg = `🔴 <b>Terminal Offline</b>\n\n` +
+                                            `📟 <b>${terminal.nome}</b>\n` +
+                                            `📍 Local: ${terminal.local || '—'}\n` +
+                                            `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
+                                            `🕐 ${new Date().toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
+                                        await base44.asServiceRole.functions.invoke('telegramNotify', {
+                                            bot_token: u.telegram_bot_token,
+                                            chat_id: u.telegram_chat_id,
+                                            message: msg,
+                                        }).catch(() => {});
+                                    }
+                                }
+
                                 await base44.asServiceRole.entities.StatusCache.update(cache.id, {
                                     ultimo_status: 'offline',
                                     atualizado_em: agora.toISOString(),
