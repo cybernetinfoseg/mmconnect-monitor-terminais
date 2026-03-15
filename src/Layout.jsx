@@ -61,9 +61,10 @@ export default function Layout({ children, currentPageName }) {
   const prevPageRef = useRef(currentPageName);
   const [currentUser, setCurrentUser] = useState(null);
   const isPublicPage = currentPageName === 'TVMode';
+  const isProfilePage = currentPageName === 'CompletarPerfil';
 
-  // Enforce login for all pages except TVMode
-  const { user: authUser, loading: authLoading } = useRequireAuth({ skip: isPublicPage });
+  // Enforce login for all pages except TVMode and CompletarPerfil
+  const { user: authUser, loading: authLoading } = useRequireAuth({ skip: isPublicPage || isProfilePage });
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -73,6 +74,11 @@ export default function Layout({ children, currentPageName }) {
 
   if (currentPageName === 'TVMode') {
     return children;
+  }
+
+  // Redirect to profile completion if first access
+  if (currentUser && currentUser.primeiroAcesso && currentPageName !== 'CompletarPerfil') {
+    return navigate('/CompletarPerfil');
   }
 
   // Show spinner while checking authentication
@@ -86,6 +92,11 @@ export default function Layout({ children, currentPageName }) {
 
   // Not logged in → redirectToLogin already called, show nothing
   if (!authUser) return null;
+
+  // If on profile completion page, just show it without layout
+  if (isProfilePage) {
+    return children;
+  }
 
   // Admins are always approved; non-admins must have aprovado === true
   const isPending = currentUser && currentUser.role !== 'admin' && !currentUser.aprovado;
