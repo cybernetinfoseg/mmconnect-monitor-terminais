@@ -194,6 +194,61 @@ export default function Administracao() {
           </div>
         </div>
 
+        {/* Pending Approvals */}
+        {pendingUsers.length > 0 && (
+          <Card className="bg-amber-50 border-amber-200">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base text-amber-800">
+                <Clock className="h-5 w-5 text-amber-600" />
+                Aprovações Pendentes
+                <span className="ml-1 bg-amber-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {pendingUsers.length}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {pendingUsers.map(user => (
+                <div key={user.id} className="flex items-center justify-between bg-white rounded-lg px-4 py-3 border border-amber-100">
+                  <div>
+                    <p className="font-medium text-slate-900 text-sm">{user.email}</p>
+                    <p className="text-xs text-slate-400">Aguardando aprovação</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      defaultValue="viewer"
+                      onValueChange={(role) => approveMutation.mutate({
+                        id: user.id,
+                        data: { aprovado: true, role, paginas_permitidas: [] }
+                      })}
+                    >
+                      <SelectTrigger className="w-[150px] h-8 text-xs">
+                        <SelectValue placeholder="Aprovar como..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="viewer">👁 Visualizador</SelectItem>
+                        <SelectItem value="editor">✏️ Editor</SelectItem>
+                        <SelectItem value="admin">⊙ Administrador</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 gap-1 h-8"
+                      onClick={() => approveMutation.mutate({
+                        id: user.id,
+                        data: { aprovado: true, role: user.role || 'viewer', paginas_permitidas: [] }
+                      })}
+                      disabled={approveMutation.isPending}
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Aprovar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
         {/* User Management Card */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
           <CardHeader className="flex flex-row items-center justify-between pb-4">
