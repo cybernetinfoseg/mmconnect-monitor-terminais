@@ -37,9 +37,9 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
         colorClasses[color] || colorClasses.blue
       )}
     >
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-500 uppercase tracking-wider">
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-1 sm:space-y-2 min-w-0">
+          <p className="text-[10px] sm:text-sm font-medium text-slate-500 uppercase tracking-wider leading-tight">
             {title}
           </p>
           <motion.p
@@ -47,7 +47,7 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className={cn(
-              'text-4xl font-bold tracking-tight',
+              'text-2xl sm:text-4xl font-bold tracking-tight',
               valueColorClasses[color] || 'text-slate-900'
             )}
           >
@@ -55,7 +55,7 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
           </motion.p>
           {trend && (
             <p className={cn(
-              'text-xs font-medium',
+              'text-[10px] sm:text-xs font-medium hidden sm:block',
               trend === 'up' ? 'text-emerald-500' : 'text-red-500'
             )}>
               {trend === 'up' ? '↑' : '↓'} {trendValue}
@@ -63,10 +63,10 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
           )}
         </div>
         <div className={cn(
-          'rounded-xl p-3',
+          'rounded-xl p-2 sm:p-3 shrink-0',
           iconColorClasses[color] || iconColorClasses.blue
         )}>
-          <Icon className="h-6 w-6" />
+          <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
         </div>
       </div>
       
