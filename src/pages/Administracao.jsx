@@ -48,8 +48,7 @@ export default function Administracao() {
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [generatingKeyFor, setGeneratingKeyFor] = useState(null);
-  const [revealedKeys, setRevealedKeys] = useState({});
+
   const queryClient = useQueryClient();
 
   const { data: users = [], isLoading } = useQuery({
