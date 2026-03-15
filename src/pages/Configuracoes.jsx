@@ -161,10 +161,10 @@ export default function Configuracoes() {
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Configure as credenciais (CMD como Administrador):</p>
                       <p className="text-xs text-slate-500 mt-1">O agente lê as credenciais do ficheiro <code className="bg-slate-100 px-1 rounded">C:\ProgramData\Base44Agent\config.json</code>. Crie-o com o conteúdo:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto">{`{
-  "API_KEY": "SUA_API_KEY",
-  "APP_ID": "${APP_ID}"
-}`}</pre>
+                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto max-w-full">{`{
+                      "API_KEY": "SUA_API_KEY",
+                      "APP_ID": "${APP_ID}"
+                      }`}</pre>
                       <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
                         Substitua <strong>SUA_API_KEY</strong> pelo valor configurado em <em>Painel → Segredos → API_KEY</em>.
                       </p>
