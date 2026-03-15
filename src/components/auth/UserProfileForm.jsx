@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { UserCircle, Phone, MessageSquare, Loader } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function UserProfileForm({ user, onSuccess }) {
+export default function UserProfileForm({ user, onSuccess, isEditMode = false }) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     nome: user?.nome || '',
@@ -32,21 +32,25 @@ export default function UserProfileForm({ user, onSuccess }) {
         sobrenome: form.sobrenome.trim(),
         telefone: form.telefone.trim(),
         motivo_acesso: form.motivo_acesso.trim(),
-        primeiroAcesso: false,
-        data_inscricao: new Date().toISOString(),
+        ...(isEditMode ? {} : { 
+          primeiroAcesso: false,
+          data_inscricao: new Date().toISOString(),
+        }),
       });
 
-      // Notify admin about new user registration
-      await base44.functions.invoke('notifyAdminNewUser', {
-        email: user.email,
-        nome: form.nome.trim(),
-        sobrenome: form.sobrenome.trim(),
-        telefone: form.telefone.trim(),
-        motivo_acesso: form.motivo_acesso.trim(),
-        data_inscricao: new Date().toLocaleString('pt-BR'),
-      });
+      if (!isEditMode) {
+        // Notify admin about new user registration (only on first submission)
+        await base44.functions.invoke('notifyAdminNewUser', {
+          email: user.email,
+          nome: form.nome.trim(),
+          sobrenome: form.sobrenome.trim(),
+          telefone: form.telefone.trim(),
+          motivo_acesso: form.motivo_acesso.trim(),
+          data_inscricao: new Date().toLocaleString('pt-BR'),
+        });
+      }
 
-      toast.success('Perfil preenchido com sucesso! Aguarde a aprovação do admin.');
+      toast.success(isEditMode ? 'Perfil atualizado com sucesso!' : 'Perfil preenchido com sucesso! Aguarde a aprovação do admin.');
       onSuccess();
     } catch (error) {
       console.error('Erro:', error);
@@ -136,7 +140,7 @@ export default function UserProfileForm({ user, onSuccess }) {
             Salvando...
           </>
         ) : (
-          'Preencher Perfil e Solicitar Acesso'
+          isEditMode ? 'Salvar Alterações' : 'Preencher Perfil e Solicitar Acesso'
         )}
       </Button>
     </form>
