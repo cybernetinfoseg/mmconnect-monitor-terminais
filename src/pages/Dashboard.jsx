@@ -272,7 +272,7 @@ export default function Dashboard() {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-wrap items-end gap-3"
+          className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-2 sm:gap-3"
         >
           <FilterDropdown
             label="Filtrar por Local"
