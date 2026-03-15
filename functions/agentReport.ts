@@ -43,6 +43,8 @@ Deno.serve(async (req) => {
 
         const agora = new Date().toISOString();
         const statusValido = ['online', 'offline', 'warning'].includes(status) ? status : 'offline';
+        // Para lógica de cache/incidentes: warning é tratado como online (agente ainda responde)
+        const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
 
         // 5. Atualizar terminal
         await base44.asServiceRole.entities.Terminal.update(terminal_id, {
@@ -50,7 +52,8 @@ Deno.serve(async (req) => {
             ultimo_check: agora,
             latencia_ms: latencia_ms ?? null,
             segundos_sem_ping: segundos_sem_ping ?? 0,
-            ...(statusValido === 'online' && { ultimo_ping: agora }),
+            // Actualizar ultimo_ping para online E warning (agente está a responder)
+            ...(statusEfetivo === 'online' && { ultimo_ping: agora }),
         });
 
         // 6. Verificar se terminal está em janela de manutenção
