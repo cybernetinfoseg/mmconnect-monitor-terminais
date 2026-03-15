@@ -199,6 +199,11 @@ python core_agent.py --once`}</pre>
           </Card>
         </motion.div>
 
+        {/* Telegram Notifications */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+          <TelegramConfig />
+        </motion.div>
+
         {/* Delete Account — apenas admin */}
         {perms.isAdmin && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
