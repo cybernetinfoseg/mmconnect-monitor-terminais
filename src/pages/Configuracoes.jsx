@@ -31,6 +31,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
+import TelegramConfig from '../components/configuracoes/TelegramConfig';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
 
