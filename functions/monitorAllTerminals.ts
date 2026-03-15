@@ -49,7 +49,9 @@ Deno.serve(async (req) => {
                             // Criar incidente se transitou de Online → Offline
                             const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminal.id });
                             const cache = cacheResults[0] || null;
-                            if (cache && cache.ultimo_status === 'online') {
+                            // Criar incidente se: transitou online→offline OU se nunca houve cache (primeira detecção de queda)
+                            const eraOnline = !cache || cache.ultimo_status === 'online';
+                            if (eraOnline) {
                                 await base44.asServiceRole.entities.AlertIncident.create({
                                     terminal_id: terminal.id,
                                     terminal_nome: terminal.nome,
