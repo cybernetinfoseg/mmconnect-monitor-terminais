@@ -60,11 +60,25 @@ export default function Terminais() {
   const isAdmin = perms.isAdmin;
   const limiteTerminais = perms.limite_terminais;
 
-  // Fetch terminals with auto-refresh every 5 seconds
+  const [refreshInterval, setRefreshInterval] = useState(5000);
+
+  // Fetch monitor config to get actual refresh interval
+  useEffect(() => {
+    base44.entities.MonitorConfig.list()
+      .then((configs) => {
+        const config = configs[0];
+        if (config?.intervalo_sync_minutos) {
+          setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
+        }
+      })
+      .catch(() => setRefreshInterval(5000));
+  }, []);
+
+  // Fetch terminals with auto-refresh based on config
   const { data: allTerminals = [], isLoading } = useQuery({
     queryKey: ['terminals-manage'],
     queryFn: () => base44.entities.Terminal.list('-created_date'),
-    refetchInterval: 5000,
+    refetchInterval: refreshInterval,
   });
 
   // Filter: admin/editor sees all, viewer sees only their own
