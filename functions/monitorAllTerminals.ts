@@ -89,10 +89,18 @@ Deno.serve(async (req) => {
                                     }
                                 }
 
-                                await base44.asServiceRole.entities.StatusCache.update(cache.id, {
-                                    ultimo_status: 'offline',
-                                    atualizado_em: agora.toISOString(),
-                                });
+                                if (cache) {
+                                    await base44.asServiceRole.entities.StatusCache.update(cache.id, {
+                                        ultimo_status: 'offline',
+                                        atualizado_em: agora.toISOString(),
+                                    });
+                                } else {
+                                    await base44.asServiceRole.entities.StatusCache.create({
+                                        terminal_id: terminal.id,
+                                        ultimo_status: 'offline',
+                                        atualizado_em: agora.toISOString(),
+                                    });
+                                }
                             }
                         } else {
                             // Agente ativo → atualizar contador
