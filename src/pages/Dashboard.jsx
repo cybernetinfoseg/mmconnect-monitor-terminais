@@ -83,11 +83,11 @@ export default function Dashboard() {
   const perms = resolvePermissions(currentUser);
   const canSeeAll = currentUser?.role === 'admin' || currentUser?.role === 'editor';
 
-  // Fetch terminals with auto-refresh every 5 seconds
+  // Fetch terminals with auto-refresh based on config
   const { data: allTerminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals'],
     queryFn: () => base44.entities.Terminal.list(),
-    refetchInterval: 5000,
+    refetchInterval: refreshInterval,
     enabled: !!currentUser,
   });
 
