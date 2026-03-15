@@ -48,6 +48,7 @@ export default function Dashboard() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [showWidgetConfig, setShowWidgetConfig] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState(5000);
   const [widgets, setWidgets] = useState(() => {
     try {
       const saved = localStorage.getItem('dashboard-widgets');
@@ -57,6 +58,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  // Fetch monitor config to get actual refresh interval
+  useEffect(() => {
+    base44.entities.MonitorConfig.list()
+      .then((configs) => {
+        const config = configs[0];
+        if (config?.intervalo_sync_minutos) {
+          setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
+        }
+      })
+      .catch(() => setRefreshInterval(5000));
   }, []);
 
   const toggleWidget = (key) => {
