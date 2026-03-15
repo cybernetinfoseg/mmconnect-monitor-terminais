@@ -1,78 +1,41 @@
 /**
- * telegramNotify — envia mensagens de alerta para um grupo/canal Telegram.
- *
- * Secrets necessários (configurar em Dashboard → Settings → Environment Variables):
- *   TELEGRAM_BOT_TOKEN  — token do bot (via @BotFather)
- *   TELEGRAM_CHAT_ID    — ID do grupo/canal (ex: -1001234567890)
- *
- * Payload esperado:
- *   { action: 'notify_offline' | 'notify_restored', terminal_nome, local, cliente }
+ * telegramNotify — envia mensagem de alerta via Telegram Bot API
+ * Chamado internamente por agentReport/monitorAllTerminals
+ * Payload: { bot_token, chat_id, message }
  */
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 Deno.serve(async (req) => {
     try {
-        const BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
-        const CHAT_ID = Deno.env.get('TELEGRAM_CHAT_ID');
-
-        if (!BOT_TOKEN || !CHAT_ID) {
-            console.warn('telegramNotify: TELEGRAM_BOT_TOKEN ou TELEGRAM_CHAT_ID não configurados. Ignorando.');
-            return Response.json({ success: false, reason: 'secrets_not_configured' });
-        }
+        const base44 = createClientFromRequest(req);
 
         const body = await req.json();
-        const { action, terminal_nome, local, cliente } = body;
+        const { bot_token, chat_id, message } = body;
 
-        const agora = new Date().toLocaleString('pt-PT', { timeZone: 'UTC', hour12: false });
-
-        let text = '';
-        if (action === 'notify_offline') {
-            text = [
-                `🔴 *TERMINAL OFFLINE*`,
-                ``,
-                `📟 *Terminal:* ${terminal_nome || 'Desconhecido'}`,
-                `📍 *Local:* ${local || '—'}`,
-                `🏢 *Cliente:* ${cliente || '—'}`,
-                `🕐 *Hora:* ${agora} UTC`,
-                ``,
-                `⚠️ O terminal deixou de responder. Verificar ligação.`,
-            ].join('\n');
-        } else if (action === 'notify_restored') {
-            text = [
-                `✅ *TERMINAL RESTAURADO*`,
-                ``,
-                `📟 *Terminal:* ${terminal_nome || 'Desconhecido'}`,
-                `📍 *Local:* ${local || '—'}`,
-                `🏢 *Cliente:* ${cliente || '—'}`,
-                `🕐 *Hora:* ${agora} UTC`,
-                ``,
-                `✔️ Terminal voltou a ficar online.`,
-            ].join('\n');
-        } else {
-            return Response.json({ success: false, reason: 'unknown_action' });
+        if (!bot_token || !chat_id || !message) {
+            return Response.json({ error: 'bot_token, chat_id e message são obrigatórios' }, { status: 400 });
         }
 
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+        const url = `https://api.telegram.org/bot${bot_token}/sendMessage`;
         const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                chat_id: CHAT_ID,
-                text,
-                parse_mode: 'Markdown',
+                chat_id,
+                text: message,
+                parse_mode: 'HTML',
             }),
         });
 
-        const result = await res.json();
+        const data = await res.json();
 
-        if (!result.ok) {
-            console.error('telegramNotify erro Telegram API:', result);
-            return Response.json({ success: false, error: result.description }, { status: 500 });
+        if (!res.ok) {
+            return Response.json({ error: data.description || 'Erro Telegram' }, { status: 400 });
         }
 
-        return Response.json({ success: true, message_id: result.result?.message_id });
+        return Response.json({ success: true, message_id: data.result?.message_id });
 
     } catch (error) {
-        console.error('telegramNotify erro:', error);
-        return Response.json({ success: false, error: error.message }, { status: 500 });
+        return Response.json({ error: error.message }, { status: 500 });
     }
 });
