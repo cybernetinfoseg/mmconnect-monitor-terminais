@@ -201,8 +201,50 @@ export default function Administracao() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Administração</h1>
-            <p className="text-sm text-slate-500">Gerencie usuários e permissões do sistema</p>
+            <p className="text-sm text-slate-500">Gerencie usuários, permissões e configurações do sistema</p>
           </div>
+        </div>
+
+        {/* System Configuration Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Intervalo Sync</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-2">{monitorConfig[0]?.intervalo_sync_minutos || 5}m</p>
+                  <p className="text-xs text-blue-600 mt-1">Atualização automática</p>
+                </div>
+                <Activity className="h-8 w-8 text-blue-400 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Usuários</p>
+                  <p className="text-2xl font-bold text-emerald-900 mt-2">{approvedUsers.length}</p>
+                  <p className="text-xs text-emerald-600 mt-1">{pendingUsers.length} pendentes</p>
+                </div>
+                <UserCheck className="h-8 w-8 text-emerald-400 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+            <CardContent className="pt-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-orange-700 uppercase tracking-wider">Regras Alerta</p>
+                  <p className="text-2xl font-bold text-orange-900 mt-2">{alertRules.filter(r => r.ativo).length}</p>
+                  <p className="text-xs text-orange-600 mt-1">Ativas de {alertRules.length}</p>
+                </div>
+                <AlertCircle className="h-8 w-8 text-orange-400 opacity-50" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Pending Approvals */}
