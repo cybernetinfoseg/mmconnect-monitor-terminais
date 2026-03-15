@@ -172,63 +172,80 @@ export default function Auditoria() {
           {filtered.length !== logs.length && <span>de {logs.length} total</span>}
         </div>
 
-        {/* Logs Table */}
-        <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Data/Hora</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Usuário</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Ação</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Descrição</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Entidade</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {isLoading ? (
-                    <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>
-                  ) : filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
-                        <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                        <p>Nenhum registro encontrado</p>
-                      </td>
-                    </tr>
-                  ) : filtered.map(log => {
-                    const acaoInfo = ACAO_LABELS[log.acao] || { label: log.acao, color: 'bg-slate-100 text-slate-600' };
-                    return (
-                      <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
-                          {moment(log.timestamp).format('DD/MM/YY HH:mm:ss')}
-                        </td>
-                        <td className="px-4 py-3 text-slate-700 max-w-[160px] truncate">
-                          {log.usuario_email}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Badge className={cn("text-xs whitespace-nowrap", acaoInfo.color)}>
-                            {acaoInfo.label}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 hidden md:table-cell max-w-xs truncate">
-                          {log.descricao || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">
-                          {log.entidade && (
-                            <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                              {log.entidade}{log.entidade_id ? ` #${log.entidade_id.slice(-6)}` : ''}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        {/* Logs — cards on mobile, table on desktop */}
+        {isLoading ? (
+          <div className="text-center py-8 text-slate-400">Carregando...</div>
+        ) : filtered.length === 0 ? (
+          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+            <CardContent className="py-12 text-center text-slate-400">
+              <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-30" />
+              <p>Nenhum registro encontrado</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Mobile cards */}
+            <div className="sm:hidden space-y-2">
+              {filtered.map(log => {
+                const acaoInfo = ACAO_LABELS[log.acao] || { label: log.acao, color: 'bg-slate-100 text-slate-600' };
+                return (
+                  <Card key={log.id} className="bg-white/80 border-slate-200/50">
+                    <CardContent className="p-3 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge className={cn("text-xs shrink-0", acaoInfo.color)}>{acaoInfo.label}</Badge>
+                        <span className="font-mono text-xs text-slate-400">{moment(log.timestamp).format('DD/MM/YY HH:mm')}</span>
+                      </div>
+                      <p className="text-xs text-slate-600 truncate">{log.usuario_email}</p>
+                      {log.descricao && <p className="text-xs text-slate-500 line-clamp-2">{log.descricao}</p>}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-          </CardContent>
-        </Card>
+            {/* Desktop table */}
+            <Card className="hidden sm:block bg-white/80 backdrop-blur-sm border-slate-200/50">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Data/Hora</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Usuário</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Ação</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden md:table-cell">Descrição</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden lg:table-cell">Entidade</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filtered.map(log => {
+                        const acaoInfo = ACAO_LABELS[log.acao] || { label: log.acao, color: 'bg-slate-100 text-slate-600' };
+                        return (
+                          <tr key={log.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
+                              {moment(log.timestamp).format('DD/MM/YY HH:mm:ss')}
+                            </td>
+                            <td className="px-4 py-3 text-slate-700 max-w-[160px] truncate">{log.usuario_email}</td>
+                            <td className="px-4 py-3">
+                              <Badge className={cn("text-xs whitespace-nowrap", acaoInfo.color)}>{acaoInfo.label}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 hidden md:table-cell max-w-xs truncate">{log.descricao || '—'}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs hidden lg:table-cell">
+                              {log.entidade && (
+                                <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {log.entidade}{log.entidade_id ? ` #${log.entidade_id.slice(-6)}` : ''}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </div>
   );
