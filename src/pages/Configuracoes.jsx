@@ -144,7 +144,7 @@ export default function Configuracoes() {
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Baixe o NSSM (gerenciador de serviços Windows)</p>
                       <a href="https://nssm.cc/download" target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs">nssm.cc/download</a>
-                      <p className="text-xs text-slate-500 mt-1">Extraia e copie <code className="bg-slate-100 px-1 rounded">nssm.exe</code> para <code className="bg-slate-100 px-1 rounded">C:\Base44Agent\</code></p>
+                      <p className="text-xs text-slate-500 mt-1">Extraia e copie <code className="bg-slate-100 px-1 rounded">nssm.exe</code> para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\</code></p>
                     </div>
                   </div>
 

@@ -159,15 +159,6 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
             api_key = config["API_KEY"]
             app_id  = config["APP_ID"]
 
-            # Validacao local minima antes de qualquer pedido de rede
-            if not api_key.startswith("noc_"):
-                logger.error("API Key invalida: deve comecar com 'noc_'. Verifique a configuracao.")
-                for _ in range(30):
-                    if stop_event and stop_event.is_set(): return 0
-                    time.sleep(1)
-                if once: break
-                continue
-
             agora = datetime.now(timezone.utc)
             if enable_update and check_update_safe and (agora - last_update_check) >= UPDATE_EVERY:
                 try:
