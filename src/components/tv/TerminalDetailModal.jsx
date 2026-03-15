@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -15,15 +15,10 @@ import {
   CheckCircle,
   Network,
   FileText,
-  Zap,
-  RefreshCw,
-  CalendarClock
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 import StatusBadge from '../dashboard/StatusBadge';
-import ScheduleCheckModal from './ScheduleCheckModal';
 
 const formatTimeSince = (seconds) => {
   if (!seconds || seconds < 0) return '—';
@@ -44,31 +39,6 @@ const InfoRow = ({ icon: Icon, label, value, mono }) => (
 );
 
 export default function TerminalDetailModal({ terminal, onClose }) {
-  const queryClient = useQueryClient();
-  const [isPinging, setIsPinging] = useState(false);
-  const [pingResult, setPingResult] = useState(null);
-  const [showSchedule, setShowSchedule] = useState(false);
-
-  const handlePing = async () => {
-    setIsPinging(true);
-    setPingResult(null);
-    try {
-      const res = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
-      const data = res.data;
-      setPingResult({ success: data.success, status: data.status, latencia: data.latencia, error: data.error });
-      // Refresh queries
-      queryClient.invalidateQueries({ queryKey: ['terminals'] });
-      queryClient.invalidateQueries({ queryKey: ['terminals-tv'] });
-      queryClient.invalidateQueries({ queryKey: ['terminal-history', terminal.id] });
-      queryClient.invalidateQueries({ queryKey: ['terminal-incidents', terminal.id] });
-    } catch (e) {
-      setPingResult({ success: false, error: e.message });
-    } finally {
-      setIsPinging(false);
-    }
-  };
-
-  // Fetch status history for this terminal
   const { data: history = [] } = useQuery({
     queryKey: ['terminal-history', terminal.id],
     queryFn: () => base44.entities.StatusHistory.filter(
@@ -79,7 +49,6 @@ export default function TerminalDetailModal({ terminal, onClose }) {
     enabled: !!terminal.id,
   });
 
-  // Fetch incidents for this terminal
   const { data: incidents = [] } = useQuery({
     queryKey: ['terminal-incidents', terminal.id],
     queryFn: () => base44.entities.AlertIncident.filter(
@@ -116,10 +85,8 @@ export default function TerminalDetailModal({ terminal, onClose }) {
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
-        {/* Backdrop */}
         <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
 
-        {/* Modal */}
         <motion.div
           className="relative w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-2xl overflow-hidden flex flex-col"
           initial={{ y: 60, opacity: 0, scale: 0.97 }}
@@ -150,28 +117,6 @@ export default function TerminalDetailModal({ terminal, onClose }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <StatusBadge status={terminal.status} pulse />
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handlePing}
-                disabled={isPinging}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
-              >
-                {isPinging
-                  ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  : <Zap className="h-3.5 w-3.5 text-yellow-400" />
-                }
-                <span className="hidden sm:inline">{isPinging ? 'A verificar...' : 'Verificar'}</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowSchedule(true)}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
-              >
-                <CalendarClock className="h-3.5 w-3.5 text-blue-400" />
-                <span className="hidden sm:inline">Agendar</span>
-              </Button>
               <button
                 onClick={onClose}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
@@ -183,39 +128,6 @@ export default function TerminalDetailModal({ terminal, onClose }) {
 
           {/* Body */}
           <div className="overflow-y-auto flex-1 p-5 space-y-5">
-
-            {/* Ping Result */}
-            <AnimatePresence>
-              {pingResult && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium",
-                    pingResult.status === 'online'
-                      ? "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300"
-                      : "bg-red-500/15 border border-red-500/30 text-red-300"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    {pingResult.status === 'online'
-                      ? <CheckCircle className="h-4 w-4" />
-                      : <WifiOff className="h-4 w-4" />
-                    }
-                    <span>
-                      {pingResult.status === 'online'
-                        ? `Online • ${pingResult.latencia}ms de latência`
-                        : `Offline${pingResult.error ? ` • ${pingResult.error}` : ''}`
-                      }
-                    </span>
-                  </div>
-                  <button onClick={() => setPingResult(null)} className="text-slate-400 hover:text-white">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {/* Quick Stats */}
             <div className="grid grid-cols-3 gap-3">
@@ -333,14 +245,6 @@ export default function TerminalDetailModal({ terminal, onClose }) {
           </div>
         </motion.div>
       </motion.div>
-
-      {/* Schedule Modal */}
-      {showSchedule && (
-        <ScheduleCheckModal
-          terminal={terminal}
-          onClose={() => setShowSchedule(false)}
-        />
-      )}
     </AnimatePresence>
   );
 }
