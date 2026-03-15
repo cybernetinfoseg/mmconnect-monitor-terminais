@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import PushNotificationManager from './components/notifications/PushNotificationManager';
 import PendingApproval from './components/auth/PendingApproval';
+import { useRequireAuth } from './components/auth/useRequireAuth';
 
 const ALL_NAV_ITEMS = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
