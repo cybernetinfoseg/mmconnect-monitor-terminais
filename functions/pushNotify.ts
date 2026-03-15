@@ -54,10 +54,14 @@ Deno.serve(async (req) => {
       return Response.json({ success: true });
     }
 
-    // ─── CHECK ESCALATIONS (called by automation, admin-only) ─────
+    // ─── CHECK ESCALATIONS (called by automation/scheduler – no auth required) ─
     if (action === 'check_escalations') {
-      const user = await base44.auth.me();
-      if (user?.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
+      // Se houver utilizador autenticado, verificar que é admin; scheduler chama sem auth
+      const isAuthenticated = await base44.auth.isAuthenticated();
+      if (isAuthenticated) {
+        const user = await base44.auth.me();
+        if (user?.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
+      }
 
       const now = new Date();
       const threshold24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
