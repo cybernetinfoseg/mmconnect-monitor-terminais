@@ -147,7 +147,7 @@ export default function Incidents() {
           
           <Button
             variant="outline"
-            onClick={() => refetch()}
+            onClick={handleRefresh}
             className="flex items-center gap-2"
           >
             <RefreshCw className="h-4 w-4" />
