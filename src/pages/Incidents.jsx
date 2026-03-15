@@ -349,16 +349,28 @@ export default function Incidents() {
                       </div>
                       
                       {!incident.resolvido && incident.tipo === 'offline' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                          onClick={() => handleResolve(incident)}
-                          disabled={resolveMutation.isPending}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Resolver
-                        </Button>
+                        <div className="flex flex-col items-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className={cn(
+                              checkError === incident.id
+                                ? "border-red-300 text-red-700 hover:bg-red-50"
+                                : "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                            )}
+                            onClick={() => handleResolve(incident)}
+                            disabled={checkingId === incident.id || resolveMutation.isPending}
+                          >
+                            {checkingId === incident.id
+                              ? <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                              : <CheckCircle className="h-4 w-4 mr-1" />
+                            }
+                            {checkingId === incident.id ? 'A verificar...' : 'Resolver'}
+                          </Button>
+                          {checkError === incident.id && (
+                            <p className="text-xs text-red-600 font-medium">Terminal ainda offline</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </motion.div>
