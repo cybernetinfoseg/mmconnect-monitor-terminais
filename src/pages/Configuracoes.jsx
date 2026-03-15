@@ -186,7 +186,8 @@ nssm start Base44Agent`}</pre>
                     <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">5</span>
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Teste rápido (sem instalar serviço):</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto">{`python agent.py --once`}</pre>
+                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto">{`cd "C:\\Program Files\\Base44Agent"
+python core_agent.py --once`}</pre>
                     </div>
                   </div>
 
