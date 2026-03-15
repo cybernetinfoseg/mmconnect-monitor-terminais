@@ -232,7 +232,7 @@ export default function Terminais() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
               <p className="text-xs sm:text-sm text-emerald-600 flex items-center gap-1">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shrink-0 inline-block"></span>
-                Auto-refresh 5s
+                Auto-refresh {(refreshInterval / 1000).toFixed(0)}s
                 {!isAdmin && (
                   <span className={cn("ml-2 font-semibold", atLimit ? "text-red-600" : "text-slate-500")}>
                     • {terminalCount}/{limiteTerminais} terminais
