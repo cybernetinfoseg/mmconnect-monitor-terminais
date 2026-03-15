@@ -101,6 +101,16 @@ Deno.serve(async (req) => {
                         }
                     }
 
+                    // Gravar histórico de status
+                    await base44.asServiceRole.entities.StatusHistory.create({
+                        terminal_id: terminal.id,
+                        terminal_nome: terminal.nome,
+                        status: novoStatus === 'warning' ? 'offline' : novoStatus,
+                        timestamp: agora.toISOString(),
+                        local: terminal.local || '',
+                        cliente: terminal.cliente_nome || '',
+                    }).catch(() => {});
+
                     return { terminal_id: terminal.id, terminal_nome: terminal.nome, success: true, status: novoStatus };
                 } catch (error) {
                     return { terminal_id: terminal.id, terminal_nome: terminal.nome, success: false, error: error.message };
