@@ -386,7 +386,7 @@ export default function Administracao() {
                     <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>
                   ) : users.length === 0 ? (
                     <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Nenhum usuário encontrado</td></tr>
-                  ) : users.map(user => {
+                  ) : approvedUsers.map(user => {
                     const count = terminalCountByUser[user.email] || 0;
                     const limit = user.limite_terminais ?? 0;
                     return (
