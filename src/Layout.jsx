@@ -55,6 +55,10 @@ export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const prevPageRef = useRef(currentPageName);
   const [currentUser, setCurrentUser] = useState(null);
+  const isPublicPage = currentPageName === 'TVMode';
+
+  // Enforce login for all pages except TVMode
+  const { user: authUser, loading: authLoading } = useRequireAuth({ skip: isPublicPage });
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
