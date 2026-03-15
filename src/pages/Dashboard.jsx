@@ -33,13 +33,10 @@ import PullToRefresh from '../components/dashboard/PullToRefresh';
 import TerminalStatusWidget from '../components/dashboard/TerminalStatusWidget';
 import AlertRulesWidget from '../components/dashboard/AlertRulesWidget';
 import RecentAuditWidget from '../components/dashboard/RecentAuditWidget';
-import ApiKeyStatsWidget from '../components/dashboard/ApiKeyStatsWidget';
-
 const DEFAULT_WIDGETS = {
   terminalStatus: true,
   alertRules: true,
   recentAudit: true,
-  apiKeyStats: true,
 };
 
 export default function Dashboard() {

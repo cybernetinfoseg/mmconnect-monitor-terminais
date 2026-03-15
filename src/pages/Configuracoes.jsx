@@ -151,7 +151,7 @@ export default function Configuracoes() {
                   <div className="flex gap-3 items-start">
                     <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
                     <div className="flex-1">
-                      <p className="font-medium text-slate-700">Coloque os arquivos do agente em <code className="bg-slate-100 px-1 rounded">C:\Base44Agent\</code></p>
+                      <p className="font-medium text-slate-700">Coloque os arquivos do agente em <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\</code></p>
                       <p className="text-xs text-slate-500 mt-1">Copie o código fonte abaixo para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\core_agent.py</code></p>
                     </div>
                   </div>

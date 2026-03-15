@@ -22,7 +22,6 @@ const ACAO_LABELS = {
   terminal_editado: { label: 'Terminal Editado', color: 'bg-blue-100 text-blue-700' },
   terminal_excluido: { label: 'Terminal Excluído', color: 'bg-red-100 text-red-700' },
   terminal_verificado: { label: 'Terminal Verificado', color: 'bg-slate-100 text-slate-600' },
-  api_key_gerada: { label: 'API Key Gerada', color: 'bg-amber-100 text-amber-700' },
   usuario_convidado: { label: 'Usuário Convidado', color: 'bg-purple-100 text-purple-700' },
   permissao_atualizada: { label: 'Permissão Atualizada', color: 'bg-indigo-100 text-indigo-700' },
 };
