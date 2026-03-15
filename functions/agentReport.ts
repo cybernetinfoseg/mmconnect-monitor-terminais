@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
                     }
                 }
             }
-        } else if (!emManutencao && cache && cache.ultimo_status === 'offline' && statusValido === 'online') {
+        } else if (!emManutencao && cache && cache.ultimo_status === 'offline' && statusEfetivo === 'online') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id,
                 terminal_nome: terminal.nome,
