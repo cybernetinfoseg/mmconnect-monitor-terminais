@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import PushNotificationManager from './components/notifications/PushNotificationManager';
+import PendingApproval from './components/auth/PendingApproval';
 
 const ALL_NAV_ITEMS = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
@@ -62,6 +63,12 @@ export default function Layout({ children, currentPageName }) {
 
   if (currentPageName === 'TVMode') {
     return children;
+  }
+
+  // Admins are always approved; non-admins must have aprovado === true
+  const isPending = currentUser && currentUser.role !== 'admin' && !currentUser.aprovado;
+  if (isPending) {
+    return <PendingApproval user={currentUser} />;
   }
 
   const isRoot = rootPages.includes(currentPageName);
