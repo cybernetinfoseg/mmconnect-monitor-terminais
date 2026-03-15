@@ -73,14 +73,22 @@ Deno.serve(async (req) => {
                 resolvido: false,
                 notificado: false,
             });
-            await base44.asServiceRole.functions.invoke('pushNotify', {
-                action: 'notify_offline',
-                terminal_id,
-                terminal_nome: terminal.nome,
-                local: terminal.local || '',
-                cliente: terminal.cliente_nome || '',
-                owner_email: terminal.created_by || '',
-            }).catch(() => {});
+            await Promise.all([
+                base44.asServiceRole.functions.invoke('pushNotify', {
+                    action: 'notify_offline',
+                    terminal_id,
+                    terminal_nome: terminal.nome,
+                    local: terminal.local || '',
+                    cliente: terminal.cliente_nome || '',
+                    owner_email: terminal.created_by || '',
+                }).catch(() => {}),
+                base44.asServiceRole.functions.invoke('telegramNotify', {
+                    action: 'notify_offline',
+                    terminal_nome: terminal.nome,
+                    local: terminal.local || '',
+                    cliente: terminal.cliente_nome || '',
+                }).catch(() => {}),
+            ]);
         } else if (!emManutencao && cache && cache.ultimo_status === 'offline' && statusValido === 'online') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id,
@@ -98,6 +106,12 @@ Deno.serve(async (req) => {
             for (const alert of openAlerts) {
                 await base44.asServiceRole.entities.EscalationAlert.update(alert.id, { resolvido: true }).catch(() => {});
             }
+            await base44.asServiceRole.functions.invoke('telegramNotify', {
+                action: 'notify_restored',
+                terminal_nome: terminal.nome,
+                local: terminal.local || '',
+                cliente: terminal.cliente_nome || '',
+            }).catch(() => {});
         }
 
         // 7. Atualizar cache
