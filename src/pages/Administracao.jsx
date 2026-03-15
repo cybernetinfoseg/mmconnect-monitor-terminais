@@ -54,6 +54,21 @@ export default function Administracao() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: () => base44.entities.User.list(),
+    refetchInterval: 15000,
+  });
+
+  const pendingUsers = users.filter(u => u.role !== 'admin' && !u.aprovado);
+  const approvedUsers = users.filter(u => u.role === 'admin' || u.aprovado);
+
+  const approveMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.User.update(id, data),
+    onSuccess: (_, { id, data }) => {
+      const u = users.find(u => u.id === id);
+      logAudit('permissao_atualizada', id, `Utilizador ${u?.email || id} aprovado com role "${data.role}"`);
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('Utilizador aprovado!');
+    },
+    onError: () => toast.error('Erro ao aprovar utilizador'),
   });
 
   // Count terminals per user
