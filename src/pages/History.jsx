@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UptimeChart from '../components/dashboard/UptimeChart';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+import { format, subHours, pt } from 'date-fns';
 
 export default function History() {
   const [period, setPeriod] = useState('24h');
@@ -62,9 +62,9 @@ export default function History() {
       '7d': 168,
       '30d': 720
     };
-    
+
     const hours = periodHours[period] || 24;
-    const cutoff = moment().subtract(hours, 'hours').toDate();
+    const cutoff = subHours(new Date(), hours);
     
     const filteredHistory = history.filter(h => new Date(h.timestamp) >= cutoff);
     
