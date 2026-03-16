@@ -28,6 +28,19 @@ export default function History() {
   const perms = resolvePermissions(currentUser);
   const canSeeAll = perms.isAdmin || perms.isEditor;
 
+  // Fetch terminals
+  const { data: allTerminals = [] } = useQuery({
+    queryKey: ['terminals-history'],
+    queryFn: () => base44.entities.Terminal.list(),
+    enabled: !!currentUser,
+  });
+
+  const terminals = useMemo(() => {
+    if (!currentUser) return [];
+    if (canSeeAll) return allTerminals;
+    return allTerminals.filter(t => t.created_by === currentUser.email);
+  }, [allTerminals, currentUser, canSeeAll]);
+
   // Fetch status history
   const { data: allHistory = [], isLoading: historyLoading } = useQuery({
     queryKey: ['status-history', period],
@@ -41,19 +54,6 @@ export default function History() {
     const myIds = new Set(terminals.map(t => t.id));
     return allHistory.filter(h => myIds.has(h.terminal_id));
   }, [allHistory, currentUser, canSeeAll, terminals]);
-
-  // Fetch terminals
-  const { data: allTerminals = [] } = useQuery({
-    queryKey: ['terminals-history'],
-    queryFn: () => base44.entities.Terminal.list(),
-    enabled: !!currentUser,
-  });
-
-  const terminals = useMemo(() => {
-    if (!currentUser) return [];
-    if (canSeeAll) return allTerminals;
-    return allTerminals.filter(t => t.created_by === currentUser.email);
-  }, [allTerminals, currentUser, canSeeAll]);
 
   // Calculate uptime per terminal based on period
   const uptimeData = useMemo(() => {
