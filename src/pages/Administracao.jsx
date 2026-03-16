@@ -184,31 +184,12 @@ export default function Administracao() {
     onError: () => toast.error('Erro ao enviar convite'),
   });
 
-  const applyRoleDefaults = (role) => {
-    setForm(prev => ({
-      ...prev,
-      role,
-      // Keep all permissions locked — admin must grant them manually
-      paginas_permitidas: [],
-      pode_configurar_alertas: false,
-      pode_gerenciar_usuarios: false,
-      pode_editar_terminais: false,
-      pode_editar_clientes: false,
-      limite_terminais: 0,
-    }));
-  };
-
   const handleEdit = (user) => {
     setEditingUser(user);
     setForm({
       email: user.email,
-      role: user.role || 'viewer',
-      paginas_permitidas: user.paginas_permitidas || ROLE_DEFAULTS.viewer.paginas_permitidas,
-      pode_configurar_alertas: user.pode_configurar_alertas || false,
-      pode_gerenciar_usuarios: user.pode_gerenciar_usuarios || false,
-      pode_editar_terminais: user.pode_editar_terminais || false,
-      pode_editar_clientes: user.pode_editar_clientes || false,
-      limite_terminais: user.limite_terminais ?? 0,
+      role: user.role || 'user',
+      limite_terminais: user.limite_terminais ?? 50,
     });
     setShowForm(true);
   };
