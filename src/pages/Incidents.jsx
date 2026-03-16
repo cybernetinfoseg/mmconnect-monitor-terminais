@@ -22,7 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FilterDropdown from '../components/dashboard/FilterDropdown';
 import { cn } from '@/lib/utils';
-import { format, isSameDay, pt } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
+import pt from 'date-fns/locale/pt';
 import { formatDateTimePT } from '@/lib/localization';
 
 export default function Incidents() {
