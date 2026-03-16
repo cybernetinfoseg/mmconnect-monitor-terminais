@@ -187,7 +187,7 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
               id="telefone"
               value={form.telefone}
               onChange={(e) => setForm(prev => ({ ...prev, telefone: e.target.value }))}
-              placeholder="21 9999-9999"
+              placeholder="923 456 789"
               required
               className="flex-1 border-slate-300"
             />
