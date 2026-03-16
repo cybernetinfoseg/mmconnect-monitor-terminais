@@ -35,13 +35,6 @@ export default function Relatorios() {
         enabled: !!currentUser,
     });
 
-    const history = useMemo(() => {
-        if (!currentUser) return [];
-        if (canSeeAll) return allHistory;
-        const myIds = new Set(terminals.map(t => t.id));
-        return allHistory.filter(h => myIds.has(h.terminal_id));
-    }, [allHistory, currentUser, canSeeAll, terminals]);
-
     const { data: allTerminals = [] } = useQuery({
         queryKey: ['rel-terminals'],
         queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
@@ -59,6 +52,13 @@ export default function Relatorios() {
         if (canSeeAll) return allTerminals;
         return allTerminals.filter(t => t.created_by === currentUser.email);
     }, [allTerminals, currentUser, canSeeAll]);
+
+    const history = useMemo(() => {
+        if (!currentUser) return [];
+        if (canSeeAll) return allHistory;
+        const myIds = new Set(terminals.map(t => t.id));
+        return allHistory.filter(h => myIds.has(h.terminal_id));
+    }, [allHistory, currentUser, canSeeAll, terminals]);
 
     const incidents = useMemo(() => {
         if (!currentUser) return [];
