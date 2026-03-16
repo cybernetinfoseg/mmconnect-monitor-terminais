@@ -176,7 +176,7 @@ export default function Layout({ children, currentPageName }) {
         </button>
         <PushNotificationManager />
         {currentUser && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-[#1c2433]">
             <User className="h-4 w-4 text-slate-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{currentUser.full_name || currentUser.email}</p>
