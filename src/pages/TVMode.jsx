@@ -95,17 +95,25 @@ export default function TVMode() {
 
   // Fetch terminals with auto-refresh based on config
   const { data: allTerminalsRaw = [], refetch } = useQuery({
-    queryKey: ['terminals-tv'],
-    queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
+    queryKey: ['terminals-tv', currentUser?.email, canSeeAll],
+    queryFn: async () => {
+      const baseFilter = { ativo: true };
+      if (canSeeAll) {
+        return await base44.entities.Terminal.filter(baseFilter);
+      }
+      return await base44.entities.Terminal.filter({
+        ...baseFilter,
+        created_by: currentUser?.email
+      });
+    },
     refetchInterval: refreshInterval,
     enabled: !!currentUser
   });
 
   const allTerminals = useMemo(() => {
     if (!currentUser) return [];
-    if (canSeeAll) return allTerminalsRaw;
-    return allTerminalsRaw.filter((t) => t.created_by === currentUser.email);
-  }, [allTerminalsRaw, currentUser, canSeeAll]);
+    return allTerminalsRaw;
+  }, [allTerminalsRaw, currentUser]);
 
   // Manual refresh
   const handleManualRefresh = async () => {
