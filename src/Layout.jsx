@@ -197,7 +197,41 @@ export default function Layout({ children, currentPageName }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0d1117]">
+      <style>{`
+        .dark {
+          --background: 215 28% 7%;
+          --foreground: 210 40% 92%;
+          --card: 215 25% 10%;
+          --card-foreground: 210 40% 92%;
+          --popover: 215 25% 10%;
+          --popover-foreground: 210 40% 92%;
+          --primary: 160 84% 39%;
+          --primary-foreground: 0 0% 100%;
+          --secondary: 215 25% 13%;
+          --secondary-foreground: 210 40% 85%;
+          --muted: 215 25% 13%;
+          --muted-foreground: 215 20% 52%;
+          --accent: 215 25% 15%;
+          --accent-foreground: 210 40% 92%;
+          --destructive: 0 62.8% 50%;
+          --destructive-foreground: 0 0% 98%;
+          --border: 215 25% 16%;
+          --input: 215 25% 16%;
+          --ring: 160 84% 39%;
+        }
+        .dark .bg-white { background-color: #111827 !important; }
+        .dark .bg-slate-50 { background-color: #0d1117 !important; }
+        .dark .bg-slate-100 { background-color: #161b22 !important; }
+        .dark .bg-slate-800 { background-color: #1c2433 !important; }
+        .dark .bg-slate-900 { background-color: #111827 !important; }
+        .dark .bg-slate-950 { background-color: #0d1117 !important; }
+        .dark .border-slate-200 { border-color: #1f2d3d !important; }
+        .dark .border-slate-700 { border-color: #1f2d3d !important; }
+        .dark [class*="rounded"][class*="border"] { border-color: rgba(255,255,255,0.07); }
+        .dark .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+        .dark .shadow-lg { box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+      `}</style>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-slate-200 dark:lg:bg-slate-900 dark:lg:border-slate-700">
         <Sidebar />
