@@ -23,6 +23,8 @@ export default function NovoClienteModal({ open, onClose, onCreated }) {
     onSuccess: (novoCliente) => {
       queryClient.invalidateQueries(['clientes']);
       queryClient.invalidateQueries(['clientes-manage']);
+      queryClient.invalidateQueries(['my-clientes']);
+      queryClient.invalidateQueries(['my-terminals-for-clientes']);
       toast.success(`Cliente "${novoCliente.nome}" criado!`);
       onCreated(novoCliente);
       setFormData({ ativo: true });
