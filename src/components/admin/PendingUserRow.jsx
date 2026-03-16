@@ -14,28 +14,12 @@ export default function PendingUserRow({ user, approveMutation, rejectMutation, 
           <p className="text-xs text-slate-400">Aguardando aprovação</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
-          <Select
-            defaultValue="viewer"
-            onValueChange={(role) => approveMutation.mutate({
-              id: user.id,
-              data: { aprovado: true, role, paginas_permitidas: [] }
-            })}
-          >
-            <SelectTrigger className="w-full sm:w-[120px] h-8 text-xs">
-              <SelectValue placeholder="Aprovar como..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="viewer">👁 Visualizador</SelectItem>
-              <SelectItem value="editor">✏️ Editor</SelectItem>
-              <SelectItem value="admin">⊙ Administrador</SelectItem>
-            </SelectContent>
-          </Select>
           <Button
             size="sm"
             className="bg-emerald-600 hover:bg-emerald-700 gap-1 h-8"
             onClick={() => approveMutation.mutate({
               id: user.id,
-              data: { aprovado: true, role: user.role || 'viewer', paginas_permitidas: [] }
+              data: { aprovado: true, role: 'user' }
             })}
             disabled={approveMutation.isPending}
           >
