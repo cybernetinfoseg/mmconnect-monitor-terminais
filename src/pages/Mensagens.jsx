@@ -303,8 +303,26 @@ export default function Mensagens() {
                           </div>
                           </div>
 
-                          {/* Inline Reply */}
-                          {replyingTo === msg.id && (
+                          {/* Resposta registrada */}
+                           {msg.respondido && msg.resposta_texto && replyingTo !== msg.id && (
+                             <div className="pt-3 border-t border-emerald-100 bg-emerald-50 rounded-lg p-3 space-y-1">
+                               <p className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
+                                 <CheckCircle className="h-3 w-3" /> Resposta enviada
+                                 {msg.respondido_em && (
+                                   <span className="font-normal text-emerald-600 ml-1">
+                                     — {new Date(msg.respondido_em).toLocaleString('pt-BR')}
+                                   </span>
+                                 )}
+                                 {msg.respondido_por && (
+                                   <span className="font-normal text-emerald-600">por {msg.respondido_por}</span>
+                                 )}
+                               </p>
+                               <p className="text-sm text-emerald-800 whitespace-pre-wrap">{msg.resposta_texto}</p>
+                             </div>
+                           )}
+
+                           {/* Inline Reply */}
+                           {replyingTo === msg.id && (
                           <div className="pt-3 border-t border-slate-200 space-y-2">
                           <p className="text-xs font-medium text-slate-600">Responder para: <span className="text-blue-600">{msg.from_email}</span></p>
                           <Textarea
