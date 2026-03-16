@@ -95,15 +95,15 @@ export default function Configuracoes() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-3 sm:p-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-slate-900 rounded-xl">
-            <Settings className="h-6 w-6 text-white" />
+        <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 bg-slate-900 rounded-xl shrink-0">
+              <Settings className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Configurações</h1>
+              <p className="text-xs sm:text-sm text-slate-500">Agente Local e configurações do sistema</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Configurações</h1>
-            <p className="text-sm text-slate-500">Agente Local e configurações do sistema</p>
-          </div>
-        </div>
 
         {/* Monitor Sync Configuration */}
         {perms.isAdmin && (
@@ -183,20 +183,20 @@ export default function Configuracoes() {
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                   <strong>Segurança:</strong> O agente autentica-se enviando a <strong>API Key</strong> (configurada em <em>Painel → Segredos → API_KEY</em>) e o <strong>APP ID</strong> em cada pedido. Sem ambos, o pedido é rejeitado.
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">API KEY — definida em <strong>Painel → Segredos → API_KEY</strong></Label>
                     <Input
                       readOnly
                       value="Configurada no painel de segredos do projeto"
-                      className="bg-slate-50 text-sm text-slate-400 italic cursor-not-allowed"
+                      className="bg-slate-50 text-xs sm:text-sm text-slate-400 italic cursor-not-allowed"
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">APP ID</Label>
                     <div className="flex gap-2">
-                      <Input readOnly value={APP_ID} className="bg-slate-50 text-sm font-mono" />
-                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(APP_ID, 'APP ID')}>
+                      <Input readOnly value={APP_ID} className="bg-slate-50 text-xs sm:text-sm font-mono" />
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(APP_ID, 'APP ID')} className="shrink-0">
                         <Copy className="h-4 w-4" />
                       </Button>
                     </div>
@@ -205,14 +205,14 @@ export default function Configuracoes() {
                     <Label className="text-xs text-slate-500">Endpoint — Obter Terminais</Label>
                     <div className="flex gap-2">
                       <Input readOnly value="/api/functions/agentGetTerminals" className="bg-slate-50 text-xs font-mono" />
-                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentGetTerminals', 'Endpoint')}><Copy className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentGetTerminals', 'Endpoint')} className="shrink-0"><Copy className="h-4 w-4" /></Button>
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Endpoint — Reportar Status</Label>
                     <div className="flex gap-2">
                       <Input readOnly value="/api/functions/agentReport" className="bg-slate-50 text-xs font-mono" />
-                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentReport', 'Endpoint')}><Copy className="h-4 w-4" /></Button>
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentReport', 'Endpoint')} className="shrink-0"><Copy className="h-4 w-4" /></Button>
                     </div>
                   </div>
                 </div>
@@ -303,14 +303,14 @@ python core_agent.py --once`}</pre>
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg bg-red-50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 border border-red-200 rounded-lg bg-red-50">
                   <div>
                     <p className="font-medium text-slate-900">Excluir Conta</p>
-                    <p className="text-sm text-slate-500">Remove permanentemente todos os dados e configurações.</p>
+                    <p className="text-xs sm:text-sm text-slate-500">Remove permanentemente todos os dados e configurações.</p>
                   </div>
                   <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="sm" className="select-none shrink-0 ml-4">
+                      <Button variant="destructive" size="sm" className="select-none shrink-0 w-full sm:w-auto">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Excluir Conta
                       </Button>
