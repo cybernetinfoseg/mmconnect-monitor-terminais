@@ -92,7 +92,7 @@ export default function Terminais() {
   });
 
   const terminalCount = terminals.length;
-  const atLimit = !isAdmin && limiteTerminais > 0 && terminalCount >= limiteTerminais;
+  const atLimit = !isAdmin && (limiteTerminais === 0 || (limiteTerminais > 0 && terminalCount >= limiteTerminais));
 
   // Fetch clientes with security filtering
   const { data: clientes = [] } = useQuery({
