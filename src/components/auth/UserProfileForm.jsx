@@ -73,7 +73,8 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
   const [form, setForm] = useState({
     nome: user?.nome || '',
     sobrenome: user?.sobrenome || '',
-    pais_telefone: user?.pais_telefone || '+55',
+    pais: user?.pais || 'Portugal',
+    pais_telefone: user?.pais_telefone || '+351',
     telefone: user?.telefone || '',
     motivo_acesso: user?.motivo_acesso || '',
   });
