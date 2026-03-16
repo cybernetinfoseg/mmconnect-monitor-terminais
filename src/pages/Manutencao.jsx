@@ -31,12 +31,27 @@ export default function Manutencao() {
     const queryClient = useQueryClient();
     const [modalOpen, setModalOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
+    const [currentUser, setCurrentUser] = useState(null);
 
-    const { data: janelas = [], isLoading } = useQuery({
+    useEffect(() => {
+        base44.auth.me().then(setCurrentUser).catch(() => {});
+    }, []);
+
+    const perms = resolvePermissions(currentUser);
+    const canSeeAll = perms.isAdmin || perms.isEditor;
+
+    const { data: allJanelas = [], isLoading } = useQuery({
         queryKey: ['maintenance-windows'],
         queryFn: () => base44.entities.MaintenanceWindow.list('-inicio', 100),
         refetchInterval: 30000,
+        enabled: !!currentUser,
     });
+
+    const janelas = useMemo(() => {
+        if (!currentUser) return [];
+        if (canSeeAll) return allJanelas;
+        return allJanelas.filter(j => j.criado_por === currentUser.email);
+    }, [allJanelas, currentUser, canSeeAll]);
 
     const deleteMutation = useMutation({
         mutationFn: (id) => base44.entities.MaintenanceWindow.delete(id),
