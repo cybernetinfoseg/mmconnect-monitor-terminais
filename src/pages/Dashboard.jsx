@@ -192,29 +192,29 @@ export default function Dashboard() {
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Header */}
-      <div className="bg-slate-900 text-white px-4 sm:px-6 py-4">
-        <div className="max-w-[1920px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-500/20 rounded-lg shrink-0">
-              <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-400" />
+      <div className="bg-slate-900 text-white px-3 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-[1920px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg shrink-0">
+              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
             </div>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight">NOC Monitor</h1>
-              <p className="text-xs text-slate-400">Terminais Biométricos</p>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight truncate">NOC Monitor</h1>
+              <p className="text-xs text-slate-400 truncate">Terminais Biométricos</p>
               <p className="text-xs text-emerald-400/70 font-mono mt-0.5 hidden sm:block">App ID: 697aa46c9998c30665e2e19a</p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
             {currentUser && (
-              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300">
-                <User className="h-4 w-4 text-slate-400" />
-                <span>{currentUser.full_name || currentUser.email}</span>
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap">
+                <User className="h-4 w-4 text-slate-400 shrink-0" />
+                <span className="truncate">{currentUser.full_name || currentUser.email}</span>
               </div>
             )}
-            <div className="text-right hidden sm:block">
+            <div className="text-right hidden sm:block whitespace-nowrap">
               <p className="text-xs text-slate-400">Última atualização</p>
-              <p className="text-sm font-mono text-slate-200">
+              <p className="text-xs sm:text-sm font-mono text-slate-200">
                 {lastRefresh.toLocaleTimeString('pt-PT')}
               </p>
             </div>
@@ -293,48 +293,51 @@ export default function Dashboard() {
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-2 sm:flex sm:flex-wrap items-end gap-2 sm:gap-3"
+          className="flex flex-col gap-3 sm:gap-4"
         >
-          <FilterDropdown
-            label="Filtrar por Local"
-            icon={MapPin}
-            value={localFilter}
-            onChange={setLocalFilter}
-            options={locais}
-            placeholder="Todos os locais"
-          />
-          <FilterDropdown
-            label="Filtrar por Cliente"
-            icon={Building2}
-            value={clienteFilter}
-            onChange={setClienteFilter}
-            options={clientes}
-            placeholder="Todos os clientes"
-          />
-          <FilterDropdown
-            label="Status"
-            icon={Activity}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={['online', 'offline']}
-            placeholder="Todos os status"
-          />
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              Ordenar por
-            </label>
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value)}
-              className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
-            >
-              <option value="status">Status (offline primeiro)</option>
-              <option value="nome">Nome (A-Z)</option>
-              <option value="ping">Sem ping (maior primeiro)</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <FilterDropdown
+              label="Filtrar por Local"
+              icon={MapPin}
+              value={localFilter}
+              onChange={setLocalFilter}
+              options={locais}
+              placeholder="Todos os locais"
+            />
+            <FilterDropdown
+              label="Filtrar por Cliente"
+              icon={Building2}
+              value={clienteFilter}
+              onChange={setClienteFilter}
+              options={clientes}
+              placeholder="Todos os clientes"
+            />
+            <FilterDropdown
+              label="Status"
+              icon={Activity}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={['online', 'offline']}
+              placeholder="Todos os status"
+            />
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                Ordenar por
+              </label>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 w-full"
+              >
+                <option value="status">Status</option>
+                <option value="nome">Nome</option>
+                <option value="ping">Sem ping</option>
+              </select>
+            </div>
           </div>
-          {(localFilter || clienteFilter || statusFilter) && (
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+            {(localFilter || clienteFilter || statusFilter) && (
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -346,13 +349,14 @@ export default function Dashboard() {
             )}
             <Link
               to={`/TVMode${localFilter || clienteFilter ? `?${new URLSearchParams([...(localFilter ? [['local', localFilter]] : []), ...(clienteFilter ? [['cliente', clienteFilter]] : [])]).toString()}` : ''}`}
-              className="col-span-2 sm:ml-auto sm:col-span-1"
+              className="w-full sm:w-auto"
             >
               <Button variant="outline" size="sm" className="gap-1.5 text-slate-600 w-full sm:w-auto">
                 <Tv className="h-4 w-4" />
                 Modo TV
               </Button>
             </Link>
+          </div>
         </motion.div>
 
         {/* KPIs */}
@@ -380,16 +384,17 @@ export default function Dashboard() {
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           {/* Chart */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
+            className="md:col-span-1"
           >
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
+                <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider">
                   Distribuição de Status
                 </CardTitle>
               </CardHeader>
@@ -407,11 +412,11 @@ export default function Dashboard() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
-            className="lg:col-span-2"
+            className="md:col-span-1 lg:col-span-2"
           >
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
+                <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <span>Terminais</span>
                   <span className="text-xs font-normal text-emerald-600 flex items-center gap-1">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
@@ -434,12 +439,13 @@ export default function Dashboard() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3 }}
+            className="md:col-span-1 lg:col-span-1"
           >
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-orange-500" />
-                  Incidentes Recentes
+                  Incidentes
                 </CardTitle>
               </CardHeader>
               <CardContent>
