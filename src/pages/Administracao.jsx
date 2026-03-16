@@ -52,7 +52,7 @@ export default function Administracao() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [currentUser, setCurrentUser] = useState(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
