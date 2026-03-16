@@ -163,6 +163,27 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
       </div>
 
       <div className="space-y-2">
+        <Label htmlFor="pais" className="text-slate-700 font-medium">
+          <span className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            País *
+          </span>
+        </Label>
+        <Select value={form.pais} onValueChange={(value) => setForm(prev => ({ ...prev, pais: value }))}>
+          <SelectTrigger className="border-slate-300">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-60">
+            {COUNTRIES.map((country) => (
+              <SelectItem key={country.code} value={country.name}>
+                {country.flag} {country.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
         <Label className="text-slate-700 font-medium">
           <span className="flex items-center gap-2">
             <Phone className="h-4 w-4" />
@@ -170,7 +191,7 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
           </span>
         </Label>
         <div className="flex gap-2">
-          <div className="w-32">
+          <div className="w-40">
             <Select value={form.pais_telefone} onValueChange={(value) => setForm(prev => ({ ...prev, pais_telefone: value }))}>
               <SelectTrigger className="border-slate-300">
                 <SelectValue />
@@ -178,7 +199,7 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
               <SelectContent className="max-h-60">
                 {COUNTRIES.map((country) => (
                   <SelectItem key={country.code} value={country.code}>
-                    {country.name} {country.code}
+                    {country.flag} {country.name} {country.code}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -188,7 +209,7 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
             id="telefone"
             value={form.telefone}
             onChange={(e) => setForm(prev => ({ ...prev, telefone: e.target.value }))}
-            placeholder="11 99999-9999"
+            placeholder="21 9999-9999"
             required
             className="flex-1 border-slate-300"
           />
