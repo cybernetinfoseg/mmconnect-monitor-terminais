@@ -297,17 +297,28 @@ export default function Mensagens() {
                             {msg.respondido ? '✓ Respondida' : 'Marcar como Respondida'}
                           </Button>
                           <Button
-                           variant="ghost"
-                           size="sm"
-                           onClick={() => {
-                             setReplyingTo(replyingTo === msg.id ? null : msg.id);
-                             setReplyText('');
-                           }}
-                           className="gap-2 text-xs text-blue-600 hover:bg-blue-50"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setReplyingTo(replyingTo === msg.id ? null : msg.id);
+                            setReplyText('');
+                          }}
+                          className="gap-2 text-xs text-blue-600 hover:bg-blue-50"
                           >
-                           <Mail className="h-3 w-3" />
-                           Responder
+                          <Mail className="h-3 w-3" />
+                          Responder
                           </Button>
+                          {msg.lido && msg.respondido && (
+                           <Button
+                             variant="ghost"
+                             size="sm"
+                             onClick={() => deleteMutation.mutate(msg.id)}
+                             className="gap-2 text-xs text-red-500 hover:bg-red-50 hover:text-red-700"
+                           >
+                             <Trash2 className="h-3 w-3" />
+                             Excluir
+                           </Button>
+                          )}
                           </div>
                           </div>
 
