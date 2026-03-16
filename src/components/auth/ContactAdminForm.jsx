@@ -56,13 +56,6 @@ export default function ContactAdminForm({ user }) {
         />
       </div>
 
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-600 space-y-1">
-        <p><strong>Informações que serão enviadas:</strong></p>
-        <p>• Email: <span className="font-mono text-slate-700">{user.email}</span></p>
-        <p>• Nome: <span className="font-mono text-slate-700">{user.nome || 'N/A'} {user.sobrenome || ''}</span></p>
-        <p>• Telefone: <span className="font-mono text-slate-700">{user.telefone || 'N/A'}</span></p>
-      </div>
-
       <Button
         type="submit"
         disabled={loading || !message.trim()}
