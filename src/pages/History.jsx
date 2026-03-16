@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UptimeChart from '../components/dashboard/UptimeChart';
 import { cn } from '@/lib/utils';
-import { format, subHours, pt } from 'date-fns';
+import { format, subHours } from 'date-fns';
 
 export default function History() {
   const [period, setPeriod] = useState('24h');
