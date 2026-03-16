@@ -8,8 +8,9 @@ import UserProfileForm from './UserProfileForm';
 import ContactAdminForm from './ContactAdminForm';
 
 export default function PendingApproval({ user: initialUser }) {
-  const [activeTab, setActiveTab] = useState('profile');
-  const [formSubmitted, setFormSubmitted] = useState(false);
+  const profileAlreadyFilled = !!(initialUser?.nome && initialUser?.telefone);
+  const [activeTab, setActiveTab] = useState(profileAlreadyFilled ? 'contact' : 'profile');
+  const [formSubmitted, setFormSubmitted] = useState(profileAlreadyFilled);
   const [user, setUser] = useState(initialUser);
 
   const handleProfileSuccess = async () => {
