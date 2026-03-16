@@ -94,7 +94,7 @@ export default function Configuracoes() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-3 sm:p-6">
-      <div className="max-w-4xl mx-auto space-y-6 overflow-hidden">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-slate-900 rounded-xl">
             <Settings className="h-6 w-6 text-white" />
@@ -183,7 +183,7 @@ export default function Configuracoes() {
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
                   <strong>Segurança:</strong> O agente autentica-se enviando a <strong>API Key</strong> (configurada em <em>Painel → Segredos → API_KEY</em>) e o <strong>APP ID</strong> em cada pedido. Sem ambos, o pedido é rejeitado.
                 </div>
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">API KEY — definida em <strong>Painel → Segredos → API_KEY</strong></Label>
                     <Input
