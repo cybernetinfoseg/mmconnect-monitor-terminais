@@ -307,9 +307,10 @@ export default function Administracao() {
               Gerenciamento de Usuários
             </CardTitle>
             {!showForm && (
-              <Button onClick={handleNew} className="bg-blue-600 hover:bg-blue-700 gap-2">
+              <Button onClick={handleNew} size="sm" className="bg-blue-600 hover:bg-blue-700 gap-2">
                 <UserPlus className="h-4 w-4" />
-                Adicionar Usuário
+                <span className="hidden sm:inline">Adicionar Usuário</span>
+                <span className="sm:hidden">Adicionar</span>
               </Button>
             )}
           </CardHeader>
@@ -371,74 +372,94 @@ export default function Administracao() {
               </div>
             )}
 
-            {/* Users Table */}
-            <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                   <th className="text-left px-4 py-3 font-semibold text-slate-600">Email</th>
-                   <th className="text-left px-4 py-3 font-semibold text-slate-600">Role</th>
-                   <th className="text-center px-4 py-3 font-semibold text-slate-600">Terminais</th>
-                   <th className="text-center px-4 py-3 font-semibold text-slate-600">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {isLoading ? (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Carregando...</td></tr>
-                  ) : users.length === 0 ? (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Nenhum usuário encontrado</td></tr>
-                  ) : approvedUsers.map(user => {
+            {/* Users — cards on mobile, table on desktop */}
+            {isLoading ? (
+              <div className="text-center py-8 text-slate-400">Carregando...</div>
+            ) : approvedUsers.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">Nenhum usuário encontrado</div>
+            ) : (
+              <>
+                {/* Mobile cards */}
+                <div className="sm:hidden space-y-2">
+                  {approvedUsers.map(user => {
                     const count = terminalCountByUser[user.email] || 0;
                     const limit = user.limite_terminais ?? 0;
                     return (
-                      <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate">{user.email}</td>
-                        <td className="px-4 py-3">
-                          <Badge className={cn("text-xs", ROLE_COLORS[user.role] || ROLE_COLORS.user)}>
-                            {user.role === 'admin' ? '⊙ ' : '👤 '}
+                      <div key={user.id} className="border border-slate-200 rounded-xl p-3 bg-white space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-slate-900 truncate">{user.email}</p>
+                          <Badge className={cn("text-xs shrink-0", ROLE_COLORS[user.role] || ROLE_COLORS.user)}>
                             {ROLE_LABELS[user.role] || 'Utilizador'}
                           </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={cn(
-                            "font-mono text-xs font-semibold",
-                            limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600"
-                          )}>
-                            {count}{limit > 0 ? `/${limit}` : ''}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>
+                            {count}{limit > 0 ? `/${limit}` : ''} terminais
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(user)}
-                              className="h-8 w-8 text-slate-400 hover:text-blue-600"
-                            >
-                              <Pencil className="h-4 w-4" />
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(user)} className="h-7 w-7 text-slate-400 hover:text-blue-600">
+                              <Pencil className="h-3.5 w-3.5" />
                             </Button>
                             {user.email !== currentUser?.email && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  if (confirm(`Excluir o usuário ${user.email}?`)) {
-                                    deleteUserMutation.mutate(user.id);
-                                  }
-                                }}
-                                className="h-8 w-8 text-slate-400 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
+                              <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Excluir ${user.email}?`)) deleteUserMutation.mutate(user.id); }} className="h-7 w-7 text-slate-400 hover:text-red-600">
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             )}
                           </div>
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </div>
+                {/* Desktop table */}
+                <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Email</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Role</th>
+                        <th className="text-center px-4 py-3 font-semibold text-slate-600">Terminais</th>
+                        <th className="text-center px-4 py-3 font-semibold text-slate-600">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {approvedUsers.map(user => {
+                        const count = terminalCountByUser[user.email] || 0;
+                        const limit = user.limite_terminais ?? 0;
+                        return (
+                          <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate">{user.email}</td>
+                            <td className="px-4 py-3">
+                              <Badge className={cn("text-xs", ROLE_COLORS[user.role] || ROLE_COLORS.user)}>
+                                {user.role === 'admin' ? '⊙ ' : '👤 '}
+                                {ROLE_LABELS[user.role] || 'Utilizador'}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>
+                                {count}{limit > 0 ? `/${limit}` : ''}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(user)} className="h-8 w-8 text-slate-400 hover:text-blue-600">
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                {user.email !== currentUser?.email && (
+                                  <Button variant="ghost" size="icon" onClick={() => { if (confirm(`Excluir o usuário ${user.email}?`)) deleteUserMutation.mutate(user.id); }} className="h-8 w-8 text-slate-400 hover:text-red-600">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
