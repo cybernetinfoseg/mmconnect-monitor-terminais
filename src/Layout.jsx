@@ -133,7 +133,7 @@ export default function Layout({ children, currentPageName }) {
       >
         <Icon className={cn(
           "h-5 w-5",
-          isActive ? "text-emerald-400 dark:text-white" : "text-slate-400"
+          isActive ? "text-emerald-400" : "text-slate-400 dark:text-slate-500"
         )} />
         {item.name}
       </Link>
