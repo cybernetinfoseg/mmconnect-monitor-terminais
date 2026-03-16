@@ -230,10 +230,10 @@ export default function Terminais() {
                 <span className="w-2 h-2 bg-accent rounded-full animate-pulse shrink-0 inline-block"></span>
                 Auto-refresh {refreshInterval >= 60000 ? (refreshInterval / 60000).toFixed(0) + 'm' : (refreshInterval / 1000).toFixed(0) + 's'}
                 {!isAdmin && (
-                  <span className={cn("ml-2 font-semibold", atLimit ? "text-red-600" : "text-slate-500")}>
-                    • {terminalCount}/{limiteTerminais} terminais
-                  </span>
-                )}
+                   <span className={cn("ml-2 font-semibold", atLimit ? "text-destructive" : "text-muted-foreground")}>
+                     • {terminalCount}/{limiteTerminais} terminais
+                   </span>
+                 )}
               </p>
             </div>
           </div>
@@ -269,7 +269,7 @@ export default function Terminais() {
         )}
 
         {/* Filters */}
-        <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+        <Card className="bg-card border-border">
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
               <div className="flex-1 min-w-[200px] relative">
