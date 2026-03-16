@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,19 +8,33 @@ import { cn } from '@/lib/utils';
 import moment from 'moment';
 
 export default function ClienteTerminaisModal({ cliente, onClose }) {
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const isAdmin = currentUser?.role === 'admin';
+
   const { data: terminals = [], isLoading } = useQuery({
     queryKey: ['terminals-cliente', cliente?.id],
     queryFn: () => base44.entities.Terminal.filter({ cliente_id: cliente.id }),
-    enabled: !!cliente,
+    enabled: !!cliente && !!currentUser,
     refetchInterval: 10000,
+    select: (data) => {
+      // Non-admins only see their own terminals
+      if (isAdmin) return data;
+      return data.filter(t => t.created_by === currentUser?.email);
+    },
   });
 
-  // Fallback: buscar por nome caso cliente_id não esteja populado
+  // Fallback: buscar por nome mas filtrado ao utilizador
   const { data: terminalsByNome = [] } = useQuery({
-    queryKey: ['terminals-cliente-nome', cliente?.nome],
-    queryFn: () => base44.entities.Terminal.list(),
-    enabled: !!cliente && terminals.length === 0 && !isLoading,
-    select: (all) => all.filter(t => t.cliente_nome === cliente.nome || t.cliente === cliente.nome),
+    queryKey: ['terminals-cliente-nome', cliente?.nome, currentUser?.email],
+    queryFn: () => isAdmin
+      ? base44.entities.Terminal.filter({ cliente_nome: cliente.nome })
+      : base44.entities.Terminal.filter({ cliente_nome: cliente.nome, created_by: currentUser.email }),
+    enabled: !!cliente && !!currentUser && terminals.length === 0 && !isLoading,
   });
 
   const allTerminals = terminals.length > 0 ? terminals : terminalsByNome;
