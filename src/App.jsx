@@ -6,7 +6,6 @@ import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Manutencao from './pages/Manutencao';
 import Relatorios from './pages/Relatorios';
-import Mensagens from './pages/Mensagens';
 import CompletarPerfil from './pages/CompletarPerfil';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
