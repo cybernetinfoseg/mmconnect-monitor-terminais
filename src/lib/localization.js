@@ -1,6 +1,6 @@
 // Portugal localization configuration
 import { format, formatDistanceToNow } from 'date-fns';
-import { pt } from 'date-fns/locale';
+import pt from 'date-fns/locale/pt';
 
 export const PT_LOCALE = 'pt-PT';
 
