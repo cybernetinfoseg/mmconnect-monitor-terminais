@@ -53,20 +53,36 @@ export default function Clientes() {
   const { data: allClientes = [] } = useQuery({
     queryKey: ['clientes-manage'],
     queryFn: () => base44.entities.Cliente.list('-created_date'),
+    enabled: !!currentUser && canSeeAll,
   });
 
-  // Viewers only see clients linked to their own terminals
+  // Non-admins: fetch only their own terminals to derive accessible clients
   const { data: myTerminals = [] } = useQuery({
     queryKey: ['my-terminals-for-clientes'],
-    queryFn: () => base44.entities.Terminal.list(),
+    queryFn: () => base44.entities.Terminal.filter({ created_by: currentUser.email }),
     enabled: !canSeeAll && !!currentUser,
+  });
+
+  // Non-admins: fetch only clients linked to their own terminals by ID
+  const myClienteIds = useMemo(() => {
+    if (canSeeAll || !currentUser) return null;
+    return [...new Set(myTerminals.map(t => t.cliente_id).filter(Boolean))];
+  }, [myTerminals, canSeeAll, currentUser]);
+
+  const { data: myClientes = [] } = useQuery({
+    queryKey: ['my-clientes', myClienteIds],
+    queryFn: async () => {
+      if (!myClienteIds || myClienteIds.length === 0) return [];
+      const results = await Promise.all(myClienteIds.map(id => base44.entities.Cliente.get(id).catch(() => null)));
+      return results.filter(Boolean);
+    },
+    enabled: !canSeeAll && !!currentUser && myClienteIds !== null,
   });
 
   const clientes = useMemo(() => {
     if (canSeeAll) return allClientes;
-    const myClienteNomes = new Set(myTerminals.map(t => t.cliente_nome).filter(Boolean));
-    return allClientes.filter(c => myClienteNomes.has(c.nome));
-  }, [allClientes, canSeeAll, myTerminals]);
+    return myClientes;
+  }, [allClientes, canSeeAll, myClientes]);
 
   const { data: allTerminals = [] } = useQuery({
     queryKey: ['terminals-all'],
