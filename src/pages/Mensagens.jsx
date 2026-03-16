@@ -45,6 +45,14 @@ export default function Mensagens() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.ContactMessage.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-messages'] });
+      toast.success('Mensagem excluída');
+    },
+  });
+
   const handleMarkAsRead = (message) => {
     markAsReadMutation.mutate({
       id: message.id,
