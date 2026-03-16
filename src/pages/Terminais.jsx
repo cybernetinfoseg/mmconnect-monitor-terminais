@@ -74,18 +74,22 @@ export default function Terminais() {
       .catch(() => setRefreshInterval(5000));
   }, []);
 
-  // Fetch terminals with auto-refresh based on config
-  const { data: allTerminals = [], isLoading } = useQuery({
-    queryKey: ['terminals-manage'],
-    queryFn: () => base44.entities.Terminal.list('-created_date'),
+  // Fetch terminals with server-side filtering for security
+  const { data: terminals = [], isLoading } = useQuery({
+    queryKey: ['terminals-manage', currentUser?.email, isAdmin],
+    queryFn: async () => {
+      if (isAdmin) {
+        return await base44.entities.Terminal.list('-created_date');
+      }
+      // Non-admins only see their own terminals
+      return await base44.entities.Terminal.filter(
+        { created_by: currentUser?.email },
+        '-created_date'
+      );
+    },
+    enabled: !!currentUser, // Only run when user is loaded
     refetchInterval: refreshInterval,
   });
-
-  // Filter: admin/editor sees all, viewer sees only their own
-  const terminals = useMemo(() => {
-    if (perms.canEdit) return allTerminals;
-    return allTerminals.filter(t => t.created_by === currentUser?.email);
-  }, [allTerminals, perms.canEdit, currentUser]);
 
   const terminalCount = terminals.length;
   const atLimit = !isAdmin && limiteTerminais > 0 && terminalCount >= limiteTerminais;
