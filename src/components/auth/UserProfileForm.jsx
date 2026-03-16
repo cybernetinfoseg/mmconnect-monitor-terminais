@@ -70,51 +70,48 @@ const COUNTRIES = [
 
 export default function UserProfileForm({ user, onSuccess, isEditMode = false }) {
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    nome: user?.nome || '',
-    sobrenome: user?.sobrenome || '',
-    pais: user?.pais || 'Portugal',
-    pais_telefone: user?.pais_telefone || '+351',
-    telefone: user?.telefone || '',
-    motivo_acesso: user?.motivo_acesso || '',
-  });
+   const [form, setForm] = useState({
+     nome: user?.nome || '',
+     sobrenome: user?.sobrenome || '',
+     pais_telefone: user?.pais_telefone || '+351',
+     telefone: user?.telefone || '',
+     motivo_acesso: user?.motivo_acesso || '',
+   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!form.nome.trim() || !form.sobrenome.trim() || !form.telefone.trim() || !form.pais.trim()) {
-      toast.error('Preencha todos os campos obrigatórios');
-      return;
-    }
+    if (!form.nome.trim() || !form.sobrenome.trim() || !form.telefone.trim()) {
+       toast.error('Preencha todos os campos obrigatórios');
+       return;
+     }
 
     setLoading(true);
     try {
       // Update user profile
-      await base44.auth.updateMe({
-        nome: form.nome.trim(),
-        sobrenome: form.sobrenome.trim(),
-        pais: form.pais.trim(),
-        pais_telefone: form.pais_telefone,
-        telefone: form.telefone.trim(),
-        motivo_acesso: form.motivo_acesso.trim(),
-        ...(isEditMode ? {} : { 
-          primeiroAcesso: false,
-          data_inscricao: new Date().toISOString(),
-        }),
-      });
+       await base44.auth.updateMe({
+         nome: form.nome.trim(),
+         sobrenome: form.sobrenome.trim(),
+         pais_telefone: form.pais_telefone,
+         telefone: form.telefone.trim(),
+         motivo_acesso: form.motivo_acesso.trim(),
+         ...(isEditMode ? {} : { 
+           primeiroAcesso: false,
+           data_inscricao: new Date().toISOString(),
+         }),
+       });
 
       if (!isEditMode) {
         // Notify admin about new user registration (only on first submission)
         await base44.functions.invoke('notifyAdminNewUser', {
-          email: user.email,
-          nome: form.nome.trim(),
-          sobrenome: form.sobrenome.trim(),
-          pais: form.pais.trim(),
-          pais_telefone: form.pais_telefone,
-          telefone: form.telefone.trim(),
-          motivo_acesso: form.motivo_acesso.trim(),
-          data_inscricao: new Date().toLocaleString('pt-PT'),
-        });
+           email: user.email,
+           nome: form.nome.trim(),
+           sobrenome: form.sobrenome.trim(),
+           pais_telefone: form.pais_telefone,
+           telefone: form.telefone.trim(),
+           motivo_acesso: form.motivo_acesso.trim(),
+           data_inscricao: new Date().toLocaleString('pt-PT'),
+         });
       }
 
       toast.success(isEditMode ? 'Perfil atualizado com sucesso!' : 'Solicitação enviada! Aguarde a aprovação do admin.');
@@ -162,26 +159,7 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="pais" className="text-slate-700 font-medium">
-          <span className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            País *
-          </span>
-        </Label>
-        <Select value={form.pais} onValueChange={(value) => setForm(prev => ({ ...prev, pais: value }))}>
-          <SelectTrigger className="border-slate-300">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-60">
-            {COUNTRIES.map((country) => (
-              <SelectItem key={country.code} value={country.name}>
-                {country.flag} {country.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+
 
       <div className="space-y-2">
         <Label className="text-slate-700 font-medium">
@@ -191,29 +169,29 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
           </span>
         </Label>
         <div className="flex gap-2">
-          <div className="w-40">
-            <Select value={form.pais_telefone} onValueChange={(value) => setForm(prev => ({ ...prev, pais_telefone: value }))}>
-              <SelectTrigger className="border-slate-300">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="max-h-60">
-                {COUNTRIES.map((country) => (
-                  <SelectItem key={country.code} value={country.code}>
-                    {country.flag} {country.name} {country.code}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="w-48 z-50">
+              <Select value={form.pais_telefone} onValueChange={(value) => setForm(prev => ({ ...prev, pais_telefone: value }))}>
+                <SelectTrigger className="border-slate-300 cursor-pointer">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-60 z-[9999]">
+                  {COUNTRIES.map((country) => (
+                    <SelectItem key={country.code} value={country.code} className="cursor-pointer">
+                      {country.flag} {country.name} {country.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Input
+              id="telefone"
+              value={form.telefone}
+              onChange={(e) => setForm(prev => ({ ...prev, telefone: e.target.value }))}
+              placeholder="21 9999-9999"
+              required
+              className="flex-1 border-slate-300"
+            />
           </div>
-          <Input
-            id="telefone"
-            value={form.telefone}
-            onChange={(e) => setForm(prev => ({ ...prev, telefone: e.target.value }))}
-            placeholder="21 9999-9999"
-            required
-            className="flex-1 border-slate-300"
-          />
-        </div>
       </div>
 
       <div className="space-y-2">
