@@ -109,7 +109,7 @@ export default function Administracao() {
     mutationFn: (id) => base44.entities.User.delete(id),
     onSuccess: (_, id) => {
       const u = users.find(u => u.id === id);
-      logAudit('usuario_excluido', id, `Usuário pendente ${u?.email || id} excluído`);
+      logAudit('permissao_atualizada', id, `Usuário pendente ${u?.email || id} excluído`);
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Usuário removido');
     },
