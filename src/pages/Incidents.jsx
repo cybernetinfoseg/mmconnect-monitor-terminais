@@ -60,7 +60,6 @@ export default function Incidents() {
 
   const handleRefresh = () => {
     refetch();
-    queryClient.invalidateQueries({ queryKey: ['terminals-incidents-user'] });
   };
 
   const incidents = useMemo(() => {
