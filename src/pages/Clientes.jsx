@@ -134,6 +134,9 @@ export default function Clientes() {
     onSuccess: () => {
       queryClient.invalidateQueries(['clientes-manage']);
       queryClient.invalidateQueries(['clientes']);
+      queryClient.invalidateQueries(['my-clientes']);
+      queryClient.invalidateQueries(['my-terminals-for-clientes']);
+      queryClient.invalidateQueries(['terminals-all']);
       setDialogOpen(false);
       setEditingCliente(null);
       setFormData({});
