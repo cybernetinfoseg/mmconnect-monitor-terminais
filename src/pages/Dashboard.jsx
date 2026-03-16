@@ -401,11 +401,11 @@ export default function Dashboard() {
             transition={{ delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
+            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50 dark:bg-slate-900/40 dark:border-slate-700/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center justify-between">
                   <span>Terminais</span>
-                  <span className="text-xs font-normal text-emerald-600 flex items-center gap-1">
+                  <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                     Tempo Real ({refreshInterval >= 60000 ? (refreshInterval / 60000).toFixed(0) + 'm' : (refreshInterval / 1000).toFixed(0) + 's'})
                   </span>
