@@ -30,5 +30,10 @@ export function resolvePermissions(user) {
     isAdmin,
     isEditor,
     paginas_permitidas,
+    canEdit: isAdmin,
+    pode_editar_terminais: isAdmin,
+    pode_editar_clientes: isAdmin,
+    pode_configurar_alertas: isAdmin,
+    limite_terminais: user?.limite_terminais ?? 0,
   };
 }
