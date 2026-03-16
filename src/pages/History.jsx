@@ -148,29 +148,29 @@ export default function History() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-100 rounded-xl">
-                    <TrendingUp className="h-6 w-6 text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Uptime Médio</p>
-                    <p className={cn(
-                      "text-3xl font-bold",
-                      avgUptime >= 99 ? "text-emerald-600" : 
-                      avgUptime >= 95 ? "text-yellow-600" : "text-red-600"
-                    )}>
-                      {avgUptime.toFixed(2)}%
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
+             <CardContent className="p-3 sm:p-6">
+               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                 <div className="p-2 sm:p-3 bg-emerald-100 rounded-xl w-fit">
+                   <TrendingUp className="h-4 w-4 sm:h-6 sm:w-6 text-emerald-600" />
+                 </div>
+                 <div>
+                   <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider">Uptime Médio</p>
+                   <p className={cn(
+                     "text-xl sm:text-3xl font-bold",
+                     avgUptime >= 99 ? "text-emerald-600" : 
+                     avgUptime >= 95 ? "text-yellow-600" : "text-red-600"
+                   )}>
+                     {avgUptime.toFixed(1)}%
+                   </p>
+                 </div>
+               </div>
+             </CardContent>
             </Card>
           </motion.div>
 
@@ -180,14 +180,14 @@ export default function History() {
             transition={{ delay: 0.1 }}
           >
             <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Activity className="h-6 w-6 text-blue-600" />
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                  <div className="p-2 sm:p-3 bg-blue-100 rounded-xl w-fit">
+                    <Activity className="h-4 w-4 sm:h-6 sm:w-6 text-blue-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Terminais Monitorados</p>
-                    <p className="text-3xl font-bold text-blue-600">
+                    <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider">Terminais</p>
+                    <p className="text-xl sm:text-3xl font-bold text-blue-600">
                       {terminals.length}
                     </p>
                   </div>
@@ -202,21 +202,21 @@ export default function History() {
             transition={{ delay: 0.2 }}
           >
             <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
+              <CardContent className="p-3 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                   <div className={cn(
-                    "p-3 rounded-xl",
+                    "p-2 sm:p-3 rounded-xl w-fit",
                     worstPerformers.length === 0 ? "bg-emerald-100" : "bg-orange-100"
                   )}>
                     <Clock className={cn(
-                      "h-6 w-6",
+                      "h-4 w-4 sm:h-6 sm:w-6",
                       worstPerformers.length === 0 ? "text-emerald-600" : "text-orange-600"
                     )} />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wider">Abaixo de 99%</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wider">Abaixo 99%</p>
                     <p className={cn(
-                      "text-3xl font-bold",
+                      "text-xl sm:text-3xl font-bold",
                       worstPerformers.length === 0 ? "text-emerald-600" : "text-orange-600"
                     )}>
                       {worstPerformers.length}
@@ -229,7 +229,7 @@ export default function History() {
         </div>
 
         {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Uptime Chart */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
