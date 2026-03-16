@@ -38,35 +38,26 @@ export default function Incidents() {
 
   const queryClient = useQueryClient();
 
-  // Fetch terminals to know which ones belong to this user
-  const { data: allTerminals = [] } = useQuery({
-    queryKey: ['terminals-incidents-user'],
-    queryFn: () => base44.entities.Terminal.list(),
-    enabled: !!currentUser,
-  });
-
-  const myTerminalIds = useMemo(() => {
-    if (!currentUser || canSeeAll) return null;
-    return new Set(allTerminals.filter(t => t.created_by === currentUser.email).map(t => t.id));
-  }, [allTerminals, currentUser, canSeeAll]);
-
-  // Fetch incidents
-  const { data: allIncidents = [], isLoading, refetch } = useQuery({
-    queryKey: ['incidents'],
-    queryFn: () => base44.entities.AlertIncident.list('-created_date', 200),
+  // Fetch incidents with server-side filtering for security
+  const { data: incidents = [], isLoading, refetch } = useQuery({
+    queryKey: ['incidents', currentUser?.email, canSeeAll],
+    queryFn: async () => {
+      if (canSeeAll) {
+        return await base44.entities.AlertIncident.list('-created_date', 200);
+      }
+      // Non-admins: fetch incidents from their own terminals only
+      const myTerminals = await base44.entities.Terminal.filter(
+        { created_by: currentUser?.email }
+      );
+      const myTerminalIds = myTerminals.map(t => t.id);
+      if (myTerminalIds.length === 0) return [];
+      // Fetch all incidents and filter by owned terminals
+      const allIncidents = await base44.entities.AlertIncident.list('-created_date', 200);
+      return allIncidents.filter(i => myTerminalIds.includes(i.terminal_id));
+    },
     refetchInterval: 30000,
     enabled: !!currentUser,
   });
-
-  const handleRefresh = () => {
-    refetch();
-  };
-
-  const incidents = useMemo(() => {
-    if (!currentUser) return [];
-    if (canSeeAll) return allIncidents;
-    return allIncidents.filter(i => myTerminalIds?.has(i.terminal_id));
-  }, [allIncidents, currentUser, canSeeAll, myTerminalIds]);
 
   const [checkingId, setCheckingId] = useState(null);
   const [checkError, setCheckError] = useState(null);
@@ -302,7 +293,7 @@ export default function Incidents() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleRefresh}
+              onClick={refetch}
               className="flex items-center gap-1.5"
             >
               <RefreshCw className="h-4 w-4" />
