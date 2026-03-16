@@ -83,19 +83,21 @@ export default function Dashboard() {
   const perms = resolvePermissions(currentUser);
   const canSeeAll = currentUser?.role === 'admin' || currentUser?.role === 'editor';
 
-  // Fetch terminals with auto-refresh based on config
-  const { data: allTerminals = [], isLoading, refetch } = useQuery({
-    queryKey: ['terminals'],
-    queryFn: () => base44.entities.Terminal.list(),
+  // Fetch terminals with server-side filtering for security
+  const { data: terminals = [], isLoading, refetch } = useQuery({
+    queryKey: ['terminals', currentUser?.email, canSeeAll],
+    queryFn: async () => {
+      if (canSeeAll) {
+        return await base44.entities.Terminal.list();
+      }
+      return await base44.entities.Terminal.filter(
+        { created_by: currentUser?.email },
+        '-created_date'
+      );
+    },
     refetchInterval: refreshInterval,
     enabled: !!currentUser,
   });
-
-  const terminals = useMemo(() => {
-    if (!currentUser) return [];
-    if (canSeeAll) return allTerminals;
-    return allTerminals.filter(t => t.created_by === currentUser.email);
-  }, [allTerminals, currentUser, canSeeAll]);
 
   // Monitorar todos os terminais
   const handleMonitorAll = async () => {
@@ -111,20 +113,26 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch alerts
-  const { data: allAlerts = [] } = useQuery({
-    queryKey: ['alerts'],
-    queryFn: () => base44.entities.AlertIncident.list('-created_date', 50),
+  // Fetch alerts with server-side filtering for security
+  const { data: alerts = [] } = useQuery({
+    queryKey: ['alerts', currentUser?.email, canSeeAll],
+    queryFn: async () => {
+      if (canSeeAll) {
+        return await base44.entities.AlertIncident.list('-created_date', 50);
+      }
+      // Non-admins: fetch alerts from their own terminals only
+      const myTerminals = await base44.entities.Terminal.filter(
+        { created_by: currentUser?.email }
+      );
+      const myTerminalIds = myTerminals.map(t => t.id);
+      if (myTerminalIds.length === 0) return [];
+      // Fetch alerts and filter by owned terminals
+      const allAlerts = await base44.entities.AlertIncident.list('-created_date', 50);
+      return allAlerts.filter(a => myTerminalIds.includes(a.terminal_id));
+    },
     refetchInterval: refreshInterval,
+    enabled: !!currentUser,
   });
-
-  const alerts = useMemo(() => {
-    if (!currentUser) return [];
-    if (canSeeAll) return allAlerts;
-    // Viewers see only alerts from their own terminals
-    const myTerminalIds = new Set(terminals.map(t => t.id));
-    return allAlerts.filter(a => myTerminalIds.has(a.terminal_id));
-  }, [allAlerts, currentUser, canSeeAll, terminals]);
 
   // Get unique values for filters
   const locais = useMemo(() => 
