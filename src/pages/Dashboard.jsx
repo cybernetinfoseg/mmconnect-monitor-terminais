@@ -319,7 +319,7 @@ export default function Dashboard() {
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
-              className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
+              className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200"
             >
               <option value="status">Status (offline primeiro)</option>
               <option value="nome">Nome (A-Z)</option>
