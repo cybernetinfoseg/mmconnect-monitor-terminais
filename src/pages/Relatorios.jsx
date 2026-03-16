@@ -29,11 +29,18 @@ export default function Relatorios() {
     const perms = resolvePermissions(currentUser);
     const canSeeAll = perms.isAdmin || perms.isEditor;
 
-    const { data: history = [], isLoading: historyLoading } = useQuery({
+    const { data: allHistory = [], isLoading: historyLoading } = useQuery({
         queryKey: ['rel-history', period],
         queryFn: () => base44.entities.StatusHistory.list('-timestamp', 2000),
         enabled: !!currentUser,
     });
+
+    const history = useMemo(() => {
+        if (!currentUser) return [];
+        if (canSeeAll) return allHistory;
+        const myIds = new Set(terminals.map(t => t.id));
+        return allHistory.filter(h => myIds.has(h.terminal_id));
+    }, [allHistory, currentUser, canSeeAll, terminals]);
 
     const { data: allTerminals = [] } = useQuery({
         queryKey: ['rel-terminals'],
