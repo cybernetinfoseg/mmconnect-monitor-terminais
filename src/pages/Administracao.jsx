@@ -399,42 +399,20 @@ export default function Administracao() {
                     const limit = user.limite_terminais ?? 0;
                     return (
                       <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-900 max-w-[160px] truncate">{user.email}</td>
+                        <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate">{user.email}</td>
                         <td className="px-4 py-3">
-                          <Badge className={cn("text-xs", ROLE_COLORS[user.role] || ROLE_COLORS.viewer)}>
-                            {user.role === 'admin' ? '⊙ ' : user.role === 'editor' ? '✏️ ' : '👁 '}
-                            {ROLE_LABELS[user.role] || user.role || 'Visualizador'}
+                          <Badge className={cn("text-xs", ROLE_COLORS[user.role] || ROLE_COLORS.user)}>
+                            {user.role === 'admin' ? '⊙ ' : '👤 '}
+                            {ROLE_LABELS[user.role] || 'Utilizador'}
                           </Badge>
-                        </td>
-                        <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs max-w-[180px] truncate">
-                          {(user.paginas_permitidas || []).map(p => PAGE_LABELS[p] || p).join(', ') || '—'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={cn(
                             "font-mono text-xs font-semibold",
-                            count >= limit ? "text-red-600" : "text-emerald-600"
+                            limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600"
                           )}>
-                            {count}/{limit}
+                            {count}{limit > 0 ? `/${limit}` : ''}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 hidden sm:table-cell">
-                         <div className="flex gap-1 flex-wrap">
-                           {user.pode_configurar_alertas && (
-                             <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">Alertas</Badge>
-                           )}
-                           {user.pode_gerenciar_usuarios && (
-                             <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">Usuários</Badge>
-                           )}
-                           {user.pode_editar_terminais && (
-                             <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs">Terminais</Badge>
-                           )}
-                           {user.pode_editar_clientes && (
-                             <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">Clientes</Badge>
-                           )}
-                           {!user.pode_configurar_alertas && !user.pode_gerenciar_usuarios && !user.pode_editar_terminais && !user.pode_editar_clientes && (
-                             <span className="text-slate-400 text-xs">—</span>
-                           )}
-                         </div>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
