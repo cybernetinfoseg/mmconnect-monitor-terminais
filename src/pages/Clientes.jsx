@@ -72,9 +72,20 @@ export default function Clientes() {
   const { data: myClientes = [] } = useQuery({
     queryKey: ['my-clientes', myClienteIds],
     queryFn: async () => {
-      if (!myClienteIds || myClienteIds.length === 0) return [];
-      const results = await Promise.all(myClienteIds.map(id => base44.entities.Cliente.get(id).catch(() => null)));
-      return results.filter(Boolean);
+      if (!currentUser) return [];
+      // Fetch clientes created by the user
+      const userCreatedClientes = await base44.entities.Cliente.filter({ created_by: currentUser.email });
+      // If user has terminal-linked clients, fetch those too
+      if (!myClienteIds || myClienteIds.length === 0) return userCreatedClientes;
+      const linkedResults = await Promise.all(myClienteIds.map(id => base44.entities.Cliente.get(id).catch(() => null)));
+      const linkedClientes = linkedResults.filter(Boolean);
+      // Merge and deduplicate by id
+      const merged = [...userCreatedClientes];
+      const userCreatedIds = new Set(userCreatedClientes.map(c => c.id));
+      linkedClientes.forEach(c => {
+        if (!userCreatedIds.has(c.id)) merged.push(c);
+      });
+      return merged;
     },
     enabled: !canSeeAll && !!currentUser && myClienteIds !== null,
   });
