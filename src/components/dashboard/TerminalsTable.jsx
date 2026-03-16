@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, MapPin, Building2, Clock, AlertTriangle } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+import { formatDateTimePT, formatTimePT } from '@/lib/localization';
 
 export default function TerminalsTable({ terminals, maxRows = 15, compact = false }) {
   const sortedTerminals = [...terminals].sort((a, b) => {
@@ -100,7 +100,7 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
                   <td className={cn("text-slate-600", compact ? "px-4 py-3 text-sm" : "px-6 py-4")}>{terminal.cliente}</td>
                   <td className={cn("text-center", compact ? "px-4 py-3" : "px-6 py-4")}><StatusBadge status={terminal.status} /></td>
                   <td className={cn("text-slate-500", compact ? "px-4 py-3 text-sm" : "px-6 py-4")}>
-                    {terminal.ultimo_ping ? moment(terminal.ultimo_ping).format('DD/MM HH:mm:ss') : '—'}
+                    {terminal.ultimo_ping ? formatDateTimePT(terminal.ultimo_ping) : '—'}
                   </td>
                   <td className={cn("text-right font-mono", compact ? "px-4 py-3 text-sm" : "px-6 py-4", terminal.status === 'offline' ? 'text-red-600 font-semibold' : 'text-slate-500')}>
                     {formatTimeSince(terminal.segundos_sem_ping)}

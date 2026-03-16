@@ -215,7 +215,7 @@ export default function Dashboard() {
             <div className="text-right hidden sm:block">
               <p className="text-xs text-slate-400">Última atualização</p>
               <p className="text-sm font-mono text-slate-200">
-                {lastRefresh.toLocaleTimeString('pt-BR')}
+                {lastRefresh.toLocaleTimeString('pt-PT')}
               </p>
             </div>
             {/* Mobile: single refresh button + menu; Desktop: full buttons */}
