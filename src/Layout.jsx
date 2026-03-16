@@ -239,7 +239,7 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Mobile Header */}
       <header
-        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4"
+        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-[#1f2d3d] px-4"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="flex items-center justify-between h-14">
