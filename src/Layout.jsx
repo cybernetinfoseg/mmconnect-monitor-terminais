@@ -228,6 +228,10 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </div>
 
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="select-none">
+              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="select-none">
@@ -238,6 +242,7 @@ export default function Layout({ children, currentPageName }) {
               <Sidebar />
             </SheetContent>
           </Sheet>
+          </div>
         </div>
       </header>
 
