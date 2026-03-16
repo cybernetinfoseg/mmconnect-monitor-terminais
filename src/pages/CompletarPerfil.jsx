@@ -75,7 +75,7 @@ export default function CompletarPerfil() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 flex items-center justify-center p-4 z-50 overflow-hidden">
       <div className="max-w-2xl w-full">
         
         {/* Header */}

@@ -165,13 +165,18 @@ export default function Administracao() {
     base44.functions.invoke('auditLog', { acao, entidade: 'User', entidade_id, descricao }).catch(() => {});
 
   const inviteMutation = useMutation({
-    mutationFn: async ({ email, role }) => {
-      return base44.users.inviteUser(email, role === 'admin' ? 'admin' : 'user');
+    mutationFn: async ({ email, role, limite_terminais }) => {
+      const user = await base44.users.inviteUser(email, role === 'admin' ? 'admin' : 'user');
+      // Atualizar limite de terminais para 0 (novo usuário)
+      if (user?.id && !role?.includes('admin')) {
+        await base44.entities.User.update(user.id, { limite_terminais: 0 });
+      }
+      return user;
     },
     onSuccess: (_, { email, role }) => {
-      logAudit('usuario_convidado', '', `Usuário ${email} convidado com role "${role}"`);
+      logAudit('usuario_convidado', '', `Usuário ${email} convidado com role "${role}" e limite 0/0`);
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success('Convite enviado!');
+      toast.success('Convite enviado! Novo usuário começa com limite 0/0.');
       handleCancel();
     },
     onError: () => toast.error('Erro ao enviar convite'),
@@ -209,7 +214,7 @@ export default function Administracao() {
         },
       });
     } else {
-      inviteMutation.mutate({ email: form.email, role: form.role === 'admin' ? 'admin' : 'user' });
+      inviteMutation.mutate({ email: form.email, role: form.role === 'admin' ? 'admin' : 'user', limite_terminais: 0 });
     }
   };
 
