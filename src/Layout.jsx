@@ -272,7 +272,7 @@ export default function Layout({ children, currentPageName }) {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
+            <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-[#1f2d3d] dark:bg-[#111827]">
               <Sidebar />
             </SheetContent>
           </Sheet>
