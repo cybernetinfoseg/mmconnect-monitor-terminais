@@ -148,7 +148,7 @@ export default function Terminais() {
       setDialogOpen(false);
       setEditingTerminal(null);
       setFormData({});
-      toast.success(isEdit ? 'Terminal actualizado' : 'Terminal criado');
+      toast.success(isEdit ? 'Terminal atualizado' : 'Terminal criado');
     },
     onError: (error) => toast.error(`Erro: ${error.message}`),
   });
@@ -275,7 +275,7 @@ export default function Terminais() {
               className="border-emerald-600 text-emerald-700 hover:bg-emerald-50"
             >
               <RefreshCw className={cn("h-4 w-4 sm:mr-2", verificandoTodos && "animate-spin")} />
-              <span className="hidden sm:inline">{verificandoTodos ? 'A verificar...' : 'Verificar Todos'}</span>
+              <span className="hidden sm:inline">{verificandoTodos ? 'A verificar...' : 'Verificar Tudo'}</span>
             </Button>
             <Button
               onClick={handleNew}
