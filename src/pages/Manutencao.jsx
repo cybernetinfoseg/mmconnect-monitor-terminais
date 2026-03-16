@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Plus, Wrench, Calendar, Clock, Trash2, Pencil, AlertTriangle } from 'lu
 import { format, isAfter, isBefore } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import MaintenanceModal from '@/components/manutencao/MaintenanceModal';
+import { resolvePermissions } from '../components/auth/usePermissions';
 
 function getStatus(item) {
     const now = new Date();
