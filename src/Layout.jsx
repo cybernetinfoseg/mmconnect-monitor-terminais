@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { resolvePermissions } from './components/auth/usePermissions.jsx';
+import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { AnimatePresence, motion } from 'framer-motion';
