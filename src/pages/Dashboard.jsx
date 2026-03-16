@@ -379,9 +379,9 @@ export default function Dashboard() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
+            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50 dark:bg-slate-900/40 dark:border-slate-700/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
+                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
                   Distribuição de Status
                 </CardTitle>
               </CardHeader>
