@@ -328,8 +328,11 @@ export default function Administracao() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {pendingUsers.map(user => (
-                <div key={user.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white rounded-lg px-4 py-3 border border-amber-100 gap-3">
+              {pendingUsers.map(user => {
+          const [expanded, setExpanded] = React.useState(false);
+          return (
+                <div key={user.id} className="bg-white rounded-lg border border-amber-100 overflow-hidden">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 gap-3">
                   <div className="flex-1">
                     <p className="font-medium text-slate-900 text-sm">{user.email}</p>
                     <p className="text-xs text-slate-400">Aguardando aprovação</p>
