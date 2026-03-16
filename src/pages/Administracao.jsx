@@ -83,28 +83,22 @@ export default function Administracao() {
     mutationFn: async (id) => {
       const u = users.find(u => u.id === id);
       
-      // Envia email de recusa
-      if (u?.email && u?.nome) {
-        try {
-          await base44.functions.invoke('sendContactMessage', {
-            from_email: 'noreply@nocmonitor.com',
-            from_name: 'NOC Monitor',
-            to_email: u.email,
-            subject: 'Solicitação de Acesso Recusada',
-            body: `Olá ${u.nome},\n\nSua solicitação de acesso ao NOC Monitor foi recusada.\n\nSe tiver dúvidas, entre em contato com o administrador.`,
-          }).catch(() => {});
-        } catch (error) {
-          console.error('Erro ao enviar email de recusa:', error);
-        }
+      // Envia email de recusa diretamente
+      if (u?.email) {
+        await base44.integrations.Core.SendEmail({
+          to: u.email,
+          subject: '[NOC Monitor] Solicitação de Acesso Recusada',
+          body: `Olá ${u.nome || u.full_name || ''},\n\nInfelizmente, sua solicitação de acesso ao NOC Monitor foi recusada.\n\nSe tiver dúvidas, entre em contato com o administrador do sistema.\n\n---\nNOC Monitor`,
+        }).catch(() => {});
       }
       
       // Deleta usuário
       await base44.entities.User.delete(id);
       return id;
     },
-    onSuccess: (id) => {
+    onSuccess: (_, id) => {
       const u = users.find(u => u.id === id);
-      logAudit('usuario_recusado', id, `Solicitação de ${u?.email || id} recusada e usuário excluído`);
+      logAudit('permissao_atualizada', id, `Solicitação de ${u?.email || id} recusada e usuário excluído`);
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast.success('Solicitação recusada e usuário removido');
     },
