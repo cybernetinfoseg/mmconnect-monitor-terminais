@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Mail, CheckCircle, Clock, Search, Send, X, Trash2 } from 'lucide-react';
@@ -27,7 +27,7 @@ export default function Mensagens() {
   const [sendingReply, setSendingReply] = useState(false);
   const queryClient = useQueryClient();
 
-  React.useEffect(() => {
+  useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
