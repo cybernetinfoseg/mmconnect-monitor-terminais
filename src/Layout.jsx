@@ -233,7 +233,7 @@ export default function Layout({ children, currentPageName }) {
         .dark .shadow-lg { box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
       `}</style>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-slate-200 dark:lg:bg-slate-900 dark:lg:border-slate-700">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-slate-200 dark:lg:bg-[#111827] dark:lg:border-[#1f2d3d]">
         <Sidebar />
       </aside>
 
