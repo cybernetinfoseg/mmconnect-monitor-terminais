@@ -127,8 +127,8 @@ export default function Layout({ children, currentPageName }) {
           "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 select-none",
           "text-sm font-medium",
           isActive
-            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-emerald-600"
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/25"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-200"
         )}
       >
         <Icon className={cn(
