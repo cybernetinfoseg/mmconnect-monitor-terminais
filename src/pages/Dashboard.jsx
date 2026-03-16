@@ -182,7 +182,7 @@ export default function Dashboard() {
 
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-[#0d1117] dark:via-[#0d1117] dark:to-[#0d1117]">
       {/* Header */}
       <div className="bg-slate-900 text-white px-4 sm:px-6 py-4">
         <div className="max-w-[1920px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
