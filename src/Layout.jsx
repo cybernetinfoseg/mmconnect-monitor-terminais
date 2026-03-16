@@ -20,11 +20,8 @@ import {
   LogOut,
   User,
   Wrench,
-  FileBarChart2,
-  Sun,
-  Moon
+  FileBarChart2
 } from 'lucide-react';
-import { useTheme } from '@/components/ThemeContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -127,13 +124,13 @@ export default function Layout({ children, currentPageName }) {
           "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 select-none",
           "text-sm font-medium",
           isActive
-            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border dark:border-emerald-500/25"
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-200"
+            ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-emerald-600"
+            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
         )}
       >
         <Icon className={cn(
           "h-5 w-5",
-          isActive ? "text-emerald-400" : "text-slate-400 dark:text-slate-500"
+          isActive ? "text-emerald-400 dark:text-white" : "text-slate-400"
         )} />
         {item.name}
       </Link>
@@ -146,14 +143,12 @@ export default function Layout({ children, currentPageName }) {
     return perms.paginas_permitidas.includes(item.page);
   });
 
-  const { isDark, toggleTheme } = useTheme();
-
   const Sidebar = ({ onClose }) => (
-    <div className="flex flex-col h-full bg-white dark:bg-[#111827]">
-      <div className="p-6 border-b border-slate-200 dark:border-[#1f2d3d]">
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
+      <div className="p-6 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-900 dark:bg-emerald-600/20 dark:border dark:border-emerald-500/30 rounded-xl">
-            <Monitor className="h-6 w-6 text-emerald-400" />
+          <div className="p-2 bg-slate-900 dark:bg-emerald-600 rounded-xl">
+            <Monitor className="h-6 w-6 text-emerald-400 dark:text-white" />
           </div>
           <div>
             <h1 className="font-bold text-slate-900 dark:text-white">NOC Monitor</h1>
@@ -166,17 +161,10 @@ export default function Layout({ children, currentPageName }) {
           <NavLink key={item.page} item={item} onClick={onClose} />
         ))}
       </nav>
-      <div className="p-4 border-t border-slate-200 dark:border-[#1f2d3d] space-y-2">
-        <button
-          onClick={toggleTheme}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:text-white transition-colors"
-        >
-          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          {isDark ? 'Tema Claro' : 'Tema Escuro (TV)'}
-        </button>
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
         <PushNotificationManager />
         {currentUser && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-[#1c2433]">
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
             <User className="h-4 w-4 text-slate-400 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{currentUser.full_name || currentUser.email}</p>
@@ -197,49 +185,15 @@ export default function Layout({ children, currentPageName }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0d1117]">
-      <style>{`
-        .dark {
-          --background: 215 28% 7%;
-          --foreground: 210 40% 92%;
-          --card: 215 25% 10%;
-          --card-foreground: 210 40% 92%;
-          --popover: 215 25% 10%;
-          --popover-foreground: 210 40% 92%;
-          --primary: 160 84% 39%;
-          --primary-foreground: 0 0% 100%;
-          --secondary: 215 25% 13%;
-          --secondary-foreground: 210 40% 85%;
-          --muted: 215 25% 13%;
-          --muted-foreground: 215 20% 52%;
-          --accent: 215 25% 15%;
-          --accent-foreground: 210 40% 92%;
-          --destructive: 0 62.8% 50%;
-          --destructive-foreground: 0 0% 98%;
-          --border: 215 25% 16%;
-          --input: 215 25% 16%;
-          --ring: 160 84% 39%;
-        }
-        .dark .bg-white { background-color: #111827 !important; }
-        .dark .bg-slate-50 { background-color: #0d1117 !important; }
-        .dark .bg-slate-100 { background-color: #161b22 !important; }
-        .dark .bg-slate-800 { background-color: #1c2433 !important; }
-        .dark .bg-slate-900 { background-color: #111827 !important; }
-        .dark .bg-slate-950 { background-color: #0d1117 !important; }
-        .dark .border-slate-200 { border-color: #1f2d3d !important; }
-        .dark .border-slate-700 { border-color: #1f2d3d !important; }
-        .dark [class*="rounded"][class*="border"] { border-color: rgba(255,255,255,0.07); }
-        .dark .shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
-        .dark .shadow-lg { box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
-      `}</style>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-slate-200 dark:lg:bg-[#111827] dark:lg:border-[#1f2d3d]">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:bg-white lg:border-r lg:border-slate-200 dark:lg:bg-slate-900 dark:lg:border-slate-700">
         <Sidebar />
       </aside>
 
       {/* Mobile Header */}
       <header
-        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-[#111827] border-b border-slate-200 dark:border-[#1f2d3d] px-4"
+        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="flex items-center justify-between h-14">
@@ -262,21 +216,16 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="select-none">
-              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="select-none">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-[#1f2d3d] dark:bg-[#111827]">
+            <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
               <Sidebar />
             </SheetContent>
           </Sheet>
-          </div>
         </div>
       </header>
 
@@ -305,7 +254,7 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Mobile Bottom Navigation */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-[#111827] border-t border-slate-200 dark:border-[#1f2d3d]"
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-stretch">

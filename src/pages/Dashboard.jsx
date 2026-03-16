@@ -182,7 +182,7 @@ export default function Dashboard() {
 
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-[#0d1117] dark:via-[#0d1117] dark:to-[#0d1117]">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Header */}
       <div className="bg-slate-900 text-white px-4 sm:px-6 py-4">
         <div className="max-w-[1920px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -255,7 +255,7 @@ export default function Dashboard() {
 
       {/* Widget Config Panel */}
       {showWidgetConfig && (
-        <div className="bg-slate-800 dark:bg-slate-900/50 border-b border-slate-700 dark:border-slate-800 px-4 sm:px-6 py-3">
+        <div className="bg-slate-800 border-b border-slate-700 px-4 sm:px-6 py-3">
           <div className="max-w-[1920px] mx-auto flex flex-wrap items-center gap-4 sm:gap-6">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
               <LayoutDashboard className="h-3.5 w-3.5" /> Widgets visíveis
@@ -319,7 +319,7 @@ export default function Dashboard() {
             <select
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
-              className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200"
+              className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
             >
               <option value="status">Status (offline primeiro)</option>
               <option value="nome">Nome (A-Z)</option>
@@ -379,9 +379,9 @@ export default function Dashboard() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50 dark:bg-slate-900/40 dark:border-slate-700/50">
+            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
                   Distribuição de Status
                 </CardTitle>
               </CardHeader>
@@ -401,11 +401,11 @@ export default function Dashboard() {
             transition={{ delay: 0.2 }}
             className="lg:col-span-2"
           >
-            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50 dark:bg-slate-900/40 dark:border-slate-700/50">
+            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
                   <span>Terminais</span>
-                  <span className="text-xs font-normal text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <span className="text-xs font-normal text-emerald-600 flex items-center gap-1">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
                     Tempo Real ({refreshInterval >= 60000 ? (refreshInterval / 60000).toFixed(0) + 'm' : (refreshInterval / 1000).toFixed(0) + 's'})
                   </span>
@@ -427,10 +427,10 @@ export default function Dashboard() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50 dark:bg-slate-900/40 dark:border-slate-700/50">
+            <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
                   Incidentes Recentes
                 </CardTitle>
               </CardHeader>
