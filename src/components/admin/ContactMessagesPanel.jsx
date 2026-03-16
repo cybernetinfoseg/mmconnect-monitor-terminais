@@ -161,6 +161,21 @@ export default function ContactMessagesPanel() {
               <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedMessage.message}</p>
             </div>
 
+            {selectedMessage.respondido && selectedMessage.resposta_texto && (
+              <div className="bg-emerald-50 rounded border border-emerald-200 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-emerald-900">Resposta Enviada</p>
+                  <p className="text-xs text-emerald-600">
+                    {new Date(selectedMessage.respondido_em).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+                <p className="text-sm text-emerald-900 whitespace-pre-wrap">{selectedMessage.resposta_texto}</p>
+                {selectedMessage.respondido_por && (
+                  <p className="text-xs text-emerald-600">Por: {selectedMessage.respondido_por}</p>
+                )}
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-xs font-medium text-slate-600">Sua Resposta</label>
               <Textarea
