@@ -94,7 +94,7 @@ export default function Clientes() {
       else map[key].offline++;
     });
     return map;
-  }, [allTerminals]);
+  }, [visibleTerminals]);
 
   const saveMutation = useMutation({
     mutationFn: (data) => {
