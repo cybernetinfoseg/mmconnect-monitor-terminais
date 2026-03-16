@@ -94,10 +94,23 @@ export default function Terminais() {
   const terminalCount = terminals.length;
   const atLimit = !isAdmin && limiteTerminais > 0 && terminalCount >= limiteTerminais;
 
-  // Fetch clientes
+  // Fetch clientes with security filtering
   const { data: clientes = [] } = useQuery({
-    queryKey: ['clientes'],
-    queryFn: () => base44.entities.Cliente.list(),
+    queryKey: ['clientes', currentUser?.email, isAdmin],
+    queryFn: async () => {
+      if (isAdmin) {
+        return await base44.entities.Cliente.list();
+      }
+      // Non-admins only see clients from their terminals
+      const userTerminals = await base44.entities.Terminal.filter(
+        { created_by: currentUser?.email },
+        '-created_date'
+      );
+      const clienteIds = new Set(userTerminals.map(t => t.cliente_id).filter(Boolean));
+      const allClientes = await base44.entities.Cliente.list();
+      return allClientes.filter(c => clienteIds.has(c.id));
+    },
+    enabled: !!currentUser,
   });
 
   const logAudit = (acao, entidade_id, descricao) =>
