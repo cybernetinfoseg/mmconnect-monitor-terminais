@@ -146,6 +146,8 @@ export default function Layout({ children, currentPageName }) {
     return perms.paginas_permitidas.includes(item.page);
   });
 
+  const { isDark, toggleTheme } = useTheme();
+
   const Sidebar = ({ onClose }) => (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900">
       <div className="p-6 border-b border-slate-200 dark:border-slate-700">
