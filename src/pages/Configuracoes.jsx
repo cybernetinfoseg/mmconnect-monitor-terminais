@@ -189,30 +189,30 @@ export default function Configuracoes() {
                     <Input
                       readOnly
                       value="Configurada no painel de segredos do projeto"
-                      className="bg-slate-50 text-xs sm:text-sm text-slate-400 italic cursor-not-allowed"
+                      className="bg-slate-50 text-xs text-slate-400 italic cursor-not-allowed"
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">APP ID</Label>
                     <div className="flex gap-2">
-                      <Input readOnly value={APP_ID} className="bg-slate-50 text-xs sm:text-sm font-mono" />
+                      <Input readOnly value={APP_ID} className="bg-slate-50 text-xs font-mono min-w-0" />
                       <Button variant="outline" size="sm" onClick={() => copyToClipboard(APP_ID, 'APP ID')} className="shrink-0">
-                        <Copy className="h-4 w-4" />
+                        <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Endpoint — Obter Terminais</Label>
                     <div className="flex gap-2">
-                      <Input readOnly value="/api/functions/agentGetTerminals" className="bg-slate-50 text-xs font-mono" />
-                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentGetTerminals', 'Endpoint')} className="shrink-0"><Copy className="h-4 w-4" /></Button>
+                      <Input readOnly value="/api/functions/agentGetTerminals" className="bg-slate-50 text-xs font-mono min-w-0 break-all" />
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentGetTerminals', 'Endpoint')} className="shrink-0"><Copy className="h-3 w-3 sm:h-4 sm:w-4" /></Button>
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Endpoint — Reportar Status</Label>
                     <div className="flex gap-2">
-                      <Input readOnly value="/api/functions/agentReport" className="bg-slate-50 text-xs font-mono" />
-                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentReport', 'Endpoint')} className="shrink-0"><Copy className="h-4 w-4" /></Button>
+                      <Input readOnly value="/api/functions/agentReport" className="bg-slate-50 text-xs font-mono min-w-0 break-all" />
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentReport', 'Endpoint')} className="shrink-0"><Copy className="h-3 w-3 sm:h-4 sm:w-4" /></Button>
                     </div>
                   </div>
                 </div>
@@ -247,7 +247,7 @@ export default function Configuracoes() {
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Configure as credenciais (CMD como Administrador):</p>
                       <p className="text-xs text-slate-500 mt-1">O agente lê as credenciais do ficheiro <code className="bg-slate-100 px-1 rounded">C:\ProgramData\Base44Agent\config.json</code>. Crie-o com o conteúdo:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto max-w-full">{`{
+                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto max-w-full break-words whitespace-pre-wrap">{`{
                       "API_KEY": "SUA_API_KEY",
                       "APP_ID": "${APP_ID}"
                       }`}</pre>
@@ -261,7 +261,12 @@ export default function Configuracoes() {
                     <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">4</span>
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Instale como serviço Windows com NSSM:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto max-w-full whitespace-pre-wrap break-all">{`nssm install Base44Agent python "C:\\Program Files\\Base44Agent\\core_agent.py"\nnssm set Base44Agent AppParameters "--interval 30"\nnssm set Base44Agent AppDirectory "C:\\Program Files\\Base44Agent"\nnssm start Base44Agent`}</pre>
+                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto max-w-full whitespace-pre-wrap break-words">{`nssm install Base44Agent python \
+                      "C:\\Program Files\\Base44Agent\\core_agent.py"
+                      nssm set Base44Agent AppParameters "--interval 30"
+                      nssm set Base44Agent AppDirectory \
+                      "C:\\Program Files\\Base44Agent"
+                      nssm start Base44Agent`}</pre>
                     </div>
                   </div>
 
@@ -269,8 +274,8 @@ export default function Configuracoes() {
                     <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">5</span>
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Teste rápido (sem instalar serviço):</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto">{`cd "C:\\Program Files\\Base44Agent"
-python core_agent.py --once`}</pre>
+                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto break-words whitespace-pre-wrap">{`cd "C:\\Program Files\\Base44Agent"
+                      python core_agent.py --once`}</pre>
                     </div>
                   </div>
 
