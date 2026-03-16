@@ -4,27 +4,27 @@ import { cn } from '@/lib/utils';
 
 export default function KPICard({ title, value, icon: Icon, color, trend, trendValue }) {
   const colorClasses = {
-    blue: 'from-blue-500/10 to-blue-600/5 border-blue-500/20',
-    green: 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20',
-    red: 'from-red-500/10 to-red-600/5 border-red-500/20',
-    orange: 'from-orange-500/10 to-orange-600/5 border-orange-500/20',
-    purple: 'from-purple-500/10 to-purple-600/5 border-purple-500/20',
+    blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30 bg-card',
+    green: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 bg-card',
+    red: 'from-red-500/20 to-red-600/10 border-red-500/30 bg-card',
+    orange: 'from-orange-500/20 to-orange-600/10 border-orange-500/30 bg-card',
+    purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30 bg-card',
   };
 
   const iconColorClasses = {
-    blue: 'text-blue-500 bg-blue-500/10',
-    green: 'text-emerald-500 bg-emerald-500/10',
-    red: 'text-red-500 bg-red-500/10',
-    orange: 'text-orange-500 bg-orange-500/10',
-    purple: 'text-purple-500 bg-purple-500/10',
+    blue: 'text-blue-400 bg-blue-500/20',
+    green: 'text-emerald-400 bg-emerald-500/20',
+    red: 'text-red-400 bg-red-500/20',
+    orange: 'text-orange-400 bg-orange-500/20',
+    purple: 'text-purple-400 bg-purple-500/20',
   };
 
   const valueColorClasses = {
-    blue: 'text-blue-600',
-    green: 'text-emerald-600',
-    red: 'text-red-600',
-    orange: 'text-orange-600',
-    purple: 'text-purple-600',
+    blue: 'text-blue-400',
+    green: 'text-emerald-400',
+    red: 'text-red-400',
+    orange: 'text-orange-400',
+    purple: 'text-purple-400',
   };
 
   return (
@@ -39,7 +39,7 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
     >
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1 sm:space-y-2 min-w-0">
-          <p className="text-[10px] sm:text-sm font-medium text-slate-500 uppercase tracking-wider leading-tight">
+          <p className="text-[10px] sm:text-sm font-medium text-muted-foreground uppercase tracking-wider leading-tight">
             {title}
           </p>
           <motion.p
@@ -48,7 +48,7 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
             animate={{ scale: 1, opacity: 1 }}
             className={cn(
               'text-2xl sm:text-4xl font-bold tracking-tight',
-              valueColorClasses[color] || 'text-slate-900'
+              valueColorClasses[color] || 'text-foreground'
             )}
           >
             {value}
@@ -56,7 +56,7 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
           {trend && (
             <p className={cn(
               'text-[10px] sm:text-xs font-medium hidden sm:block',
-              trend === 'up' ? 'text-emerald-500' : 'text-red-500'
+              trend === 'up' ? 'text-emerald-400' : 'text-red-400'
             )}>
               {trend === 'up' ? '↑' : '↓'} {trendValue}
             </p>
