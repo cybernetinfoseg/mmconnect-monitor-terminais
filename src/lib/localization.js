@@ -1,26 +1,30 @@
 // Portugal localization configuration
+import { format, formatDistanceToNow, pt } from 'date-fns';
+
 export const PT_LOCALE = 'pt-PT';
 
-// Format date as DD/MM/YYYY
+// Format date as DD/MM/YYYY using date-fns
 export function formatDatePT(date) {
   if (!date) return '';
-  const d = new Date(date);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return format(new Date(date), 'dd/MM/yyyy', { locale: pt });
 }
 
-// Format date and time as DD/MM/YYYY HH:MM
+// Format date and time as DD/MM/YYYY HH:mm using date-fns
 export function formatDateTimePT(date) {
   if (!date) return '';
-  const d = new Date(date);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+  return format(new Date(date), 'dd/MM/yyyy HH:mm', { locale: pt });
+}
+
+// Format time as HH:mm:ss
+export function formatTimePT(date) {
+  if (!date) return '';
+  return format(new Date(date), 'HH:mm:ss', { locale: pt });
+}
+
+// Format relative time (e.g., "há 2 horas")
+export function formatDistancePT(date) {
+  if (!date) return '';
+  return formatDistanceToNow(new Date(date), { locale: pt, addSuffix: true });
 }
 
 // Format number with comma as decimal separator
@@ -51,3 +55,6 @@ export function getDayNamePT(dayIndex) {
   const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
   return days[dayIndex] || '';
 }
+
+// Configure date-fns as default for Portugal
+export const ptBRLocale = pt;
