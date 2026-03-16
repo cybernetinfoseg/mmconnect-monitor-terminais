@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { resolvePermissions } from '../components/auth/usePermissions';
+import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Plus, Trash2, ToggleLeft, ToggleRight, Mail, Zap, Clock, AlertTriangle, CheckCircle, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

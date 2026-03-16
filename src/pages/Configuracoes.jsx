@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useEffect } from 'react';
-import { resolvePermissions } from '../components/auth/usePermissions';
+import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { motion } from 'framer-motion';
 import { 
   Settings, 

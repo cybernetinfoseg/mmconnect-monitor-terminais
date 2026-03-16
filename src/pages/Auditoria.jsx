@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { resolvePermissions } from '../components/auth/usePermissions';
+import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { ClipboardList, Search, Filter, User, Calendar, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

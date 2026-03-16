@@ -40,7 +40,7 @@ import StatusBadge from '../components/dashboard/StatusBadge';
 import NovoClienteModal from '../components/clientes/NovoClienteModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { resolvePermissions } from '../components/auth/usePermissions';
+import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 
 export default function Terminais() {
   const [searchTerm, setSearchTerm] = useState('');
