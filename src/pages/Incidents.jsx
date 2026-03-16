@@ -109,6 +109,148 @@ export default function Incidents() {
     return { active, resolved, today };
   }, [incidents]);
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    let y = 20;
+
+    // Header
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, pageW, 16, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('NOC Monitor — Relatório de Incidentes', margin, 11);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Gerado em: ${moment().format('DD/MM/YYYY HH:mm')}`, pageW - margin, 11, { align: 'right' });
+
+    y = 26;
+    doc.setTextColor(30, 41, 59);
+
+    // Filtros aplicados
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    const filterDesc = [
+      `Status: ${statusFilter === 'all' ? 'Todos' : statusFilter === 'active' ? 'Ativos' : 'Resolvidos'}`,
+      `Tipo: ${tipoFilter === 'all' ? 'Todos' : tipoFilter === 'offline' ? 'Offline' : 'Restaurado'}`,
+      `Total: ${filteredIncidents.length} incidente(s)`,
+    ].join('   |   ');
+    doc.text(filterDesc, margin, y);
+    y += 6;
+
+    // Linha separadora
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin, y, pageW - margin, y);
+    y += 5;
+
+    // Resumo KPI
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Resumo', margin, y);
+    y += 5;
+
+    const kpis = [
+      { label: 'Incidentes Ativos', value: String(stats.active), color: [220, 38, 38] },
+      { label: 'Resolvidos', value: String(stats.resolved), color: [5, 150, 105] },
+      { label: 'Hoje', value: String(stats.today), color: [37, 99, 235] },
+    ];
+    const kpiW = (pageW - margin * 2) / 3;
+    kpis.forEach((kpi, i) => {
+      const x = margin + i * kpiW;
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(x, y, kpiW - 3, 14, 2, 2, 'F');
+      doc.setTextColor(...kpi.color);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(kpi.value, x + 4, y + 9);
+      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'normal');
+      doc.text(kpi.label, x + 4, y + 13);
+    });
+    y += 20;
+
+    // Linha separadora
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin, y, pageW - margin, y);
+    y += 6;
+
+    // Título tabela
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text('Histórico de Incidentes', margin, y);
+    y += 5;
+
+    // Cabeçalho tabela
+    const cols = [
+      { label: 'Terminal', x: margin, w: 42 },
+      { label: 'Tipo', x: margin + 42, w: 22 },
+      { label: 'Local', x: margin + 64, w: 38 },
+      { label: 'Cliente', x: margin + 102, w: 38 },
+      { label: 'Data/Hora', x: margin + 140, w: 30 },
+      { label: 'Duração', x: margin + 170, w: 26 },
+    ];
+
+    doc.setFillColor(30, 41, 59);
+    doc.rect(margin, y, pageW - margin * 2, 7, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    cols.forEach(col => doc.text(col.label, col.x + 1, y + 4.8));
+    y += 7;
+
+    // Linhas da tabela
+    doc.setFont('helvetica', 'normal');
+    filteredIncidents.forEach((incident, idx) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 14;
+      }
+      const rowBg = idx % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
+      doc.setFillColor(...rowBg);
+      doc.rect(margin, y, pageW - margin * 2, 7, 'F');
+
+      // Cor por tipo/status
+      if (incident.tipo === 'offline' && !incident.resolvido) {
+        doc.setTextColor(185, 28, 28);
+      } else if (incident.tipo === 'restored' || incident.resolvido) {
+        doc.setTextColor(4, 120, 87);
+      } else {
+        doc.setTextColor(51, 65, 85);
+      }
+
+      const tipo = incident.tipo === 'offline' ? 'Offline' : 'Restaurado';
+      const status = incident.resolvido ? ' ✓' : '';
+      const duracao = incident.duracao_minutos ? `${incident.duracao_minutos} min` : '-';
+      const data = moment(incident.timestamp).format('DD/MM/YY HH:mm');
+
+      const truncate = (str, max) => str?.length > max ? str.slice(0, max - 1) + '…' : (str || '-');
+
+      doc.setFontSize(7);
+      doc.text(truncate(incident.terminal_nome, 22), cols[0].x + 1, y + 4.8);
+      doc.text(tipo + status, cols[1].x + 1, y + 4.8);
+      doc.setTextColor(51, 65, 85);
+      doc.text(truncate(incident.local, 20), cols[2].x + 1, y + 4.8);
+      doc.text(truncate(incident.cliente, 20), cols[3].x + 1, y + 4.8);
+      doc.text(data, cols[4].x + 1, y + 4.8);
+      doc.text(duracao, cols[5].x + 1, y + 4.8);
+      y += 7;
+    });
+
+    // Rodapé
+    doc.setTextColor(148, 163, 184);
+    doc.setFontSize(7);
+    doc.text('NOC Monitor — Relatório gerado automaticamente', margin, 292);
+    doc.text(`Página 1`, pageW - margin, 292, { align: 'right' });
+
+    const filename = `incidentes_${moment().format('YYYYMMDD_HHmm')}.pdf`;
+    doc.save(filename);
+  };
+
   const handleResolve = async (incident) => {
     setCheckingId(incident.id);
     setCheckError(null);
