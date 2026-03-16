@@ -82,7 +82,7 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!form.nome.trim() || !form.sobrenome.trim() || !form.telefone.trim()) {
+    if (!form.nome.trim() || !form.sobrenome.trim() || !form.telefone.trim() || !form.pais.trim()) {
       toast.error('Preencha todos os campos obrigatórios');
       return;
     }
@@ -93,6 +93,7 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
       await base44.auth.updateMe({
         nome: form.nome.trim(),
         sobrenome: form.sobrenome.trim(),
+        pais: form.pais.trim(),
         pais_telefone: form.pais_telefone,
         telefone: form.telefone.trim(),
         motivo_acesso: form.motivo_acesso.trim(),
@@ -108,10 +109,11 @@ export default function UserProfileForm({ user, onSuccess, isEditMode = false })
           email: user.email,
           nome: form.nome.trim(),
           sobrenome: form.sobrenome.trim(),
+          pais: form.pais.trim(),
           pais_telefone: form.pais_telefone,
           telefone: form.telefone.trim(),
           motivo_acesso: form.motivo_acesso.trim(),
-          data_inscricao: new Date().toLocaleString('pt-BR'),
+          data_inscricao: new Date().toLocaleString('pt-PT'),
         });
       }
 
