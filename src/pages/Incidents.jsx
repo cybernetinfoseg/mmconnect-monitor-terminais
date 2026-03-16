@@ -22,7 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FilterDropdown from '../components/dashboard/FilterDropdown';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+import { format, isSameDay, pt } from 'date-fns';
+import { formatDateTimePT } from '@/lib/localization';
 
 export default function Incidents() {
   const [statusFilter, setStatusFilter] = useState('all');
@@ -94,7 +95,7 @@ export default function Incidents() {
     const active = incidents.filter(i => !i.resolvido && i.tipo === 'offline').length;
     const resolved = incidents.filter(i => i.resolvido).length;
     const today = incidents.filter(i => 
-      moment(i.timestamp).isSame(moment(), 'day')
+      isSameDay(new Date(i.timestamp), new Date())
     ).length;
     return { active, resolved, today };
   }, [incidents]);
@@ -114,7 +115,7 @@ export default function Incidents() {
     doc.text('NOC Monitor — Relatório de Incidentes', margin, 11);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${moment().format('DD/MM/YYYY HH:mm')}`, pageW - margin, 11, { align: 'right' });
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: pt })}`, pageW - margin, 11, { align: 'right' });
 
     y = 26;
     doc.setTextColor(30, 41, 59);
@@ -216,7 +217,7 @@ export default function Incidents() {
       const tipo = incident.tipo === 'offline' ? 'Offline' : 'Restaurado';
       const status = incident.resolvido ? ' ✓' : '';
       const duracao = incident.duracao_minutos ? `${incident.duracao_minutos} min` : '-';
-      const data = moment(incident.timestamp).format('DD/MM/YY HH:mm');
+      const data = format(new Date(incident.timestamp), 'dd/MM/yy HH:mm', { locale: pt });
 
       const truncate = (str, max) => str?.length > max ? str.slice(0, max - 1) + '…' : (str || '-');
 
@@ -237,7 +238,7 @@ export default function Incidents() {
     doc.text('NOC Monitor — Relatório gerado automaticamente', margin, 292);
     doc.text(`Página 1`, pageW - margin, 292, { align: 'right' });
 
-    const filename = `incidentes_${moment().format('YYYYMMDD_HHmm')}.pdf`;
+    const filename = `incidentes_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
     doc.save(filename);
   };
 
@@ -484,7 +485,7 @@ export default function Incidents() {
                           <div className="flex items-center gap-4 text-xs text-slate-400 mt-2">
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {moment(incident.timestamp).format('DD/MM/YYYY HH:mm:ss')}
+                              {formatDateTimePT(incident.timestamp)}
                             </span>
                             {incident.duracao_minutos && (
                               <span>
@@ -493,7 +494,7 @@ export default function Incidents() {
                             )}
                             {incident.resolvido_em && (
                               <span>
-                                Resolvido em: {moment(incident.resolvido_em).format('DD/MM HH:mm')}
+                                Resolvido em: {format(new Date(incident.resolvido_em), 'dd/MM HH:mm', { locale: pt })}
                               </span>
                             )}
                           </div>
