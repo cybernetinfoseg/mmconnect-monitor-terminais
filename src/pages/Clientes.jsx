@@ -177,9 +177,7 @@ export default function Clientes() {
   const filteredClientes = useMemo(() => {
     return clientes.filter(c => 
       !searchTerm || 
-      c.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.razao_social?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.cnpj?.includes(searchTerm)
+      c.nome?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [clientes, searchTerm]);
 
@@ -232,7 +230,7 @@ export default function Clientes() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Buscar por nome, razão social ou CNPJ..."
+                placeholder="Buscar por nome..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -264,9 +262,7 @@ export default function Clientes() {
                             <Badge variant="outline" className="text-xs">Inativo</Badge>
                           )}
                         </CardTitle>
-                        {cliente.razao_social && (
-                          <p className="text-sm text-slate-500 mt-1">{cliente.razao_social}</p>
-                        )}
+
                       </div>
                     </div>
                   </CardHeader>
@@ -297,11 +293,7 @@ export default function Clientes() {
                       );
                     })()}
 
-                    {cliente.cnpj && (
-                      <div className="text-sm text-slate-600">
-                        <span className="text-slate-500">CNPJ:</span> {cliente.cnpj}
-                      </div>
-                    )}
+
                     
                     {cliente.contato_email && (
                       <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -376,29 +368,11 @@ export default function Clientes() {
           </DialogHeader>
           
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Nome *</Label>
-                <Input
-                  value={formData.nome || ''}
-                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Razão Social</Label>
-                <Input
-                  value={formData.razao_social || ''}
-                  onChange={(e) => setFormData({...formData, razao_social: e.target.value})}
-                />
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <Label>CNPJ</Label>
+              <Label>Nome *</Label>
               <Input
-                value={formData.cnpj || ''}
-                onChange={(e) => setFormData({...formData, cnpj: e.target.value})}
+                value={formData.nome || ''}
+                onChange={(e) => setFormData({...formData, nome: e.target.value})}
               />
             </div>
 
