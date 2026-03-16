@@ -29,11 +29,18 @@ export default function History() {
   const canSeeAll = perms.isAdmin || perms.isEditor;
 
   // Fetch status history
-  const { data: history = [], isLoading: historyLoading } = useQuery({
+  const { data: allHistory = [], isLoading: historyLoading } = useQuery({
     queryKey: ['status-history', period],
     queryFn: () => base44.entities.StatusHistory.list('-created_date', 1000),
     enabled: !!currentUser,
   });
+
+  const history = useMemo(() => {
+    if (!currentUser) return [];
+    if (canSeeAll) return allHistory;
+    const myIds = new Set(terminals.map(t => t.id));
+    return allHistory.filter(h => myIds.has(h.terminal_id));
+  }, [allHistory, currentUser, canSeeAll, terminals]);
 
   // Fetch terminals
   const { data: allTerminals = [] } = useQuery({
