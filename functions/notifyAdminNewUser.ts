@@ -53,12 +53,14 @@ O usuário pode entrar em contato através do formulário de contato disponível
       from_name: 'NOC Monitor - Sistema',
     });
 
-    // Log audit
-    await base44.functions.invoke('auditLog', {
-      acao: 'usuario_registrado',
+    // Log audit via service role (sem utilizador autenticado neste contexto)
+    await base44.asServiceRole.entities.AuditLog.create({
+      usuario_email: email,
+      acao: 'usuario_convidado',
       entidade: 'User',
       entidade_id: email,
       descricao: `Novo usuário registrado: ${nome} ${sobrenome} (${email}). Admin notificado.`,
+      timestamp: new Date().toISOString(),
     }).catch(() => {});
 
     return Response.json({ success: true });
