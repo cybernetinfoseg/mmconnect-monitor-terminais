@@ -203,19 +203,54 @@ export default function Configuracoes() {
                   <Key className="h-4 w-4" /> Credenciais do Agente
                 </p>
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-                  <strong>Segurança:</strong> O agente autentica-se enviando a <strong>API Key</strong> (configurada em <em>Painel → Segredos → API_KEY</em>) e o <strong>APP ID</strong> em cada pedido. Sem ambos, o pedido é rejeitado.
+                  <strong>Isolamento por utilizador:</strong> Cada utilizador possui a sua própria <strong>API Key pessoal</strong>. O agente configurado com a sua key só vê e reporta os seus terminais — sem interferência com outros utilizadores.
                 </div>
                 <div className="grid grid-cols-1 gap-3">
+                  {/* API Key pessoal */}
                   <div className="space-y-1">
-                    <Label className="text-xs text-slate-500">API KEY — definida em <strong>Painel → Segredos → API_KEY</strong></Label>
-                    <Input
-                      readOnly
-                      value="Configurada no painel de segredos do projeto"
-                      className="bg-slate-50 text-xs text-slate-400 italic cursor-not-allowed"
-                    />
+                    <Label className="text-xs text-slate-500 flex items-center justify-between">
+                      <span>SUA API KEY PESSOAL</span>
+                      {currentUser?.api_key && (
+                        <button onClick={() => setShowApiKey(v => !v)} className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                          {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                          {showApiKey ? 'Ocultar' : 'Mostrar'}
+                        </button>
+                      )}
+                    </Label>
+                    {currentUser?.api_key ? (
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={showApiKey ? currentUser.api_key : '•'.repeat(20)}
+                          className="bg-slate-50 text-xs font-mono min-w-0"
+                        />
+                        <Button variant="outline" size="sm" onClick={() => copyToClipboard(currentUser.api_key, 'API Key')} className="shrink-0">
+                          <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 italic">Nenhuma API Key gerada ainda. Clique em "Gerar" abaixo.</p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGenerateApiKey}
+                      disabled={generatingKey}
+                      className="gap-2 text-xs"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${generatingKey ? 'animate-spin' : ''}`} />
+                      {currentUser?.api_key ? 'Regenerar API Key' : 'Gerar API Key'}
+                    </Button>
+                    {currentUser?.api_key && (
+                      <p className="text-xs text-orange-600 bg-orange-50 border border-orange-200 rounded px-2 py-1">
+                        ⚠️ Ao regenerar, o agente atual deixa de funcionar até ser reconfigurado com a nova key.
+                      </p>
+                    )}
                   </div>
+
+                  {/* APP ID */}
                   <div className="space-y-1">
-                    <Label className="text-xs text-slate-500">APP ID</Label>
+                    <Label className="text-xs text-slate-500">APP ID (partilhado por todos)</Label>
                     <div className="flex gap-2">
                       <Input readOnly value={APP_ID} className="bg-slate-50 text-xs font-mono min-w-0" />
                       <Button variant="outline" size="sm" onClick={() => copyToClipboard(APP_ID, 'APP ID')} className="shrink-0">
@@ -223,6 +258,7 @@ export default function Configuracoes() {
                       </Button>
                     </div>
                   </div>
+
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Endpoint — Obter Terminais</Label>
                     <div className="flex gap-2">
