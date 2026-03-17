@@ -121,6 +121,24 @@ export default function Configuracoes() {
     toast.success(`${label} copiado!`);
   };
 
+  const handleTestConnection = async () => {
+    setTestingConn(true);
+    setTestResult(null);
+    try {
+      const res = await base44.functions.invoke('agentGetTerminals', {});
+      const data = res.data;
+      if (data?.success) {
+        setTestResult({ ok: true, msg: `Ligação OK — ${data.terminals?.length ?? 0} terminal(is) encontrado(s)` });
+      } else {
+        setTestResult({ ok: false, msg: data?.error || 'Resposta inesperada' });
+      }
+    } catch (e) {
+      setTestResult({ ok: false, msg: e.message || 'Erro de ligação' });
+    } finally {
+      setTestingConn(false);
+    }
+  };
+
   const handleGenerateApiKey = async () => {
     setGeneratingKey(true);
     try {
