@@ -12,7 +12,10 @@ import {
   Key,
   Terminal,
   Copy,
-  Info
+  Info,
+  RefreshCw,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import {
   AlertDialog,
