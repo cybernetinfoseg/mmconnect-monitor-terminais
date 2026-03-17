@@ -23,7 +23,7 @@ import ContactMessagesPanel from '../components/admin/ContactMessagesPanel';
 const EMPTY_FORM = {
   email: '',
   role: 'user',
-  limite_terminais: 50,
+  limite_terminais: 10,
 };
 
 export default function Administracao() {
