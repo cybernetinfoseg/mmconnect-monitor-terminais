@@ -269,8 +269,8 @@ export default function History() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {uptimeData.length > 0 ? (
-                  <UptimeChart data={uptimeData} />
+                {filteredUptimeData.length > 0 ? (
+                 <UptimeChart data={filteredUptimeData} />
                 ) : (
                   <div className="flex items-center justify-center h-64 text-slate-400">
                     <p>Nenhum dado disponível</p>
