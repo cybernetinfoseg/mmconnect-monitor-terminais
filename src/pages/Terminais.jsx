@@ -328,7 +328,7 @@ export default function Terminais() {
                 />
               </div>
               <Select value={tipoFilter} onValueChange={setTipoFilter}>
-                <SelectTrigger className="w-[200px]">
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Tipo de conexão" />
                 </SelectTrigger>
                 <SelectContent>
@@ -340,6 +340,27 @@ export default function Terminais() {
                   <SelectItem value="api">API</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                  <SelectItem value="offline">Offline</SelectItem>
+                </SelectContent>
+              </Select>
+              {clienteOptions.length > 0 && (
+                <Select value={clienteFilter} onValueChange={setClienteFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os clientes</SelectItem>
+                    {clienteOptions.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </CardContent>
         </Card>
