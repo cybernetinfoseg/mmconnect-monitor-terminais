@@ -146,11 +146,11 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 10. Histórico
+        // 10. Histórico (status só pode ser "online" ou "offline")
         await base44.asServiceRole.entities.StatusHistory.create({
             terminal_id,
             terminal_nome: terminal.nome,
-            status: statusValido,
+            status: statusEfetivo === 'offline' ? 'offline' : 'online',
             timestamp: agora,
             local: terminal.local,
             cliente: terminal.cliente_nome,

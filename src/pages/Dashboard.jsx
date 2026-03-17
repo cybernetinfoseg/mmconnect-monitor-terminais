@@ -69,7 +69,7 @@ export default function Dashboard() {
           setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
         }
       })
-      .catch(() => setRefreshInterval(5000));
+      .catch(() => setRefreshInterval(30000));
   }, []);
 
   const toggleWidget = (key) => {
