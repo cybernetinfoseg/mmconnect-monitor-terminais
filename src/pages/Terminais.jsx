@@ -451,6 +451,26 @@ export default function Terminais() {
         />
       )}
 
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar terminal?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é permanente. O terminal e todo o seu histórico serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { deleteMutation.mutate(deleteConfirmId); setDeleteConfirmId(null); }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <NovoClienteModal
         open={showNovoClienteModal}
         onClose={() => setShowNovoClienteModal(false)}
