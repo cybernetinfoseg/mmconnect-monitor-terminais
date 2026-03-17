@@ -97,6 +97,23 @@ export default function Configuracoes() {
     toast.success(`${label} copiado!`);
   };
 
+  const handleGenerateApiKey = async () => {
+    setGeneratingKey(true);
+    try {
+      const res = await base44.functions.invoke('generateUserApiKey', {});
+      const newApiKey = res.data?.api_key;
+      if (newApiKey) {
+        setCurrentUser(prev => ({ ...prev, api_key: newApiKey }));
+        setShowApiKey(true);
+        toast.success('Nova API Key gerada! Copie e configure no seu agente.');
+      }
+    } catch (e) {
+      toast.error('Erro ao gerar API Key');
+    } finally {
+      setGeneratingKey(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-3 sm:p-6">
       <div className="max-w-4xl mx-auto space-y-6">
