@@ -170,6 +170,7 @@ export default function History() {
               </TabsTrigger>
             </TabsList>
           </Tabs>
+          </div>
         </div>
 
         {/* Stats Cards */}
