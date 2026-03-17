@@ -209,9 +209,7 @@ export default function Clientes() {
   };
 
   const handleDelete = (id) => {
-    if (confirm('Tem certeza que deseja excluir este cliente?')) {
-      deleteMutation.mutate(id);
-    }
+    setDeleteConfirmId(id);
   };
 
   return (
