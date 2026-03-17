@@ -129,6 +129,14 @@ def testar_tcp(host, porta):
     except Exception: return False, None
 
 
+def testar_api_endpoint(session, url):
+    t = time.time()
+    try:
+        r = session.get(url, timeout=TIMEOUT)
+        return r.status_code < 500, int((time.time()-t)*1000)
+    except Exception: return False, None
+
+
 def escolher_host(t):
     return t.get("ip_local") or t.get("ip_publico") or t.get("dns")
 
