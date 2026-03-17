@@ -99,14 +99,15 @@ def listar_terminais(session, app_id: str, api_key: str) -> list:
 
 
 def reportar_terminal(session, app_id: str, api_key: str,
-                      terminal_id: str, status: str, latencia_ms):
+                      terminal_id: str, status: str, latencia_ms,
+                      segundos_sem_ping: int = 0):
     """POST agentReport — envia estado do terminal."""
     url = f"https://app.base44.app/api/apps/{app_id}/functions/agentReport"
     payload = {
-        "terminal_id":      terminal_id,
-        "status":           status,
-        "latencia_ms":      latencia_ms,
-        "segundos_sem_ping": 0,
+        "terminal_id":       terminal_id,
+        "status":            status,
+        "latencia_ms":       latencia_ms,
+        "segundos_sem_ping": segundos_sem_ping,
     }
     r = session.post(url, headers=_headers(api_key), json=payload, timeout=10)
     r.raise_for_status()
