@@ -49,6 +49,7 @@ export default function Clientes() {
   const [editingCliente, setEditingCliente] = useState(null);
   const [formData, setFormData] = useState({});
   const [viewingTerminaisCliente, setViewingTerminaisCliente] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   
   const queryClient = useQueryClient();
