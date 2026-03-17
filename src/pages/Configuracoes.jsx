@@ -112,7 +112,10 @@ export default function Configuracoes() {
       const res = await base44.functions.invoke('generateUserApiKey', {});
       const newApiKey = res.data?.api_key;
       if (newApiKey) {
-        setCurrentUser(prev => ({ ...prev, api_key: newApiKey }));
+        // Reler o user completo para garantir que a api_key está persistida
+        const me = await base44.auth.me();
+        const fullUser = await base44.entities.User.get(me.id);
+        setCurrentUser({ ...me, ...fullUser });
         setShowApiKey(true);
         toast.success('Nova API Key gerada! Copie e configure no seu agente.');
       }
