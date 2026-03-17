@@ -197,27 +197,41 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
                 if once: break
                 continue
 
+            t0_ciclo = time.time()
             for t in terminais:
                 if stop_event and stop_event.is_set(): return 0
                 try:
                     if not t.get("ativo", True): continue
-                    host = escolher_host(t)
-                    if not host:
-                        logger.debug(f"Terminal {t.get('id')} sem host. Pulando.")
-                        continue
 
-                    porta = t.get("porta") or 80
-                    sucesso, latencia = testar_http(session, host, porta)
-                    if not sucesso:
-                        sucesso, latencia = testar_tcp(host, porta)
+                    tipo = t.get("tipo_conexao", "ip_local")
+                    api_endpoint = t.get("api_endpoint")
+
+                    # Terminais tipo "api": usar endpoint directamente
+                    if tipo == "api" and api_endpoint:
+                        sucesso, latencia = testar_api_endpoint(session, api_endpoint)
+                        host_desc = api_endpoint
+                    else:
+                        host = escolher_host(t)
+                        if not host:
+                            logger.debug(f"Terminal {t.get('id')} sem host. Pulando.")
+                            continue
+                        porta = t.get("porta") or 80
+                        sucesso, latencia = testar_http(session, host, porta)
+                        if not sucesso:
+                            sucesso, latencia = testar_tcp(host, porta)
+                        host_desc = f"{host}:{porta}"
+
+                    # Calcular segundos_sem_ping reais desde inicio do ciclo
+                    segundos_sem_ping = int(time.time() - t0_ciclo) if not sucesso else 0
 
                     status = "online" if sucesso else "offline"
                     reportar_terminal(session, app_id, api_key,
                                       terminal_id=t["id"],
                                       status=status,
-                                      latencia_ms=latencia)
+                                      latencia_ms=latencia,
+                                      segundos_sem_ping=segundos_sem_ping)
                     logger.info(
-                        f"Testando {t.get('nome', t.get('id'))} ({host}:{porta})\\n"
+                        f"Testando {t.get('nome', t.get('id'))} ({host_desc})\\n"
                         f"-> {status} | latencia={latencia} ms"
                     )
                 except requests.HTTPError as e:
