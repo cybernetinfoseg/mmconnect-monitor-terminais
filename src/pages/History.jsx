@@ -139,42 +139,40 @@ export default function History() {
               <p className="text-sm text-slate-500">Análise de disponibilidade por período</p>
             </div>
           </div>
-          
           <div className="flex items-center gap-2 flex-wrap justify-end">
-          <Select value={terminalFilter} onValueChange={setTerminalFilter}>
-            <SelectTrigger className="w-[180px] bg-white shadow-sm">
-              <Monitor className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
-              <SelectValue placeholder="Terminal" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os terminais</SelectItem>
-              {terminals.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Tabs value={period} onValueChange={setPeriod}>
-            <TabsList className="bg-white shadow-sm">
-              <TabsTrigger value="24h" className="flex items-center gap-1.5">
-                <Clock className="h-4 w-4" />
-                <span className="hidden sm:inline">24 horas</span>
-                <span className="sm:hidden">24h</span>
-              </TabsTrigger>
-              <TabsTrigger value="7d" className="flex items-center gap-1.5">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">7 dias</span>
-                <span className="sm:hidden">7d</span>
-              </TabsTrigger>
-              <TabsTrigger value="30d" className="flex items-center gap-1.5">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">30 dias</span>
-                <span className="sm:hidden">30d</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <Select value={terminalFilter} onValueChange={setTerminalFilter}>
+              <SelectTrigger className="w-[180px] bg-white shadow-sm">
+                <Monitor className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+                <SelectValue placeholder="Terminal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os terminais</SelectItem>
+                {terminals.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Tabs value={period} onValueChange={setPeriod}>
+              <TabsList className="bg-white shadow-sm">
+                <TabsTrigger value="24h" className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" />
+                  <span className="hidden sm:inline">24 horas</span>
+                  <span className="sm:hidden">24h</span>
+                </TabsTrigger>
+                <TabsTrigger value="7d" className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  <span className="hidden sm:inline">7 dias</span>
+                  <span className="sm:hidden">7d</span>
+                </TabsTrigger>
+                <TabsTrigger value="30d" className="flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4" />
+                  <span className="hidden sm:inline">30 dias</span>
+                  <span className="sm:hidden">30d</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </div>
 
         {/* Stats Cards */}
-
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
