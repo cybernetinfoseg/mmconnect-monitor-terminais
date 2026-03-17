@@ -2,14 +2,15 @@
  * agentReport — endpoint seguro para o Agente Local
  *
  * Headers obrigatórios:
- *   X-Api-Key: <valor do segredo API_KEY configurado no painel>
- *   X-App-Id:  <app_id>
+ *   X-Api-Key: <api_key pessoal do utilizador>
+ *   X-App-Id:  <app_id global>
  *   Body: { terminal_id, status, latencia_ms, segundos_sem_ping }
+ *
+ * Só aceita reportar terminais que pertencem ao dono da API Key.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 const APP_ID = Deno.env.get('BASE44_APP_ID');
-const API_KEY = Deno.env.get('API_KEY');
 
 Deno.serve(async (req) => {
     try {
@@ -19,15 +20,23 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'APP ID inválido ou ausente' }, { status: 403 });
         }
 
-        // 2. Validar API Key contra o segredo do painel
+        // 2. Validar API Key pessoal
         const apiKey = req.headers.get('X-Api-Key');
-        if (!apiKey || !API_KEY || apiKey !== API_KEY) {
-            return Response.json({ error: 'API Key inválida ou ausente' }, { status: 401 });
+        if (!apiKey) {
+            return Response.json({ error: 'API Key ausente' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
 
-        // 3. Ler payload
+        // 3. Encontrar utilizador dono da API Key
+        const users = await base44.asServiceRole.entities.User.list();
+        const owner = users.find(u => u.api_key === apiKey);
+
+        if (!owner) {
+            return Response.json({ error: 'API Key inválida' }, { status: 401 });
+        }
+
+        // 4. Ler payload
         const body = await req.json();
         const { terminal_id, status, latencia_ms, segundos_sem_ping } = body;
 
@@ -35,10 +44,14 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'terminal_id e status são obrigatórios' }, { status: 400 });
         }
 
-        // 4. Verificar que o terminal existe
+        // 5. Verificar que o terminal existe e pertence ao dono da API Key
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id);
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
+        }
+
+        if (terminal.created_by !== owner.email) {
+            return Response.json({ error: 'Sem permissão para reportar este terminal' }, { status: 403 });
         }
 
         const agora = new Date().toISOString();
@@ -46,22 +59,21 @@ Deno.serve(async (req) => {
         // Para lógica de cache/incidentes: warning é tratado como online (agente ainda responde)
         const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
 
-        // 5. Atualizar terminal
+        // 6. Atualizar terminal
         await base44.asServiceRole.entities.Terminal.update(terminal_id, {
             status: statusValido,
             ultimo_check: agora,
             latencia_ms: latencia_ms ?? null,
             segundos_sem_ping: segundos_sem_ping ?? 0,
-            // Actualizar ultimo_ping para online E warning (agente está a responder)
             ...(statusEfetivo === 'online' && { ultimo_ping: agora }),
         });
 
-        // 6. Verificar se terminal está em janela de manutenção
+        // 7. Verificar se terminal está em janela de manutenção
         const agora2 = new Date().toISOString();
         const janelasManu = await base44.asServiceRole.entities.MaintenanceWindow.filter({ terminal_id, ativo: true });
         const emManutencao = janelasManu.some(j => j.inicio <= agora2 && j.fim >= agora2);
 
-        // 7. Verificar mudança de status para criar incidentes/alertas
+        // 8. Verificar mudança de status para criar incidentes/alertas
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
 
@@ -87,7 +99,6 @@ Deno.serve(async (req) => {
 
             // Telegram: notificar donos com bot configurado
             if (terminal.created_by) {
-                const users = await base44.asServiceRole.entities.User.list().catch(() => []);
                 const admins = users.filter(u => u.role === 'admin' || u.email === terminal.created_by);
                 for (const u of admins) {
                     if (u.telegram_bot_token && u.telegram_chat_id) {
@@ -123,7 +134,7 @@ Deno.serve(async (req) => {
             }
         }
 
-        // 7. Atualizar cache (usar statusEfetivo: warning → online para não perder histórico de transição)
+        // 9. Atualizar cache
         if (cache) {
             await base44.asServiceRole.entities.StatusCache.update(cache.id, {
                 ultimo_status: statusEfetivo,
@@ -137,7 +148,7 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 8. Histórico
+        // 10. Histórico
         await base44.asServiceRole.entities.StatusHistory.create({
             terminal_id,
             terminal_nome: terminal.nome,
