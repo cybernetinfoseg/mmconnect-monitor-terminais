@@ -174,6 +174,7 @@ export default function History() {
         </div>
 
         {/* Stats Cards */}
+
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
