@@ -310,7 +310,7 @@ export default function Configuracoes() {
                       "APP_ID": "${APP_ID}"
                       }`}</pre>
                       <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                        Substitua <strong>SUA_API_KEY</strong> pelo valor configurado em <em>Painel → Segredos → API_KEY</em>.
+                        Substitua <strong>SUA_API_KEY</strong> pela sua API Key pessoal gerada na secção "Credenciais do Agente" acima.
                       </p>
                     </div>
                   </div>
