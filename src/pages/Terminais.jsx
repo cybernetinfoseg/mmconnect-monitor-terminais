@@ -210,6 +210,11 @@ export default function Terminais() {
     toast.success('Verificação concluída!');
   };
 
+  const clienteOptions = useMemo(() =>
+    [...new Set(terminals.map(t => t.cliente_nome).filter(Boolean))].sort(),
+    [terminals]
+  );
+
   const filteredTerminals = useMemo(() => {
     return terminals.filter(t => {
       const matchSearch = !searchTerm || 
@@ -217,9 +222,11 @@ export default function Terminais() {
         t.local?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchTipo = tipoFilter === 'all' || t.tipo_conexao === tipoFilter;
-      return matchSearch && matchTipo;
+      const matchStatus = statusFilter === 'all' || t.status === statusFilter;
+      const matchCliente = clienteFilter === 'all' || t.cliente_nome === clienteFilter;
+      return matchSearch && matchTipo && matchStatus && matchCliente;
     });
-  }, [terminals, searchTerm, tipoFilter]);
+  }, [terminals, searchTerm, tipoFilter, statusFilter, clienteFilter]);
 
   const handleEdit = (terminal) => {
     setEditingTerminal(terminal);
