@@ -238,9 +238,7 @@ export default function Terminais() {
   };
 
   const handleDelete = (id) => {
-    if (confirm('Tem a certeza que deseja eliminar este terminal?')) {
-      deleteMutation.mutate(id);
-    }
+    setDeleteConfirmId(id);
   };
 
   const getTipoIcon = (tipo) => {
