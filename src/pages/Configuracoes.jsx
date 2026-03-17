@@ -44,6 +44,8 @@ export default function Configuracoes() {
   const [monitorConfig, setMonitorConfig] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState('5');
   const [saving, setSaving] = useState(false);
+  const [generatingKey, setGeneratingKey] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
