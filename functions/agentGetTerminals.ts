@@ -1,10 +1,6 @@
 /**
  * agentGetTerminals — devolve os terminais ao Agente Local
- *
- * Headers obrigatórios:
- *   X-Api-Key: <api_key pessoal do utilizador, gerada em Configurações>
- *   X-App-Id:  <app_id global>
- *
+ * Autenticação: apenas X-Api-Key pessoal (header obrigatório)
  * Retorna apenas os terminais do utilizador dono da API Key.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
@@ -12,24 +8,21 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 Deno.serve(async (req) => {
     try {
         const apiKey = req.headers.get('X-Api-Key');
-        if (!apiKey) {
-            return Response.json({ error: 'API Key ausente' }, { status: 401 });
+        if (!apiKey || apiKey.length < 10) {
+            return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
 
-        // Encontrar utilizador dono da API Key (comparação exacta, case-sensitive)
-        if (apiKey.length < 10) {
-            return Response.json({ error: 'API Key inválida' }, { status: 401 });
-        }
-        const users = await base44.asServiceRole.entities.User.list();
-        const owner = users.find(u => u.api_key && u.api_key === apiKey);
+        // Procurar utilizador com esta api_key
+        const users = await base44.asServiceRole.entities.User.filter({ api_key: apiKey });
+        const owner = users.length > 0 ? users[0] : null;
 
         if (!owner) {
             return Response.json({ error: 'API Key inválida' }, { status: 401 });
         }
 
-        // Filtrar terminais pelo dono (admin vê todos os seus, user vê só os seus)
+        // Devolver apenas terminais activos do dono da key
         const terminals = await base44.asServiceRole.entities.Terminal.filter({
             ativo: true,
             created_by: owner.email,
