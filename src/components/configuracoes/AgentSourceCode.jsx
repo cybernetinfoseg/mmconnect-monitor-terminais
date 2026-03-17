@@ -248,6 +248,19 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
         return 0
     finally:
         lock.release()
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="NOC Monitor — Agente Local")
+    parser.add_argument("--interval", type=int, default=DEFAULT_INTERVAL, help="Intervalo em segundos (default: 30)")
+    parser.add_argument("--once", action="store_true", help="Executar apenas um ciclo e sair")
+    parser.add_argument("--debug", action="store_true", help="Ativar logging detalhado")
+    args = parser.parse_args()
+
+    setup_logging(logging.DEBUG if args.debug else logging.INFO)
+    logger.info(f"Agente iniciado | intervalo={args.interval}s | once={args.once}")
+    sys.exit(run_agent(intervalo=args.interval, enable_update=False, once=args.once))
 `;
 
 export default function AgentSourceCode() {
