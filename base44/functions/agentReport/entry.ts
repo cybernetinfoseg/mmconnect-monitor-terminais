@@ -24,8 +24,8 @@ Deno.serve(async (req) => {
         if (apiKey.length < 10) {
             return Response.json({ error: 'API Key inválida' }, { status: 401 });
         }
-        const ownerList = await base44.asServiceRole.entities.User.filter({ api_key: apiKey });
-        const owner = ownerList.length > 0 ? ownerList[0] : null;
+        const allUsers = await base44.asServiceRole.entities.User.list();
+        const owner = allUsers.find(u => u.api_key === apiKey) || null;
         // Manter users para notificações Telegram abaixo (apenas se necessário)
         let users = null;
 

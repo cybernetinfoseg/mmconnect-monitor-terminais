@@ -14,9 +14,9 @@ Deno.serve(async (req) => {
 
         const base44 = createClientFromRequest(req);
 
-        // Procurar utilizador com esta api_key
-        const users = await base44.asServiceRole.entities.User.filter({ api_key: apiKey });
-        const owner = users.length > 0 ? users[0] : null;
+        // Procurar utilizador com esta api_key (campo guardado em data.api_key pelo SDK)
+        const allUsers = await base44.asServiceRole.entities.User.list();
+        const owner = allUsers.find(u => u.api_key === apiKey) || null;
 
         if (!owner) {
             return Response.json({ error: 'API Key inválida' }, { status: 401 });
