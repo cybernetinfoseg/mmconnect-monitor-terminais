@@ -145,7 +145,7 @@ export default function Configuracoes() {
     } catch (e) {
       toast.error('Erro ao gerar API Key: ' + (e.message || ''));
     } finally {
-      setGeneratingKey(false);
+      setGeneratingKey(true);
     }
   };
 
