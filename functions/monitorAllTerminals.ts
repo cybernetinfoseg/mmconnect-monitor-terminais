@@ -1,24 +1,25 @@
 /**
- * monitorAllTerminals — verifica o heartbeat de todos os terminais ativos.
+ * monitorAllTerminals — verifica o status de todos os terminais ativos.
  *
- * Lógica: O status de cada terminal depende EXCLUSIVAMENTE dos reports do Agente Local.
- * Se o agente não reportou há mais de AGENT_TIMEOUT_SECONDS → marca como Offline.
- * Chamado pelo scheduler a cada 5 minutos.
+ * Lógica por tipo de conexão:
+ *   - ip_local  → depende EXCLUSIVAMENTE do Agente Local (heartbeat via agentReport).
+ *                 Se o agente não reportou há mais de AGENT_TIMEOUT_SECONDS → Offline.
+ *   - ip_publico, dns, api → monitoramento ativo via HTTP/TCP (independente do agente).
  *
  * THROTTLE do histórico: só grava StatusHistory quando:
  *   - há mudança de status, OU
  *   - passou mais de 1 hora desde o último registo
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
-const AGENT_TIMEOUT_SECONDS = 150; // 2.5x o intervalo do agente (30s) — evita falsos alarmes
-const HISTORY_THROTTLE_SECONDS = 3600; // só grava histórico a cada 1h se status não mudou
+const AGENT_TIMEOUT_SECONDS = 150; // 2.5x o intervalo do agente (30s)
+const HISTORY_THROTTLE_SECONDS = 3600;
+const CHECK_TIMEOUT_MS = 5000;
 
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        // Permite chamada do scheduler (sem auth) ou de admin autenticado
         const isAuthenticated = await base44.auth.isAuthenticated();
         if (isAuthenticated) {
             const user = await base44.auth.me();
@@ -31,118 +32,105 @@ Deno.serve(async (req) => {
         const agora = new Date();
         const results = [];
 
-        // Processar em paralelo (máx 10 simultâneos)
         const chunkSize = 10;
         for (let i = 0; i < terminals.length; i += chunkSize) {
             const chunk = terminals.slice(i, i + chunkSize);
             const chunkResults = await Promise.all(chunk.map(async (terminal) => {
                 try {
-                    let novoStatus = terminal.status || 'offline';
-                    let statusMudou = false;
-
-                    // Buscar cache de status actual
                     const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id: terminal.id });
                     const cache = cacheResults[0] || null;
                     const statusAnterior = cache?.ultimo_status || null;
+                    let novoStatus;
+                    let latencia_ms = null;
 
-                    if (terminal.ultimo_ping) {
-                        const segundosSemPing = Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000);
-
-                        if (segundosSemPing > AGENT_TIMEOUT_SECONDS) {
-                            // Agente silencioso → Offline
-                            novoStatus = 'offline';
-                            statusMudou = statusAnterior !== 'offline';
-
+                    if (terminal.tipo_conexao === 'ip_local') {
+                        // ── Lógica AGENTE LOCAL ──────────────────────────────
+                        if (terminal.ultimo_ping) {
+                            const segundosSemPing = Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000);
+                            novoStatus = segundosSemPing > AGENT_TIMEOUT_SECONDS ? 'offline' : (terminal.status || 'online');
                             await base44.asServiceRole.entities.Terminal.update(terminal.id, {
-                                status: 'offline',
+                                status: novoStatus,
                                 segundos_sem_ping: segundosSemPing,
                                 ultimo_check: agora.toISOString(),
                             });
-
-                            // Criar incidente APENAS se transitou online → offline
-                            // (evitar duplicado com agentReport)
-                            if (statusMudou) {
-                                await base44.asServiceRole.entities.AlertIncident.create({
-                                    terminal_id: terminal.id,
-                                    terminal_nome: terminal.nome,
-                                    local: terminal.local,
-                                    cliente: terminal.cliente_nome,
-                                    tipo: 'offline',
-                                    timestamp: agora.toISOString(),
-                                    resolvido: false,
-                                    notificado: false,
-                                });
-
-                                await base44.asServiceRole.functions.invoke('pushNotify', {
-                                    action: 'notify_offline',
-                                    terminal_id: terminal.id,
-                                    terminal_nome: terminal.nome,
-                                    local: terminal.local || '',
-                                    cliente: terminal.cliente_nome || '',
-                                    owner_email: terminal.created_by || '',
-                                }).catch(() => {});
-
-                                // Telegram: notificar utilizadores com bot configurado
-                                const users = await base44.asServiceRole.entities.User.list().catch(() => []);
-                                const admins = users.filter(u => u.role === 'admin' || u.email === terminal.created_by);
-                                for (const u of admins) {
-                                    if (u.telegram_bot_token && u.telegram_chat_id) {
-                                        const msg = `🔴 <b>Terminal Offline</b>\n\n` +
-                                            `📟 <b>${terminal.nome}</b>\n` +
-                                            `📍 Local: ${terminal.local || '—'}\n` +
-                                            `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
-                                            `🕐 ${agora.toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC\n` +
-                                            `⏱ Sem ping há ${Math.round(segundosSemPing / 60)} min`;
-                                        await base44.asServiceRole.functions.invoke('telegramNotify', {
-                                            bot_token: u.telegram_bot_token,
-                                            chat_id: u.telegram_chat_id,
-                                            message: msg,
-                                        }).catch(() => {});
-                                    }
-                                }
-                            }
-
-                            // Actualizar cache
-                            if (cache) {
-                                await base44.asServiceRole.entities.StatusCache.update(cache.id, {
-                                    ultimo_status: 'offline',
-                                    atualizado_em: agora.toISOString(),
-                                });
-                            } else {
-                                await base44.asServiceRole.entities.StatusCache.create({
-                                    terminal_id: terminal.id,
-                                    ultimo_status: 'offline',
-                                    atualizado_em: agora.toISOString(),
-                                });
-                            }
-
                         } else {
-                            // Agente ativo
-                            novoStatus = terminal.status || 'online';
-                            statusMudou = statusAnterior !== novoStatus;
+                            // Nunca recebeu ping
+                            novoStatus = 'offline';
                             await base44.asServiceRole.entities.Terminal.update(terminal.id, {
-                                segundos_sem_ping: segundosSemPing,
+                                status: 'offline',
                                 ultimo_check: agora.toISOString(),
                             });
                         }
                     } else {
-                        // Nunca recebeu ping do agente → Offline
-                        novoStatus = 'offline';
-                        statusMudou = statusAnterior !== 'offline';
+                        // ── Lógica MONITORAMENTO ACTIVO ──────────────────────
+                        const checkResult = await checkTerminalActive(terminal);
+                        novoStatus = checkResult.online ? 'online' : 'offline';
+                        latencia_ms = checkResult.latencia_ms || null;
                         await base44.asServiceRole.entities.Terminal.update(terminal.id, {
-                            status: 'offline',
+                            status: novoStatus,
+                            latencia_ms,
                             ultimo_check: agora.toISOString(),
+                            ...(checkResult.online ? { ultimo_ping: agora.toISOString() } : {}),
                         });
-                        if (!cache) {
-                            await base44.asServiceRole.entities.StatusCache.create({
-                                terminal_id: terminal.id,
-                                ultimo_status: 'offline',
-                                atualizado_em: agora.toISOString(),
-                            });
+                    }
+
+                    const statusMudou = statusAnterior !== novoStatus;
+
+                    // Actualizar cache
+                    if (cache) {
+                        await base44.asServiceRole.entities.StatusCache.update(cache.id, {
+                            ultimo_status: novoStatus,
+                            atualizado_em: agora.toISOString(),
+                        });
+                    } else {
+                        await base44.asServiceRole.entities.StatusCache.create({
+                            terminal_id: terminal.id,
+                            ultimo_status: novoStatus,
+                            atualizado_em: agora.toISOString(),
+                        });
+                    }
+
+                    // Criar incidente se transitou → offline
+                    if (statusMudou && novoStatus === 'offline') {
+                        await base44.asServiceRole.entities.AlertIncident.create({
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local,
+                            cliente: terminal.cliente_nome,
+                            tipo: 'offline',
+                            timestamp: agora.toISOString(),
+                            resolvido: false,
+                            notificado: false,
+                        });
+
+                        await base44.asServiceRole.functions.invoke('pushNotify', {
+                            action: 'notify_offline',
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || '',
+                            owner_email: terminal.created_by || '',
+                        }).catch(() => {});
+
+                        const users = await base44.asServiceRole.entities.User.list().catch(() => []);
+                        const targets = users.filter(u => u.role === 'admin' || u.email === terminal.created_by);
+                        for (const u of targets) {
+                            if (u.telegram_bot_token && u.telegram_chat_id) {
+                                const msg = `🔴 <b>Terminal Offline</b>\n\n` +
+                                    `📟 <b>${terminal.nome}</b>\n` +
+                                    `📍 Local: ${terminal.local || '—'}\n` +
+                                    `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
+                                    `🕐 ${agora.toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
+                                await base44.asServiceRole.functions.invoke('telegramNotify', {
+                                    bot_token: u.telegram_bot_token,
+                                    chat_id: u.telegram_chat_id,
+                                    message: msg,
+                                }).catch(() => {});
+                            }
                         }
                     }
 
-                    // Resolver escalações abertas se terminal voltou Online
+                    // Resolver escalações se voltou online
                     if (novoStatus === 'online') {
                         const openAlerts = await base44.asServiceRole.entities.EscalationAlert.filter({
                             terminal_id: terminal.id,
@@ -153,7 +141,7 @@ Deno.serve(async (req) => {
                         }
                     }
 
-                    // THROTTLE: só grava histórico se status mudou OU passou >1h desde último registo
+                    // THROTTLE histórico
                     const ultimoHistorico = terminal.ultimo_check ? new Date(terminal.ultimo_check) : null;
                     const segundosDesdeUltimoCheck = ultimoHistorico
                         ? Math.floor((agora - ultimoHistorico) / 1000)
@@ -170,7 +158,7 @@ Deno.serve(async (req) => {
                         }).catch(() => {});
                     }
 
-                    return { terminal_id: terminal.id, terminal_nome: terminal.nome, success: true, status: novoStatus, statusMudou };
+                    return { terminal_id: terminal.id, terminal_nome: terminal.nome, tipo: terminal.tipo_conexao, success: true, status: novoStatus, statusMudou };
                 } catch (error) {
                     return { terminal_id: terminal.id, terminal_nome: terminal.nome, success: false, error: error.message };
                 }
@@ -192,3 +180,42 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: error.message }, { status: 500 });
     }
 });
+
+async function checkTerminalActive(terminal) {
+    const porta = terminal.porta || 5005;
+    const inicio = Date.now();
+
+    try {
+        if (terminal.tipo_conexao === 'api' && terminal.api_endpoint) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+            try {
+                const res = await fetch(terminal.api_endpoint, { signal: controller.signal });
+                clearTimeout(timer);
+                return { online: res.ok || res.status < 500, latencia_ms: Date.now() - inicio };
+            } catch {
+                clearTimeout(timer);
+                return { online: false };
+            }
+        }
+
+        const host = terminal.tipo_conexao === 'ip_publico' ? terminal.ip_publico :
+                     terminal.tipo_conexao === 'dns' ? terminal.dns : null;
+
+        if (!host) return { online: false };
+
+        const url = `http://${host}:${porta}`;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+        try {
+            await fetch(url, { signal: controller.signal });
+            clearTimeout(timer);
+            return { online: true, latencia_ms: Date.now() - inicio };
+        } catch {
+            clearTimeout(timer);
+            return { online: false };
+        }
+    } catch {
+        return { online: false };
+    }
+}
