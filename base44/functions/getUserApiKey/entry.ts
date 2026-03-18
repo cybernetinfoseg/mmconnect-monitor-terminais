@@ -11,7 +11,8 @@ Deno.serve(async (req) => {
         }
 
         const fullUser = await base44.asServiceRole.entities.User.get(user.id);
-        return Response.json({ api_key: fullUser?.api_key || null });
+        const api_key = fullUser?.api_key || fullUser?.data?.api_key || null;
+        return Response.json({ api_key });
     } catch (error) {
         return Response.json({ error: error.message }, { status: 500 });
     }
