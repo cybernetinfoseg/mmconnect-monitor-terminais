@@ -55,21 +55,12 @@ export default function Configuracoes() {
   useEffect(() => {
     base44.auth.me().then(async (me) => {
       if (!me) return;
-      // Tentar ler api_key via entidade (campo sensível pode não vir sempre)
-      try {
-        const fullUser = await base44.entities.User.get(me.id);
-        // Usar api_key da entidade se disponível, caso contrário manter sem ela
-        setCurrentUser({ ...me, ...fullUser });
-      } catch {
-        setCurrentUser(me);
-      }
-      // Tentar obter api_key via função dedicada
+      setCurrentUser(me);
+      // Obter api_key via função dedicada (service role garante campo completo)
       try {
         const res = await base44.functions.invoke('getUserApiKey', {});
         const key = res.data?.api_key;
-        if (key) {
-          setCurrentUser(prev => ({ ...prev, api_key: key }));
-        }
+        setCurrentUser(prev => ({ ...prev, api_key: key || '' }));
       } catch {
         // silenciar
       }
