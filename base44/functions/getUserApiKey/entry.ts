@@ -13,8 +13,11 @@ Deno.serve(async (req) => {
         // Fazer fetch completo do utilizador via service role para garantir todos os campos
         const fullUser = await base44.asServiceRole.entities.User.get(user.id);
 
-        // api_key pode estar no campo raiz ou em data.api_key
-        const api_key = fullUser?.api_key || fullUser?.data?.api_key || user?.api_key || null;
+        // Dar prioridade a data.api_key (prefixo noc_) pois é onde generateUserApiKey persiste a chave mais recente
+        const dataKey = fullUser?.data?.api_key;
+        const rootKey = fullUser?.api_key;
+        // Preferir a chave com prefixo noc_ (gerada pelo sistema)
+        const api_key = (dataKey?.startsWith('noc_') ? dataKey : null) || (rootKey?.startsWith('noc_') ? rootKey : null) || dataKey || rootKey || null;
 
         return Response.json({ api_key });
     } catch (error) {
