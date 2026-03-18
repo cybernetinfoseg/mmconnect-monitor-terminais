@@ -48,21 +48,30 @@ export default function Configuracoes() {
   const [refreshInterval, setRefreshInterval] = useState('5');
   const [saving, setSaving] = useState(false);
   const [generatingKey, setGeneratingKey] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(true);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [testingConn, setTestingConn] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
   useEffect(() => {
-    base44.auth.me().then((me) => {
+    base44.auth.me().then(async (me) => {
       if (!me) return;
-      // A chave gerada pelo sistema (prefixo noc_) está em me.data.api_key
-      // O campo raiz me.api_key pode ter um valor antigo — dar prioridade a data.api_key
-      const dataKey = me?.data?.api_key;
-      const rootKey = me?.api_key;
-      const api_key = (dataKey?.startsWith?.('noc_') ? dataKey : null)
-        || (rootKey?.startsWith?.('noc_') ? rootKey : null)
-        || dataKey || rootKey || '';
-      setCurrentUser({ ...me, api_key });
+      // Tentar ler api_key via entidade (campo sensível pode não vir sempre)
+      try {
+        const fullUser = await base44.entities.User.get(me.id);
+        // Usar api_key da entidade se disponível, caso contrário manter sem ela
+        setCurrentUser({ ...me, ...fullUser });
+      } catch {
+        setCurrentUser(me);
+      }
+      // Tentar obter api_key via função dedicada (mais fiável)
+      try {
+        const res = await base44.functions.invoke('getUserApiKey', {});
+        if (res.data?.api_key) {
+          setCurrentUser(prev => ({ ...prev, api_key: res.data.api_key }));
+        }
+      } catch {
+        // silenciar — função pode não existir ainda
+      }
     }).catch(() => {});
   }, []);
 
@@ -136,14 +145,13 @@ export default function Configuracoes() {
       const res = await base44.functions.invoke('generateUserApiKey', {});
       const newApiKey = res.data?.api_key;
       if (newApiKey) {
+        // Usar a api_key retornada directamente pela função (mais fiável)
         setCurrentUser(prev => ({ ...prev, api_key: newApiKey }));
         setShowApiKey(true);
         toast.success('Nova API Key gerada! Copie e configure no seu agente.');
-      } else {
-        toast.error('Erro: a função não retornou a API Key.');
       }
     } catch (e) {
-      toast.error('Erro ao gerar API Key: ' + (e.message || ''));
+      toast.error('Erro ao gerar API Key');
     } finally {
       setGeneratingKey(false);
     }
@@ -261,18 +269,29 @@ export default function Configuracoes() {
                 <div className="grid grid-cols-1 gap-3">
                   {/* API Key pessoal */}
                   <div className="space-y-1">
-                    <Label className="text-xs text-slate-500">SUA API KEY PESSOAL</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        readOnly
-                        value={currentUser?.api_key || ''}
-                        placeholder="Clique em 'Gerar API Key' para criar a sua chave"
-                        className="bg-slate-50 text-xs font-mono min-w-0"
-                      />
-                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(currentUser?.api_key || '', 'API Key')} disabled={!currentUser?.api_key} className="shrink-0">
-                        <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                      </Button>
-                    </div>
+                    <Label className="text-xs text-slate-500 flex items-center justify-between">
+                      <span>SUA API KEY PESSOAL</span>
+                      {currentUser?.api_key && (
+                        <button onClick={() => setShowApiKey(v => !v)} className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                          {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                          {showApiKey ? 'Ocultar' : 'Mostrar'}
+                        </button>
+                      )}
+                    </Label>
+                    {currentUser?.api_key ? (
+                      <div className="flex gap-2">
+                        <Input
+                          readOnly
+                          value={showApiKey ? currentUser.api_key : '•'.repeat(20)}
+                          className="bg-slate-50 text-xs font-mono min-w-0"
+                        />
+                        <Button variant="outline" size="sm" onClick={() => copyToClipboard(currentUser.api_key, 'API Key')} className="shrink-0">
+                          <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 italic">Nenhuma API Key gerada ainda. Clique em "Gerar" abaixo.</p>
+                    )}
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button
                         variant="outline"
