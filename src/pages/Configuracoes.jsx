@@ -48,7 +48,7 @@ export default function Configuracoes() {
   const [refreshInterval, setRefreshInterval] = useState('5');
   const [saving, setSaving] = useState(false);
   const [generatingKey, setGeneratingKey] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(true);
   const [testingConn, setTestingConn] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
