@@ -63,14 +63,15 @@ export default function Configuracoes() {
       } catch {
         setCurrentUser(me);
       }
-      // Tentar obter api_key via função dedicada (mais fiável)
+      // Tentar obter api_key via função dedicada
       try {
         const res = await base44.functions.invoke('getUserApiKey', {});
-        if (res.data?.api_key) {
-          setCurrentUser(prev => ({ ...prev, api_key: res.data.api_key }));
+        const key = res.data?.api_key;
+        if (key) {
+          setCurrentUser(prev => ({ ...prev, api_key: key }));
         }
       } catch {
-        // silenciar — função pode não existir ainda
+        // silenciar
       }
     }).catch(() => {});
   }, []);
