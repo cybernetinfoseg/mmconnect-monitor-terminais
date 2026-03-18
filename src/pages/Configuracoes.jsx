@@ -145,13 +145,14 @@ export default function Configuracoes() {
       const res = await base44.functions.invoke('generateUserApiKey', {});
       const newApiKey = res.data?.api_key;
       if (newApiKey) {
-        // Usar a api_key retornada directamente pela função (mais fiável)
         setCurrentUser(prev => ({ ...prev, api_key: newApiKey }));
         setShowApiKey(true);
         toast.success('Nova API Key gerada! Copie e configure no seu agente.');
+      } else {
+        toast.error('Erro: a função não retornou a API Key.');
       }
     } catch (e) {
-      toast.error('Erro ao gerar API Key');
+      toast.error('Erro ao gerar API Key: ' + (e.message || ''));
     } finally {
       setGeneratingKey(false);
     }
