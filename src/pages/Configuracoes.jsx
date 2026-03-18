@@ -271,15 +271,7 @@ export default function Configuracoes() {
                 <div className="grid grid-cols-1 gap-3">
                   {/* API Key pessoal */}
                   <div className="space-y-1">
-                    <Label className="text-xs text-slate-500 flex items-center justify-between">
-                      <span>SUA API KEY PESSOAL</span>
-                      {currentUser?.api_key && (
-                        <button onClick={() => setShowApiKey(v => !v)} className="text-slate-400 hover:text-slate-600 flex items-center gap-1">
-                          {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                          {showApiKey ? 'Ocultar' : 'Mostrar'}
-                        </button>
-                      )}
-                    </Label>
+                    <Label className="text-xs text-slate-500">SUA API KEY PESSOAL</Label>
                     <div className="flex gap-2">
                       <Input
                         readOnly
