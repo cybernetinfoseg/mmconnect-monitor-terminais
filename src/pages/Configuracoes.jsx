@@ -279,11 +279,9 @@ export default function Configuracoes() {
                         placeholder="Clique em 'Gerar API Key' para criar a sua chave"
                         className="bg-slate-50 text-xs font-mono min-w-0"
                       />
-                      {currentUser?.api_key && (
-                        <Button variant="outline" size="sm" onClick={() => copyToClipboard(currentUser.api_key, 'API Key')} className="shrink-0">
-                          <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                      )}
+                      <Button variant="outline" size="sm" onClick={() => copyToClipboard(currentUser?.api_key || '', 'API Key')} disabled={!currentUser?.api_key} className="shrink-0">
+                        <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button

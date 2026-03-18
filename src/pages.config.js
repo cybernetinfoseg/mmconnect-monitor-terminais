@@ -51,10 +51,13 @@ import Administracao from './pages/Administracao';
 import Alertas from './pages/Alertas';
 import Auditoria from './pages/Auditoria';
 import Clientes from './pages/Clientes';
+import CompletarPerfil from './pages/CompletarPerfil';
 import Configuracoes from './pages/Configuracoes';
 import Dashboard from './pages/Dashboard';
 import History from './pages/History';
 import Incidents from './pages/Incidents';
+import Manutencao from './pages/Manutencao';
+import Relatorios from './pages/Relatorios';
 import TVMode from './pages/TVMode';
 import Terminais from './pages/Terminais';
 import __Layout from './Layout.jsx';
@@ -65,10 +68,13 @@ export const PAGES = {
     "Alertas": Alertas,
     "Auditoria": Auditoria,
     "Clientes": Clientes,
+    "CompletarPerfil": CompletarPerfil,
     "Configuracoes": Configuracoes,
     "Dashboard": Dashboard,
     "History": History,
     "Incidents": Incidents,
+    "Manutencao": Manutencao,
+    "Relatorios": Relatorios,
     "TVMode": TVMode,
     "Terminais": Terminais,
 }
