@@ -280,20 +280,19 @@ export default function Configuracoes() {
                         </button>
                       )}
                     </Label>
-                    {currentUser?.api_key ? (
-                      <div className="flex gap-2">
-                        <Input
-                          readOnly
-                          value={showApiKey ? currentUser.api_key : '•'.repeat(20)}
-                          className="bg-slate-50 text-xs font-mono min-w-0"
-                        />
+                    <div className="flex gap-2">
+                      <Input
+                        readOnly
+                        value={currentUser?.api_key || ''}
+                        placeholder="Clique em 'Gerar API Key' para criar a sua chave"
+                        className="bg-slate-50 text-xs font-mono min-w-0"
+                      />
+                      {currentUser?.api_key && (
                         <Button variant="outline" size="sm" onClick={() => copyToClipboard(currentUser.api_key, 'API Key')} className="shrink-0">
                           <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-500 italic">Nenhuma API Key gerada ainda. Clique em "Gerar" abaixo.</p>
-                    )}
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <Button
                         variant="outline"
