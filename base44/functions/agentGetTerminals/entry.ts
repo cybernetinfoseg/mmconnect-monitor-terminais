@@ -1,16 +1,14 @@
 /**
  * agentGetTerminals — devolve os terminais ao Agente Local
- * Autenticação: X-Api-Key no header (POST ou GET)
- * Retorna apenas os terminais do utilizador dono da API Key.
+ * Autenticação: X-Api-Key no header (lida da entidade ApiKey)
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 Deno.serve(async (req) => {
     try {
-        // Aceitar GET e POST
+        // Aceitar key no header, body ou query string
         let apiKey = req.headers.get('X-Api-Key') || req.headers.get('x-api-key');
 
-        // Fallback: ler do body se POST
         if (!apiKey && req.method === 'POST') {
             try {
                 const body = await req.json();
@@ -18,30 +16,31 @@ Deno.serve(async (req) => {
             } catch (_) {}
         }
 
-        // Fallback: ler da query string
         if (!apiKey) {
             const url = new URL(req.url);
             apiKey = url.searchParams.get('api_key');
         }
 
         if (!apiKey || apiKey.length < 10) {
-            console.error('agentGetTerminals: API Key ausente');
             return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
 
-        const allUsers = await base44.asServiceRole.entities.User.list();
-        const owner = allUsers.find(u => u.api_key === apiKey) || null;
+        // Procurar chave activa na entidade ApiKey
+        const allKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
+        const match = allKeys.find(k => k.key === apiKey);
 
-        if (!owner) {
-            console.error('agentGetTerminals: API Key não encontrada em nenhum utilizador');
+        if (!match) {
+            console.error('agentGetTerminals: API Key não encontrada');
             return Response.json({ error: 'API Key inválida' }, { status: 401 });
         }
 
+        const ownerEmail = match.user_email;
+
         const terminals = await base44.asServiceRole.entities.Terminal.filter({
             ativo: true,
-            created_by: owner.email,
+            created_by: ownerEmail,
         });
 
         const result = terminals.map(t => ({
@@ -57,8 +56,8 @@ Deno.serve(async (req) => {
             ativo: t.ativo,
         }));
 
-        console.log(`agentGetTerminals: ${owner.email} → ${result.length} terminais`);
-        return Response.json({ success: true, terminals: result, owner: owner.email });
+        console.log(`agentGetTerminals: ${ownerEmail} → ${result.length} terminais`);
+        return Response.json({ success: true, terminals: result, owner: ownerEmail });
 
     } catch (error) {
         console.error('agentGetTerminals erro:', error.message);
