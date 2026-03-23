@@ -9,23 +9,33 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { targetUserId } = await req.json();
+        const { targetUserId } = await req.json().catch(() => ({}));
 
         if (targetUserId && targetUserId !== user.id && user.role !== 'admin') {
             return Response.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         const userId = targetUserId || user.id;
+        const userEmail = targetUserId
+            ? (await base44.asServiceRole.entities.User.get(userId))?.email || userId
+            : user.email;
 
-        // Fetch target user info for audit
-        const targetUser = await base44.asServiceRole.entities.User.get(userId);
-
-        // Generate a secure random API key
+        // Generate secure random API key
         const array = new Uint8Array(32);
         crypto.getRandomValues(array);
         const apiKey = 'noc_' + Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
 
-        await base44.asServiceRole.entities.User.update(userId, { api_key: apiKey });
+        // Upsert: desactivar chaves antigas e criar nova na entidade ApiKey
+        const existing = await base44.asServiceRole.entities.ApiKey.filter({ user_id: userId });
+        for (const k of existing) {
+            await base44.asServiceRole.entities.ApiKey.update(k.id, { ativo: false });
+        }
+        await base44.asServiceRole.entities.ApiKey.create({
+            user_email: userEmail,
+            user_id: userId,
+            key: apiKey,
+            ativo: true,
+        });
 
         // Audit log
         await base44.asServiceRole.entities.AuditLog.create({
@@ -33,12 +43,13 @@ Deno.serve(async (req) => {
             acao: 'api_key_gerada',
             entidade: 'User',
             entidade_id: userId,
-            descricao: `API Key gerada para ${targetUser?.email || userId}`,
+            descricao: `API Key gerada para ${userEmail}`,
             timestamp: new Date().toISOString(),
         });
 
         return Response.json({ success: true, api_key: apiKey });
     } catch (error) {
+        console.error('generateUserApiKey erro:', error.message);
         return Response.json({ error: error.message }, { status: 500 });
     }
 });
