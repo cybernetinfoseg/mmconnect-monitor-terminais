@@ -13,17 +13,17 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 Deno.serve(async (req) => {
     try {
         // 1. Validar API Key pessoal (único fator de autenticação)
-        const apiKey = req.headers.get('X-Api-Key');
-        if (!apiKey) {
-            return Response.json({ error: 'API Key ausente' }, { status: 401 });
+        // Aceitar header X-Api-Key ou campo no body
+        let apiKey = (req.headers.get('X-Api-Key') || req.headers.get('x-api-key') || '').trim();
+
+        // Validar ANTES de qualquer operação — key vazia ou curta é rejeitada imediatamente
+        if (!apiKey || apiKey.length < 16) {
+            return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
         const base44 = createClientFromRequest(req);
 
         // 3. Encontrar dono da API Key na entidade ApiKey
-        if (apiKey.length < 10) {
-            return Response.json({ error: 'API Key inválida' }, { status: 401 });
-        }
         const allApiKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
         const keyRecord = allApiKeys.find(k => k.key === apiKey) || null;
         let users = null;
