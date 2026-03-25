@@ -2,45 +2,48 @@
  * agentGetTerminals — devolve os terminais ao Agente Local
  *
  * SEGURANÇA: autenticação EXCLUSIVAMENTE por X-Api-Key pessoal.
- * Não usa sessão da plataforma. Qualquer pedido sem key válida → 401.
+ * Usa asServiceRole para queries — mas a key é validada antes de qualquer acesso.
+ * Sem key válida → 401 imediato, sem dados expostos.
  */
-import { createClient } from 'npm:@base44/sdk@0.8.21';
-
-// Client de serviço — sem contexto de utilizador/sessão
-const serviceClient = createClient({
-    appId: Deno.env.get('BASE44_APP_ID'),
-    serviceRoleKey: true,
-});
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 Deno.serve(async (req) => {
     try {
-        // Aceitar key no header ou body — NUNCA em query string
+        // 1. Extrair API Key — header tem prioridade; body como fallback para o agente
         let apiKey = (req.headers.get('X-Api-Key') || req.headers.get('x-api-key') || '').trim();
 
         if (!apiKey && req.method === 'POST') {
             try {
-                const body = await req.json();
-                apiKey = (body?.api_key || '').trim();
+                const bodyText = await req.text();
+                const bodyJson = JSON.parse(bodyText);
+                apiKey = (bodyJson?.api_key || '').trim();
+                // Re-attach para que o SDK possa ler o body se necessário
+                req = new Request(req.url, {
+                    method: req.method,
+                    headers: req.headers,
+                    body: bodyText,
+                });
             } catch (_) {}
         }
 
-        // Rejeitar IMEDIATAMENTE antes de qualquer query
+        // 2. Rejeitar IMEDIATAMENTE — antes de qualquer inicialização de cliente ou query
         if (!apiKey || apiKey.length < 16) {
             return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
-        // Procurar chave activa na entidade ApiKey
-        const allKeys = await serviceClient.entities.ApiKey.filter({ ativo: true });
+        // 3. Usar asServiceRole exclusivamente — ignora qualquer sessão de utilizador
+        const base44 = createClientFromRequest(req);
+        const allKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
         const match = allKeys.find(k => k.key === apiKey);
 
         if (!match) {
-            console.error('agentGetTerminals: API Key não encontrada');
             return Response.json({ error: 'API Key inválida' }, { status: 401 });
         }
 
         const ownerEmail = match.user_email;
 
-        const terminals = await serviceClient.entities.Terminal.filter({
+        // 4. Retornar apenas os terminais do dono da key
+        const terminals = await base44.asServiceRole.entities.Terminal.filter({
             ativo: true,
             created_by: ownerEmail,
         });
@@ -58,7 +61,7 @@ Deno.serve(async (req) => {
             ativo: t.ativo,
         }));
 
-        console.log(`agentGetTerminals: ${ownerEmail} → ${result.length} terminais`);
+        console.log(`agentGetTerminals OK: ${ownerEmail} → ${result.length} terminais`);
         return Response.json({ success: true, terminals: result, owner: ownerEmail });
 
     } catch (error) {
