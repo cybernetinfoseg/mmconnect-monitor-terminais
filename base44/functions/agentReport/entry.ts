@@ -2,15 +2,10 @@
  * agentReport — endpoint seguro para o Agente Local
  *
  * SEGURANÇA: autenticação EXCLUSIVAMENTE por X-Api-Key pessoal.
- * Não usa sessão da plataforma. Qualquer pedido sem key válida → 401.
+ * Usa asServiceRole para queries — mas a key é validada antes de qualquer acesso.
+ * Sem key válida → 401 imediato, sem dados expostos.
  */
-import { createClient } from 'npm:@base44/sdk@0.8.21';
-
-// Client de serviço — sem contexto de utilizador/sessão
-const serviceClient = createClient({
-    appId: Deno.env.get('BASE44_APP_ID'),
-    serviceRoleKey: true,
-});
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 Deno.serve(async (req) => {
     try {
@@ -21,8 +16,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
-        // 2. Verificar key na entidade ApiKey (sem sessão de plataforma)
-        const allApiKeys = await serviceClient.entities.ApiKey.filter({ ativo: true });
+        // 2. Usar asServiceRole exclusivamente — ignora qualquer sessão de utilizador
+        const base44 = createClientFromRequest(req);
+
+        const allApiKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
         const keyRecord = allApiKeys.find(k => k.key === apiKey) || null;
 
         if (!keyRecord) {
@@ -40,13 +37,12 @@ Deno.serve(async (req) => {
         }
 
         // 4. Verificar que o terminal existe e pertence ao dono da API Key
-        const terminal = await serviceClient.entities.Terminal.get(terminal_id);
+        const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id);
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
         }
 
-        // Verificar ownership (admin pode reportar qualquer terminal)
-        const allUsers = await serviceClient.entities.User.list();
+        const allUsers = await base44.asServiceRole.entities.User.list();
         const owner = allUsers.find(u => u.email === ownerEmail) || { email: ownerEmail, role: 'user' };
         const isAdmin = owner.role === 'admin';
 
@@ -59,7 +55,7 @@ Deno.serve(async (req) => {
         const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
 
         // 5. Atualizar terminal
-        await serviceClient.entities.Terminal.update(terminal_id, {
+        await base44.asServiceRole.entities.Terminal.update(terminal_id, {
             status: statusValido,
             ultimo_check: agora,
             latencia_ms: latencia_ms ?? null,
@@ -68,15 +64,15 @@ Deno.serve(async (req) => {
         });
 
         // 6. Verificar janela de manutenção
-        const janelasManu = await serviceClient.entities.MaintenanceWindow.filter({ terminal_id, ativo: true });
+        const janelasManu = await base44.asServiceRole.entities.MaintenanceWindow.filter({ terminal_id, ativo: true });
         const emManutencao = janelasManu.some(j => j.inicio <= agora && j.fim >= agora);
 
-        // 7. Verificar mudança de status
-        const cacheResults = await serviceClient.entities.StatusCache.filter({ terminal_id });
+        // 7. Verificar mudança de status para criar incidentes/alertas
+        const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
 
         if (!emManutencao && cache && cache.ultimo_status === 'online' && statusEfetivo === 'offline') {
-            await serviceClient.entities.AlertIncident.create({
+            await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id,
                 terminal_nome: terminal.nome,
                 local: terminal.local,
@@ -86,7 +82,7 @@ Deno.serve(async (req) => {
                 resolvido: false,
                 notificado: false,
             });
-            await serviceClient.functions.invoke('pushNotify', {
+            await base44.asServiceRole.functions.invoke('pushNotify', {
                 action: 'notify_offline',
                 terminal_id,
                 terminal_nome: terminal.nome,
@@ -95,7 +91,6 @@ Deno.serve(async (req) => {
                 owner_email: terminal.created_by || '',
             }).catch(() => {});
 
-            // Telegram: notificar donos com bot configurado
             const admins = allUsers.filter(u => u.role === 'admin' || u.email === terminal.created_by);
             for (const u of admins) {
                 if (u.telegram_bot_token && u.telegram_chat_id) {
@@ -104,7 +99,7 @@ Deno.serve(async (req) => {
                         `📍 Local: ${terminal.local || '—'}\n` +
                         `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
                         `🕐 ${new Date().toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
-                    await serviceClient.functions.invoke('telegramNotify', {
+                    await base44.asServiceRole.functions.invoke('telegramNotify', {
                         bot_token: u.telegram_bot_token,
                         chat_id: u.telegram_chat_id,
                         message: msg,
@@ -112,7 +107,7 @@ Deno.serve(async (req) => {
                 }
             }
         } else if (!emManutencao && cache && cache.ultimo_status === 'offline' && statusEfetivo === 'online') {
-            await serviceClient.entities.AlertIncident.create({
+            await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id,
                 terminal_nome: terminal.nome,
                 local: terminal.local,
@@ -122,22 +117,22 @@ Deno.serve(async (req) => {
                 resolvido: true,
                 notificado: false,
             });
-            const openAlerts = await serviceClient.entities.EscalationAlert.filter({
+            const openAlerts = await base44.asServiceRole.entities.EscalationAlert.filter({
                 terminal_id, resolvido: false,
             }).catch(() => []);
             for (const alert of openAlerts) {
-                await serviceClient.entities.EscalationAlert.update(alert.id, { resolvido: true }).catch(() => {});
+                await base44.asServiceRole.entities.EscalationAlert.update(alert.id, { resolvido: true }).catch(() => {});
             }
         }
 
         // 8. Atualizar cache
         if (cache) {
-            await serviceClient.entities.StatusCache.update(cache.id, {
+            await base44.asServiceRole.entities.StatusCache.update(cache.id, {
                 ultimo_status: statusEfetivo,
                 atualizado_em: agora,
             });
         } else {
-            await serviceClient.entities.StatusCache.create({
+            await base44.asServiceRole.entities.StatusCache.create({
                 terminal_id,
                 ultimo_status: statusEfetivo,
                 atualizado_em: agora,
@@ -145,7 +140,7 @@ Deno.serve(async (req) => {
         }
 
         // 9. Histórico
-        await serviceClient.entities.StatusHistory.create({
+        await base44.asServiceRole.entities.StatusHistory.create({
             terminal_id,
             terminal_nome: terminal.nome,
             status: statusEfetivo === 'offline' ? 'offline' : 'online',
