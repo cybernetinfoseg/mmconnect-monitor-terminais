@@ -12,7 +12,8 @@ import {
   Monitor,
   MapPin,
   Building2,
-  Filter
+  Filter,
+  X
 } from 'lucide-react';
 import {
   Select,
@@ -21,19 +22,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UptimeChart from '../components/dashboard/UptimeChart';
 import { cn } from '@/lib/utils';
-import { format, subHours } from 'date-fns';
+import { format, subHours, parseISO, startOfDay, endOfDay } from 'date-fns';
 
 export default function History() {
-  const [period, setPeriod] = useState('24h');
   const [terminalFilter, setTerminalFilter] = useState('all');
   const [localFilter, setLocalFilter] = useState('all');
   const [clienteFilter, setClienteFilter] = useState('all');
-  const [uptimeFilter, setUptimeFilter] = useState('all'); // 'all' | 'critical' | 'warning' | 'good'
+  const [uptimeFilter, setUptimeFilter] = useState('all');
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -58,7 +60,7 @@ export default function History() {
 
   // Fetch status history
   const { data: allHistory = [], isLoading: historyLoading } = useQuery({
-    queryKey: ['status-history', period],
+    queryKey: ['status-history'],
     queryFn: () => base44.entities.StatusHistory.list('-created_date', 1000),
     enabled: !!currentUser,
   });
@@ -70,21 +72,16 @@ export default function History() {
     return allHistory.filter(h => myIds.has(h.terminal_id));
   }, [allHistory, currentUser, canSeeAll, terminals]);
 
-  // Calculate uptime per terminal based on period
+  // Calculate uptime per terminal based on date range
   const uptimeData = useMemo(() => {
-    const periodHours = {
-      '2h': 2,
-      '12h': 12,
-      '24h': 24,
-      '7d': 168,
-      '30d': 720,
-      '90d': 2160,
-    };
-
-    const hours = periodHours[period] || 24;
-    const cutoff = subHours(new Date(), hours);
+    const now = new Date();
+    const cutoff = dataInicio ? startOfDay(parseISO(dataInicio)) : subHours(now, 24);
+    const cutoffEnd = dataFim ? endOfDay(parseISO(dataFim)) : now;
     
-    const filteredHistory = history.filter(h => new Date(h.timestamp) >= cutoff);
+    const filteredHistory = history.filter(h => {
+      const t = new Date(h.timestamp);
+      return t >= cutoff && t <= cutoffEnd;
+    });
     
     // Group by terminal
     const terminalStats = {};
@@ -118,7 +115,7 @@ export default function History() {
     });
     
     return Object.values(terminalStats).sort((a, b) => a.uptime - b.uptime);
-  }, [history, terminals, period]);
+  }, [history, terminals, dataInicio, dataFim]);
 
   // Calculate average uptime
   const avgUptime = useMemo(() => {
@@ -149,7 +146,7 @@ export default function History() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
       <div className="max-w-[1920px] mx-auto space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-purple-100 rounded-xl shrink-0">
               <BarChart3 className="h-6 w-6 text-purple-600" />
@@ -159,68 +156,73 @@ export default function History() {
               <p className="text-sm text-slate-500">Análise de disponibilidade por período</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <Select value={terminalFilter} onValueChange={setTerminalFilter}>
-              <SelectTrigger className="w-[160px] bg-white shadow-sm">
-                <Monitor className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
-                <SelectValue placeholder="Terminal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os terminais</SelectItem>
-                {terminals.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {locais.length > 0 && (
-              <Select value={localFilter} onValueChange={setLocalFilter}>
-                <SelectTrigger className="w-[140px] bg-white shadow-sm">
-                  <MapPin className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
-                  <SelectValue placeholder="Local" />
+          <div className="flex flex-col gap-2 w-full">
+            {/* Date range */}
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+              <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="flex-1 sm:w-[130px] text-sm bg-white" />
+              <span className="text-slate-400 text-sm shrink-0">–</span>
+              <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="flex-1 sm:w-[130px] text-sm bg-white" />
+              {(dataInicio || dataFim) && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => { setDataInicio(''); setDataFim(''); }}>
+                  <X className="h-4 w-4 text-slate-400" />
+                </Button>
+              )}
+            </div>
+            {/* Other filters */}
+            <div className="flex flex-wrap gap-2">
+              <Select value={terminalFilter} onValueChange={setTerminalFilter}>
+                <SelectTrigger className="w-full sm:w-[150px] bg-white shadow-sm text-xs h-8">
+                  <Monitor className="h-3 w-3 mr-1 text-slate-400 shrink-0" />
+                  <SelectValue placeholder="Terminal" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os locais</SelectItem>
-                  {locais.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  <SelectItem value="all">Todos os terminais</SelectItem>
+                  {terminals.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
                 </SelectContent>
               </Select>
-            )}
-            {clientes.length > 0 && (
-              <Select value={clienteFilter} onValueChange={setClienteFilter}>
-                <SelectTrigger className="w-[150px] bg-white shadow-sm">
-                  <Building2 className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
-                  <SelectValue placeholder="Cliente" />
+              {locais.length > 0 && (
+                <Select value={localFilter} onValueChange={setLocalFilter}>
+                  <SelectTrigger className="w-full sm:w-[130px] bg-white shadow-sm text-xs h-8">
+                    <MapPin className="h-3 w-3 mr-1 text-slate-400 shrink-0" />
+                    <SelectValue placeholder="Local" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os locais</SelectItem>
+                    {locais.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {clientes.length > 0 && (
+                <Select value={clienteFilter} onValueChange={setClienteFilter}>
+                  <SelectTrigger className="w-full sm:w-[140px] bg-white shadow-sm text-xs h-8">
+                    <Building2 className="h-3 w-3 mr-1 text-slate-400 shrink-0" />
+                    <SelectValue placeholder="Cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os clientes</SelectItem>
+                    {clientes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={uptimeFilter} onValueChange={setUptimeFilter}>
+                <SelectTrigger className="w-full sm:w-[140px] bg-white shadow-sm text-xs h-8">
+                  <Filter className="h-3 w-3 mr-1 text-slate-400 shrink-0" />
+                  <SelectValue placeholder="Uptime" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os clientes</SelectItem>
-                  {clientes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  <SelectItem value="all">Todos os uptimes</SelectItem>
+                  <SelectItem value="critical">Crítico (&lt;95%)</SelectItem>
+                  <SelectItem value="warning">Atenção (95-99%)</SelectItem>
+                  <SelectItem value="good">Bom (≥99%)</SelectItem>
                 </SelectContent>
               </Select>
-            )}
-            <Select value={uptimeFilter} onValueChange={setUptimeFilter}>
-              <SelectTrigger className="w-[140px] bg-white shadow-sm">
-                <Filter className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
-                <SelectValue placeholder="Uptime" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os uptimes</SelectItem>
-                <SelectItem value="critical">Crítico (&lt;95%)</SelectItem>
-                <SelectItem value="warning">Atenção (95-99%)</SelectItem>
-                <SelectItem value="good">Bom (≥99%)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Tabs value={period} onValueChange={setPeriod}>
-              <TabsList className="bg-white shadow-sm">
-                <TabsTrigger value="2h" className="text-xs px-2">2h</TabsTrigger>
-                <TabsTrigger value="12h" className="text-xs px-2">12h</TabsTrigger>
-                <TabsTrigger value="24h" className="text-xs px-2">24h</TabsTrigger>
-                <TabsTrigger value="7d" className="text-xs px-2">7d</TabsTrigger>
-                <TabsTrigger value="30d" className="text-xs px-2">30d</TabsTrigger>
-                <TabsTrigger value="90d" className="text-xs px-2">90d</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            </div>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

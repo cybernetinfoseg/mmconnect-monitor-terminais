@@ -4,23 +4,30 @@ import { useQuery } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-    FileBarChart2, Download, TrendingUp, AlertTriangle, Activity,
-    CheckCircle2, XCircle, Calendar, Printer, Loader2, ChevronDown
+    FileBarChart2, Download, TrendingUp, Activity,
+    CheckCircle2, XCircle, Calendar, Printer, Loader2, X
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
-import { format, subDays, subMonths, startOfDay, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, addDays, addWeeks, addMonths } from 'date-fns';
+import {
+    format, subDays, startOfDay, endOfDay, parseISO,
+    eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
+    addDays, addWeeks, addMonths, differenceInDays
+} from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import UptimeTrendChart from '@/components/relatorios/UptimeTrendChart';
 import IncidentsTrendChart from '@/components/relatorios/IncidentsTrendChart';
 import AvailabilityHeatmap from '@/components/relatorios/AvailabilityHeatmap';
 import { jsPDF } from 'jspdf';
 
 export default function Relatorios() {
-    const [period, setPeriod] = useState('7d');
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const sevenDaysAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+
+    const [dataInicio, setDataInicio] = useState(sevenDaysAgo);
+    const [dataFim, setDataFim] = useState(today);
     const [currentUser, setCurrentUser] = useState(null);
     const [printing, setPrinting] = useState(false);
     const printRef = useRef();
@@ -33,7 +40,7 @@ export default function Relatorios() {
     const canSeeAll = perms.isAdmin || perms.isEditor;
 
     const { data: allHistory = [], isLoading: historyLoading } = useQuery({
-        queryKey: ['rel-history', period],
+        queryKey: ['rel-history'],
         queryFn: () => base44.entities.StatusHistory.list('-timestamp', 2000),
         enabled: !!currentUser,
     });
@@ -45,7 +52,7 @@ export default function Relatorios() {
     });
 
     const { data: allIncidents = [] } = useQuery({
-        queryKey: ['rel-incidents', period],
+        queryKey: ['rel-incidents'],
         queryFn: () => base44.entities.AlertIncident.list('-timestamp', 1000),
         enabled: !!currentUser,
     });
@@ -56,66 +63,60 @@ export default function Relatorios() {
         return allTerminals.filter(t => t.created_by === currentUser.email);
     }, [allTerminals, currentUser, canSeeAll]);
 
+    // Computed date range
+    const { cutoff, cutoffEnd } = useMemo(() => {
+        const c = dataInicio ? startOfDay(parseISO(dataInicio)) : startOfDay(subDays(new Date(), 7));
+        const e = dataFim ? endOfDay(parseISO(dataFim)) : endOfDay(new Date());
+        return { cutoff: c, cutoffEnd: e };
+    }, [dataInicio, dataFim]);
+
     const history = useMemo(() => {
         if (!currentUser) return [];
-        if (canSeeAll) return allHistory;
-        const myIds = new Set(terminals.map(t => t.id));
-        return allHistory.filter(h => myIds.has(h.terminal_id));
-    }, [allHistory, currentUser, canSeeAll, terminals]);
+        const myIds = canSeeAll ? null : new Set(terminals.map(t => t.id));
+        return allHistory.filter(h => {
+            if (myIds && !myIds.has(h.terminal_id)) return false;
+            const t = new Date(h.timestamp);
+            return t >= cutoff && t <= cutoffEnd;
+        });
+    }, [allHistory, currentUser, canSeeAll, terminals, cutoff, cutoffEnd]);
 
     const incidents = useMemo(() => {
         if (!currentUser) return [];
-        if (canSeeAll) return allIncidents;
-        const myIds = new Set(terminals.map(t => t.id));
-        return allIncidents.filter(i => myIds.has(i.terminal_id));
-    }, [allIncidents, currentUser, canSeeAll, terminals]);
+        const myIds = canSeeAll ? null : new Set(terminals.map(t => t.id));
+        return allIncidents.filter(i => {
+            if (myIds && !myIds.has(i.terminal_id)) return false;
+            const t = new Date(i.timestamp);
+            return t >= cutoff && t <= cutoffEnd;
+        });
+    }, [allIncidents, currentUser, canSeeAll, terminals, cutoff, cutoffEnd]);
 
-    const PERIOD_OPTIONS = [
-        { value: '7d',   label: '7 dias' },
-        { value: '15d',  label: '15 dias' },
-        { value: '1m',   label: '1 mês' },
-        { value: '3m',   label: '3 meses' },
-        { value: '6m',   label: '6 meses' },
-        { value: '1y',   label: '1 ano' },
-    ];
-
-    // Define buckets based on period
-    const { buckets, bucketSize, cutoff } = useMemo(() => {
-        const now = new Date();
-        // Helper to build daily buckets
-        const dailyBuckets = (cut) => {
-            const days = eachDayOfInterval({ start: cut, end: now });
+    // Auto-select bucket size based on date range
+    const { buckets, bucketSize } = useMemo(() => {
+        const diff = differenceInDays(cutoffEnd, cutoff);
+        const dailyBuckets = () => {
+            const days = eachDayOfInterval({ start: cutoff, end: cutoffEnd });
             return days.map(d => ({ date: d, label: format(d, 'dd/MM', { locale: ptBR }) }));
         };
-        // Helper to build weekly buckets
-        const weeklyBuckets = (cut) => {
-            const weeks = eachWeekOfInterval({ start: cut, end: now });
+        const weeklyBuckets = () => {
+            const weeks = eachWeekOfInterval({ start: cutoff, end: cutoffEnd });
             return weeks.map(d => ({ date: d, label: format(d, 'dd/MM', { locale: ptBR }) }));
         };
-        // Helper to build monthly buckets
-        const monthlyBuckets = (cut) => {
-            const months = eachMonthOfInterval({ start: cut, end: now });
+        const monthlyBuckets = () => {
+            const months = eachMonthOfInterval({ start: cutoff, end: cutoffEnd });
             return months.map(d => ({ date: d, label: format(d, 'MMM yy', { locale: ptBR }) }));
         };
 
-        if (period === '7d')  { const c = subDays(now, 7);    return { cutoff: c, bucketSize: 'day',   buckets: dailyBuckets(c) }; }
-        if (period === '15d') { const c = subDays(now, 15);   return { cutoff: c, bucketSize: 'day',   buckets: dailyBuckets(c) }; }
-        if (period === '1m')  { const c = subMonths(now, 1);  return { cutoff: c, bucketSize: 'week',  buckets: weeklyBuckets(c) }; }
-        if (period === '3m')  { const c = subMonths(now, 3);  return { cutoff: c, bucketSize: 'week',  buckets: weeklyBuckets(c) }; }
-        if (period === '6m')  { const c = subMonths(now, 6);  return { cutoff: c, bucketSize: 'month', buckets: monthlyBuckets(c) }; }
-        if (period === '1y')  { const c = subMonths(now, 12); return { cutoff: c, bucketSize: 'month', buckets: monthlyBuckets(c) }; }
-        const c = subDays(now, 7); return { cutoff: c, bucketSize: 'day', buckets: dailyBuckets(c) };
-    }, [period]);
+        if (diff <= 31)  return { bucketSize: 'day',   buckets: dailyBuckets() };
+        if (diff <= 120) return { bucketSize: 'week',  buckets: weeklyBuckets() };
+        return              { bucketSize: 'month', buckets: monthlyBuckets() };
+    }, [cutoff, cutoffEnd]);
 
-    // Helper: get end of a bucket based on bucketSize
     const getBucketEnd = (date) => {
         if (bucketSize === 'day')   return addDays(date, 1);
         if (bucketSize === 'week')  return addWeeks(date, 1);
-        if (bucketSize === 'month') return addMonths(date, 1);
-        return addDays(date, 1);
+        return addMonths(date, 1);
     };
 
-    // Uptime trend data per bucket per terminal
     const uptimeTrendData = useMemo(() => {
         return buckets.map(({ date, label }) => {
             const bucketStart = startOfDay(date);
@@ -135,7 +136,6 @@ export default function Relatorios() {
         });
     }, [buckets, history, terminals, bucketSize]);
 
-    // Incidents trend per bucket
     const incidentsTrendData = useMemo(() => {
         return buckets.map(({ date, label }) => {
             const bucketStart = startOfDay(date);
@@ -152,85 +152,56 @@ export default function Relatorios() {
         });
     }, [buckets, incidents, bucketSize]);
 
-    // Summary KPIs
     const kpis = useMemo(() => {
-        const filtered = history.filter(h => new Date(h.timestamp) >= cutoff);
-        const totalOnline = filtered.filter(h => h.status === 'online').length;
-        const avgUptime = filtered.length > 0 ? (totalOnline / filtered.length) * 100 : 0;
-
-        const filteredInc = incidents.filter(i => new Date(i.timestamp) >= cutoff);
-        const totalOfflineInc = filteredInc.filter(i => i.tipo === 'offline').length;
-        const resolved = filteredInc.filter(i => i.tipo === 'offline' && i.resolvido).length;
-
-        // MTTR: média de duração dos incidentes resolvidos
-        const withDuration = filteredInc.filter(i => i.tipo === 'offline' && i.duracao_minutos > 0);
+        const totalOnline = history.filter(h => h.status === 'online').length;
+        const avgUptime = history.length > 0 ? (totalOnline / history.length) * 100 : 0;
+        const totalOfflineInc = incidents.filter(i => i.tipo === 'offline').length;
+        const resolved = incidents.filter(i => i.tipo === 'offline' && i.resolvido).length;
+        const withDuration = incidents.filter(i => i.tipo === 'offline' && i.duracao_minutos > 0);
         const avgMttr = withDuration.length > 0
             ? withDuration.reduce((a, b) => a + b.duracao_minutos, 0) / withDuration.length
             : 0;
-
         return { avgUptime, totalOfflineInc, resolved, avgMttr };
-    }, [history, incidents, cutoff]);
+    }, [history, incidents]);
 
-    // Terminal uptime ranking
     const terminalRanking = useMemo(() => {
         return terminals.map(t => {
-            const records = history.filter(h => h.terminal_id === t.id && new Date(h.timestamp) >= cutoff);
+            const records = history.filter(h => h.terminal_id === t.id);
             const online = records.filter(h => h.status === 'online').length;
             const uptime = records.length > 0 ? (online / records.length) * 100 : null;
-            const termIncidents = incidents.filter(i => i.terminal_id === t.id && new Date(i.timestamp) >= cutoff && i.tipo === 'offline');
+            const termIncidents = incidents.filter(i => i.terminal_id === t.id && i.tipo === 'offline');
             return { ...t, uptime, totalIncidents: termIncidents.length };
         }).sort((a, b) => (a.uptime ?? 101) - (b.uptime ?? 101));
-    }, [terminals, history, incidents, cutoff]);
+    }, [terminals, history, incidents]);
 
-    // Print via html2canvas (captures charts correctly)
+    const periodLabel = dataInicio && dataFim
+        ? `${format(parseISO(dataInicio), 'dd/MM/yyyy')} – ${format(parseISO(dataFim), 'dd/MM/yyyy')}`
+        : 'Período personalizado';
+
     const handlePrint = async () => {
         setPrinting(true);
         try {
             const canvas = await html2canvas(printRef.current, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff',
+                scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff',
             });
             const imgData = canvas.toDataURL('image/png');
             const win = window.open('', '_blank');
-            win.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Relatório NOC Monitor</title>
-                    <style>
-                        body { margin: 0; padding: 0; }
-                        img { width: 100%; display: block; }
-                        @media print {
-                            @page { margin: 0; size: A4 portrait; }
-                            body { margin: 0; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <img src="${imgData}" />
-                    <script>
-                        window.onload = function() {
-                            setTimeout(function() { window.print(); window.close(); }, 500);
-                        };
-                    </script>
-                </body>
-                </html>
-            `);
+            win.document.write(`<!DOCTYPE html><html><head><title>Relatório NOC Monitor</title>
+                <style>body{margin:0;padding:0;}img{width:100%;display:block;}
+                @media print{@page{margin:0;size:A4 portrait;}body{margin:0;}}</style></head>
+                <body><img src="${imgData}"/>
+                <script>window.onload=function(){setTimeout(function(){window.print();window.close();},500);};</script>
+                </body></html>`);
             win.document.close();
         } finally {
             setPrinting(false);
         }
     };
 
-    // PDF Export
-    const handleExportPDF = async () => {
+    const handleExportPDF = () => {
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const now = format(new Date(), "dd/MM/yyyy HH:mm");
-        const periodLabel = PERIOD_OPTIONS.find(o => o.value === period)?.label || period;
 
-        // Header
         doc.setFillColor(15, 23, 42);
         doc.rect(0, 0, 210, 28, 'F');
         doc.setTextColor(255, 255, 255);
@@ -241,7 +212,6 @@ export default function Relatorios() {
         doc.setFont('helvetica', 'normal');
         doc.text(`Período: ${periodLabel}  |  Gerado em: ${now}`, 14, 21);
 
-        // KPIs
         doc.setTextColor(30, 30, 50);
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
@@ -250,11 +220,10 @@ export default function Relatorios() {
         const kpiItems = [
             { label: 'Uptime Médio', value: `${kpis.avgUptime.toFixed(2)}%` },
             { label: 'Incidentes de Queda', value: `${kpis.totalOfflineInc}` },
-            { label: 'Incidentes Resolvidos', value: `${kpis.resolved}` },
+            { label: 'Resolvidos', value: `${kpis.resolved}` },
             { label: 'MTTR Médio', value: kpis.avgMttr > 0 ? `${kpis.avgMttr.toFixed(0)} min` : 'N/A' },
-            { label: 'Terminais Monitorados', value: `${terminals.length}` },
+            { label: 'Terminais', value: `${terminals.length}` },
         ];
-
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         kpiItems.forEach((k, i) => {
@@ -272,98 +241,55 @@ export default function Relatorios() {
             doc.setFontSize(9);
         });
 
-        // Incidents Trend Table
         let y = 82;
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 30, 50);
-        doc.text('Tendência de Incidentes por Período', 14, y);
-        y += 6;
-
-        doc.setFillColor(241, 245, 249);
-        doc.rect(14, y, 182, 7, 'F');
-        doc.setFontSize(8);
-        doc.setTextColor(71, 85, 105);
-        doc.text('Período', 16, y + 5);
-        doc.text('Quedas', 100, y + 5);
-        doc.text('Restaurações', 145, y + 5);
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 50);
+        doc.text('Tendência de Incidentes', 14, y); y += 6;
+        doc.setFillColor(241, 245, 249); doc.rect(14, y, 182, 7, 'F');
+        doc.setFontSize(8); doc.setTextColor(71, 85, 105);
+        doc.text('Período', 16, y + 5); doc.text('Quedas', 100, y + 5); doc.text('Restaurações', 145, y + 5);
         y += 8;
-
         incidentsTrendData.forEach((row, i) => {
             if (y > 270) { doc.addPage(); y = 20; }
-            if (i % 2 === 0) {
-                doc.setFillColor(250, 252, 254);
-                doc.rect(14, y - 2, 182, 7, 'F');
-            }
-            doc.setTextColor(30, 30, 50);
-            doc.setFont('helvetica', 'normal');
+            if (i % 2 === 0) { doc.setFillColor(250, 252, 254); doc.rect(14, y - 2, 182, 7, 'F'); }
+            doc.setTextColor(30, 30, 50); doc.setFont('helvetica', 'normal');
             doc.text(row.label, 16, y + 3);
             doc.setTextColor(row.offline > 0 ? 239 : 30, row.offline > 0 ? 68 : 30, row.offline > 0 ? 68 : 50);
-            doc.setFont('helvetica', 'bold');
-            doc.text(`${row.offline}`, 100, y + 3);
+            doc.setFont('helvetica', 'bold'); doc.text(`${row.offline}`, 100, y + 3);
             doc.setTextColor(row.restored > 0 ? 16 : 30, row.restored > 0 ? 185 : 30, row.restored > 0 ? 129 : 50);
-            doc.text(`${row.restored}`, 145, y + 3);
-            y += 7;
+            doc.text(`${row.restored}`, 145, y + 3); y += 7;
         });
 
-        y += 6;
-
-        // Terminal Ranking
-        doc.addPage();
-        y = 20;
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(30, 30, 50);
-        doc.text('Ranking de Uptime por Terminal', 14, y);
-        y += 6;
-
-        // Table header
-        doc.setFillColor(241, 245, 249);
-        doc.rect(14, y, 182, 7, 'F');
-        doc.setFontSize(8);
-        doc.setTextColor(71, 85, 105);
-        doc.text('Terminal', 16, y + 5);
-        doc.text('Local', 80, y + 5);
-        doc.text('Uptime', 140, y + 5);
-        doc.text('Incidentes', 168, y + 5);
-        y += 8;
-
+        doc.addPage(); y = 20;
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 50);
+        doc.text('Ranking de Uptime por Terminal', 14, y); y += 6;
+        doc.setFillColor(241, 245, 249); doc.rect(14, y, 182, 7, 'F');
+        doc.setFontSize(8); doc.setTextColor(71, 85, 105);
+        doc.text('Terminal', 16, y + 5); doc.text('Local', 80, y + 5);
+        doc.text('Uptime', 140, y + 5); doc.text('Incidentes', 168, y + 5); y += 8;
         terminalRanking.slice(0, 20).forEach((t, i) => {
             if (y > 270) { doc.addPage(); y = 20; }
-            if (i % 2 === 0) {
-                doc.setFillColor(250, 252, 254);
-                doc.rect(14, y - 2, 182, 7, 'F');
-            }
-            doc.setTextColor(30, 30, 50);
-            doc.setFont('helvetica', 'normal');
+            if (i % 2 === 0) { doc.setFillColor(250, 252, 254); doc.rect(14, y - 2, 182, 7, 'F'); }
+            doc.setTextColor(30, 30, 50); doc.setFont('helvetica', 'normal');
             doc.text((t.nome || '').substring(0, 30), 16, y + 3);
             doc.text((t.local || '—').substring(0, 25), 80, y + 3);
-
             const upStr = t.uptime != null ? `${t.uptime.toFixed(1)}%` : 'N/A';
             if (t.uptime != null) {
                 doc.setTextColor(t.uptime >= 99 ? 16 : t.uptime >= 95 ? 202 : 239,
                     t.uptime >= 99 ? 185 : t.uptime >= 95 ? 138 : 68,
                     t.uptime >= 99 ? 129 : t.uptime >= 95 ? 4 : 68);
             }
-            doc.setFont('helvetica', 'bold');
-            doc.text(upStr, 140, y + 3);
-            doc.setTextColor(30, 30, 50);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`${t.totalIncidents}`, 172, y + 3);
-            y += 7;
+            doc.setFont('helvetica', 'bold'); doc.text(upStr, 140, y + 3);
+            doc.setTextColor(30, 30, 50); doc.setFont('helvetica', 'normal');
+            doc.text(`${t.totalIncidents}`, 172, y + 3); y += 7;
         });
 
-        // Footer on last page
         const pageCount = doc.getNumberOfPages();
         for (let p = 1; p <= pageCount; p++) {
-            doc.setPage(p);
-            doc.setFontSize(7);
-            doc.setTextColor(148, 163, 184);
+            doc.setPage(p); doc.setFontSize(7); doc.setTextColor(148, 163, 184);
             doc.text('NOC Monitor — Terminais Biométricos', 14, 290);
             doc.text(`Página ${p} de ${pageCount}  |  ${now}`, 140, 290);
         }
-
-        doc.save(`relatorio-noc-${period}-${format(new Date(), 'yyyyMMdd')}.pdf`);
+        doc.save(`relatorio-noc-${format(new Date(), 'yyyyMMdd')}.pdf`);
     };
 
     const loading = historyLoading && !history.length;
@@ -371,9 +297,9 @@ export default function Relatorios() {
     return (
         <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-6" ref={printRef}>
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-violet-100 rounded-xl">
+                    <div className="p-2 bg-violet-100 rounded-xl shrink-0">
                         <FileBarChart2 className="h-5 w-5 text-violet-600" />
                     </div>
                     <div>
@@ -381,27 +307,43 @@ export default function Relatorios() {
                         <p className="text-sm text-slate-500">Tendências de uptime e incidentes ao longo do tempo</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <Select value={period} onValueChange={setPeriod}>
-                        <SelectTrigger className="w-36 bg-white border-slate-200 text-sm h-9">
-                            <Calendar className="h-3.5 w-3.5 text-slate-400 mr-1" />
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {PERIOD_OPTIONS.map(opt => (
-                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2 print:hidden h-9" disabled={printing}>
-                        {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                        <span className="hidden sm:inline">{printing ? 'A preparar...' : 'Imprimir'}</span>
-                    </Button>
-                    <Button onClick={handleExportPDF} variant="outline" size="sm" className="gap-2 print:hidden h-9">
-                        <Download className="h-4 w-4" />
-                        <span className="hidden sm:inline">Exportar PDF</span>
-                        <span className="sm:hidden">PDF</span>
-                    </Button>
+
+                {/* Controls row */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+                    {/* Date range */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                        <Input
+                            type="date"
+                            value={dataInicio}
+                            onChange={e => setDataInicio(e.target.value)}
+                            className="flex-1 sm:w-[130px] text-sm bg-white"
+                        />
+                        <span className="text-slate-400 text-sm shrink-0">–</span>
+                        <Input
+                            type="date"
+                            value={dataFim}
+                            onChange={e => setDataFim(e.target.value)}
+                            className="flex-1 sm:w-[130px] text-sm bg-white"
+                        />
+                        {(dataInicio !== sevenDaysAgo || dataFim !== today) && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0"
+                                onClick={() => { setDataInicio(sevenDaysAgo); setDataFim(today); }}>
+                                <X className="h-4 w-4 text-slate-400" />
+                            </Button>
+                        )}
+                    </div>
+                    {/* Action buttons */}
+                    <div className="flex gap-2 shrink-0">
+                        <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2 h-9" disabled={printing}>
+                            {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                            <span className="hidden sm:inline">{printing ? 'A preparar...' : 'Imprimir'}</span>
+                        </Button>
+                        <Button onClick={handleExportPDF} variant="outline" size="sm" className="gap-2 h-9">
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">Exportar PDF</span>
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -419,7 +361,7 @@ export default function Relatorios() {
                                 <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
                             </div>
                             <p className="text-xs text-slate-500">{kpi.label}</p>
-                            <p className={`text-2xl font-bold mt-0.5 ${kpi.color}`}>{kpi.value}</p>
+                            <p className={`text-xl sm:text-2xl font-bold mt-0.5 ${kpi.color}`}>{kpi.value}</p>
                         </CardContent>
                     </Card>
                 ))}
@@ -430,7 +372,7 @@ export default function Relatorios() {
                 <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold text-slate-700">Tendência de Uptime por Terminal</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-6">
                     {loading ? (
                         <div className="h-64 flex items-center justify-center text-slate-400 text-sm">A carregar...</div>
                     ) : (
@@ -444,7 +386,7 @@ export default function Relatorios() {
                 <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold text-slate-700">Incidentes ao Longo do Tempo</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-6">
                     {loading ? (
                         <div className="h-64 flex items-center justify-center text-slate-400 text-sm">A carregar...</div>
                     ) : (
@@ -461,7 +403,7 @@ export default function Relatorios() {
                         <span className="ml-2 text-xs font-normal text-slate-400">(% uptime por período)</span>
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="px-2 sm:px-6">
                     {loading ? (
                         <div className="h-32 flex items-center justify-center text-slate-400 text-sm">A carregar...</div>
                     ) : (
@@ -484,36 +426,36 @@ export default function Relatorios() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-slate-100 bg-slate-50">
-                                    <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">#</th>
-                                    <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">Terminal</th>
-                                    <th className="text-left text-xs text-slate-500 font-medium px-4 py-3 hidden sm:table-cell">Local</th>
-                                    <th className="text-left text-xs text-slate-500 font-medium px-4 py-3 hidden md:table-cell">Cliente</th>
-                                    <th className="text-right text-xs text-slate-500 font-medium px-4 py-3">Uptime</th>
-                                    <th className="text-right text-xs text-slate-500 font-medium px-4 py-3">Incidentes</th>
+                                    <th className="text-left text-xs text-slate-500 font-medium px-3 sm:px-4 py-3">#</th>
+                                    <th className="text-left text-xs text-slate-500 font-medium px-3 sm:px-4 py-3">Terminal</th>
+                                    <th className="text-left text-xs text-slate-500 font-medium px-3 sm:px-4 py-3 hidden sm:table-cell">Local</th>
+                                    <th className="text-left text-xs text-slate-500 font-medium px-3 sm:px-4 py-3 hidden md:table-cell">Cliente</th>
+                                    <th className="text-right text-xs text-slate-500 font-medium px-3 sm:px-4 py-3">Uptime</th>
+                                    <th className="text-right text-xs text-slate-500 font-medium px-3 sm:px-4 py-3">Inc.</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {terminalRanking.map((t, i) => (
                                     <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                                        <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
-                                        <td className="px-4 py-3 font-medium text-slate-800">{t.nome}</td>
-                                        <td className="px-4 py-3 text-slate-500 hidden sm:table-cell">{t.local || '—'}</td>
-                                        <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{t.cliente_nome || '—'}</td>
-                                        <td className="px-4 py-3 text-right">
+                                        <td className="px-3 sm:px-4 py-2.5 text-slate-400 text-xs">{i + 1}</td>
+                                        <td className="px-3 sm:px-4 py-2.5 font-medium text-slate-800 max-w-[120px] sm:max-w-none truncate">{t.nome}</td>
+                                        <td className="px-3 sm:px-4 py-2.5 text-slate-500 hidden sm:table-cell">{t.local || '—'}</td>
+                                        <td className="px-3 sm:px-4 py-2.5 text-slate-500 hidden md:table-cell">{t.cliente_nome || '—'}</td>
+                                        <td className="px-3 sm:px-4 py-2.5 text-right">
                                             {t.uptime != null ? (
                                                 <Badge variant="outline" className={
-                                                    t.uptime >= 99 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                    t.uptime >= 95 ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                                                    'bg-red-50 text-red-700 border-red-200'
+                                                    t.uptime >= 99 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 text-xs' :
+                                                    t.uptime >= 95 ? 'bg-yellow-50 text-yellow-700 border-yellow-200 text-xs' :
+                                                    'bg-red-50 text-red-700 border-red-200 text-xs'
                                                 }>
                                                     {t.uptime.toFixed(1)}%
                                                 </Badge>
                                             ) : (
-                                                <span className="text-slate-400 text-xs">Sem dados</span>
+                                                <span className="text-slate-400 text-xs">—</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <span className={t.totalIncidents > 0 ? 'text-red-600 font-semibold' : 'text-slate-400'}>
+                                        <td className="px-3 sm:px-4 py-2.5 text-right">
+                                            <span className={t.totalIncidents > 0 ? 'text-red-600 font-semibold text-sm' : 'text-slate-400 text-sm'}>
                                                 {t.totalIncidents}
                                             </span>
                                         </td>
@@ -522,7 +464,7 @@ export default function Relatorios() {
                             </tbody>
                         </table>
                         {terminalRanking.length === 0 && (
-                            <div className="text-center py-12 text-slate-400 text-sm">Sem dados para o período</div>
+                            <div className="text-center py-12 text-slate-400 text-sm">Sem dados para o período selecionado</div>
                         )}
                     </div>
                 </CardContent>
