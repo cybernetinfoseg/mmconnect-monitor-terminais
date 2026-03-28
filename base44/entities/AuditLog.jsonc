@@ -1,0 +1,62 @@
+{
+  "name": "AuditLog",
+  "type": "object",
+  "properties": {
+    "usuario_email": {
+      "type": "string",
+      "description": "Email do usu\u00e1rio que realizou a a\u00e7\u00e3o"
+    },
+    "acao": {
+      "type": "string",
+      "enum": [
+        "terminal_criado",
+        "terminal_editado",
+        "terminal_excluido",
+        "terminal_verificado",
+        "api_key_gerada",
+        "usuario_convidado",
+        "permissao_atualizada",
+        "incidente_resolvido",
+        "incidente_excluido",
+        "cliente_criado",
+        "cliente_editado",
+        "cliente_excluido",
+        "manutencao_criada",
+        "manutencao_editada",
+        "manutencao_cancelada",
+        "alerta_criado",
+        "alerta_editado",
+        "alerta_excluido",
+        "alerta_ativado",
+        "alerta_desativado"
+      ],
+      "description": "Tipo de a\u00e7\u00e3o realizada"
+    },
+    "entidade": {
+      "type": "string",
+      "description": "Nome da entidade afetada"
+    },
+    "entidade_id": {
+      "type": "string",
+      "description": "ID da entidade afetada"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o detalhada da a\u00e7\u00e3o"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Momento da a\u00e7\u00e3o"
+    },
+    "dados_extras": {
+      "type": "string",
+      "description": "JSON com dados adicionais relevantes"
+    }
+  },
+  "required": [
+    "usuario_email",
+    "acao",
+    "timestamp"
+  ]
+}

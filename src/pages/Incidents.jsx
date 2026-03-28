@@ -40,6 +40,9 @@ export default function Incidents() {
 
   const queryClient = useQueryClient();
 
+  const logAudit = (acao, entidade_id, descricao) =>
+    base44.functions.invoke('auditLog', { acao, entidade: 'AlertIncident', entidade_id, descricao }).catch(() => {});
+
   // Fetch incidents with server-side filtering for security
   const { data: incidents = [], isLoading, refetch } = useQuery({
     queryKey: ['incidents', currentUser?.email, canSeeAll],
@@ -263,6 +266,7 @@ export default function Incidents() {
         const allFromTerminal = incidents.filter(i => i.terminal_id === incident.terminal_id);
         for (const inc of allFromTerminal) {
           await base44.entities.AlertIncident.delete(inc.id);
+          logAudit('incidente_excluido', inc.id, `Incidente do terminal "${inc.terminal_nome}" excluído (terminal removido)`);
         }
         queryClient.invalidateQueries({ queryKey: ['incidents'] });
         return;
@@ -281,11 +285,13 @@ export default function Incidents() {
         i => i.terminal_id === incident.terminal_id && !i.resolvido && i.tipo === 'offline'
       );
       for (const inc of allUnresolved) {
+        const duracao = Math.round((new Date(agora) - new Date(inc.timestamp)) / 60000);
         await base44.entities.AlertIncident.update(inc.id, {
           resolvido: true,
           resolvido_em: agora,
-          duracao_minutos: Math.round((new Date(agora) - new Date(inc.timestamp)) / 60000),
+          duracao_minutos: duracao,
         });
+        logAudit('incidente_resolvido', inc.id, `Incidente do terminal "${inc.terminal_nome}" resolvido após ${duracao} min`);
       }
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
     } finally {

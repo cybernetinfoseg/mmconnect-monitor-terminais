@@ -32,6 +32,9 @@ export default function Alertas() {
   const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
 
+  const logAudit = (acao, entidade_id, descricao) =>
+    base44.functions.invoke('auditLog', { acao, entidade: 'AlertRule', entidade_id, descricao }).catch(() => {});
+
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
@@ -54,12 +57,20 @@ export default function Alertas() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.AlertRule.delete(id),
-    onSuccess: () => queryClient.invalidateQueries(['alert-rules']),
+    onSuccess: (_, id) => {
+      const rule = rules.find(r => r.id === id);
+      logAudit('alerta_excluido', id, `Regra de alerta "${rule?.nome || id}" excluída`);
+      queryClient.invalidateQueries(['alert-rules']);
+    },
   });
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, ativo }) => base44.entities.AlertRule.update(id, { ativo }),
-    onSuccess: () => queryClient.invalidateQueries(['alert-rules']),
+    onSuccess: (_, { id, ativo }) => {
+      const rule = rules.find(r => r.id === id);
+      logAudit(ativo ? 'alerta_ativado' : 'alerta_desativado', id, `Regra "${rule?.nome || id}" ${ativo ? 'ativada' : 'desativada'}`);
+      queryClient.invalidateQueries(['alert-rules']);
+    },
   });
 
   const handleEdit = (rule) => {
@@ -226,7 +237,15 @@ export default function Alertas() {
         <AlertRuleModal
           rule={editingRule}
           onClose={() => { setModalOpen(false); setEditingRule(null); }}
-          onSaved={() => {
+          onSaved={(result) => {
+            const isEdit = !!editingRule;
+            logAudit(
+              isEdit ? 'alerta_editado' : 'alerta_criado',
+              editingRule?.id || result?.id || '',
+              isEdit
+                ? `Regra "${editingRule?.nome}" editada`
+                : `Nova regra de alerta "${result?.nome || ''}" criada`
+            );
             queryClient.invalidateQueries(['alert-rules']);
             setModalOpen(false);
             setEditingRule(null);

@@ -54,6 +54,9 @@ export default function Clientes() {
   
   const queryClient = useQueryClient();
 
+  const logAudit = (acao, entidade_id, descricao) =>
+    base44.functions.invoke('auditLog', { acao, entidade: 'Cliente', entidade_id, descricao }).catch(() => {});
+
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
@@ -153,7 +156,13 @@ export default function Clientes() {
       queryClient.setQueryData(['clientes-manage'], ctx.previous);
       toast.error('Erro ao salvar cliente');
     },
-    onSuccess: () => {
+    onSuccess: (result, data) => {
+      const isEdit = !!editingCliente;
+      logAudit(
+        isEdit ? 'cliente_editado' : 'cliente_criado',
+        editingCliente?.id || result?.id || '',
+        isEdit ? `Cliente "${data.nome}" editado` : `Cliente "${data.nome}" criado`
+      );
       queryClient.invalidateQueries(['clientes-manage']);
       queryClient.invalidateQueries(['clientes']);
       queryClient.invalidateQueries(['my-clientes']);
@@ -162,7 +171,7 @@ export default function Clientes() {
       setDialogOpen(false);
       setEditingCliente(null);
       setFormData({});
-      toast.success(editingCliente ? 'Cliente atualizado' : 'Cliente criado');
+      toast.success(isEdit ? 'Cliente atualizado' : 'Cliente criado');
     }
   });
 
@@ -178,7 +187,9 @@ export default function Clientes() {
       queryClient.setQueryData(['clientes-manage'], ctx.previous);
       toast.error('Erro ao excluir cliente');
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
+      const cliente = clientes.find(c => c.id === id);
+      logAudit('cliente_excluido', id, `Cliente "${cliente?.nome || id}" excluído`);
       queryClient.invalidateQueries(['clientes-manage']);
       queryClient.invalidateQueries(['clientes']);
       toast.success('Cliente excluído');

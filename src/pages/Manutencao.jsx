@@ -33,6 +33,9 @@ export default function Manutencao() {
     const [editItem, setEditItem] = useState(null);
     const [currentUser, setCurrentUser] = useState(null);
 
+    const logAudit = (acao, entidade_id, descricao) =>
+        base44.functions.invoke('auditLog', { acao, entidade: 'MaintenanceWindow', entidade_id, descricao }).catch(() => {});
+
     useEffect(() => {
         base44.auth.me().then(setCurrentUser).catch(() => {});
     }, []);
@@ -55,15 +58,31 @@ export default function Manutencao() {
 
     const deleteMutation = useMutation({
         mutationFn: (id) => base44.entities.MaintenanceWindow.delete(id),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenance-windows'] }),
+        onSuccess: (_, id) => {
+            const item = allJanelas.find(j => j.id === id);
+            logAudit('manutencao_cancelada', id, `Manutenção "${item?.titulo || id}" do terminal "${item?.terminal_nome || ''}" removida`);
+            queryClient.invalidateQueries({ queryKey: ['maintenance-windows'] });
+        },
     });
 
     const cancelMutation = useMutation({
         mutationFn: (id) => base44.entities.MaintenanceWindow.update(id, { ativo: false }),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['maintenance-windows'] }),
+        onSuccess: (_, id) => {
+            const item = allJanelas.find(j => j.id === id);
+            logAudit('manutencao_cancelada', id, `Manutenção "${item?.titulo || id}" do terminal "${item?.terminal_nome || ''}" cancelada`);
+            queryClient.invalidateQueries({ queryKey: ['maintenance-windows'] });
+        },
     });
 
-    const handleSaved = () => {
+    const handleSaved = (result) => {
+        const isEdit = !!editItem;
+        logAudit(
+            isEdit ? 'manutencao_editada' : 'manutencao_criada',
+            editItem?.id || result?.id || '',
+            isEdit
+                ? `Manutenção "${editItem?.titulo}" do terminal "${editItem?.terminal_nome}" editada`
+                : `Nova manutenção criada`
+        );
         setModalOpen(false);
         setEditItem(null);
         queryClient.invalidateQueries({ queryKey: ['maintenance-windows'] });

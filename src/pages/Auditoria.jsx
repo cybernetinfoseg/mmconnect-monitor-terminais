@@ -19,12 +19,32 @@ import { cn } from '@/lib/utils';
 import moment from 'moment';
 
 const ACAO_LABELS = {
-  terminal_criado: { label: 'Terminal Criado', color: 'bg-emerald-100 text-emerald-700' },
-  terminal_editado: { label: 'Terminal Editado', color: 'bg-blue-100 text-blue-700' },
-  terminal_excluido: { label: 'Terminal Excluído', color: 'bg-red-100 text-red-700' },
-  terminal_verificado: { label: 'Terminal Verificado', color: 'bg-slate-100 text-slate-600' },
-  usuario_convidado: { label: 'Usuário Convidado', color: 'bg-purple-100 text-purple-700' },
-  permissao_atualizada: { label: 'Permissão Atualizada', color: 'bg-indigo-100 text-indigo-700' },
+  // Terminais
+  terminal_criado:     { label: 'Terminal Criado',     color: 'bg-emerald-100 text-emerald-700' },
+  terminal_editado:    { label: 'Terminal Editado',     color: 'bg-blue-100 text-blue-700' },
+  terminal_excluido:   { label: 'Terminal Excluído',    color: 'bg-red-100 text-red-700' },
+  terminal_verificado: { label: 'Terminal Verificado',  color: 'bg-slate-100 text-slate-600' },
+  // Incidentes
+  incidente_resolvido: { label: 'Incidente Resolvido',  color: 'bg-emerald-100 text-emerald-700' },
+  incidente_excluido:  { label: 'Incidente Excluído',   color: 'bg-red-100 text-red-700' },
+  // Clientes
+  cliente_criado:      { label: 'Cliente Criado',       color: 'bg-purple-100 text-purple-700' },
+  cliente_editado:     { label: 'Cliente Editado',      color: 'bg-blue-100 text-blue-700' },
+  cliente_excluido:    { label: 'Cliente Excluído',     color: 'bg-red-100 text-red-700' },
+  // Manutenção
+  manutencao_criada:   { label: 'Manutenção Criada',    color: 'bg-orange-100 text-orange-700' },
+  manutencao_editada:  { label: 'Manutenção Editada',   color: 'bg-blue-100 text-blue-700' },
+  manutencao_cancelada:{ label: 'Manutenção Cancelada', color: 'bg-red-100 text-red-700' },
+  // Alertas
+  alerta_criado:       { label: 'Alerta Criado',        color: 'bg-yellow-100 text-yellow-700' },
+  alerta_editado:      { label: 'Alerta Editado',       color: 'bg-blue-100 text-blue-700' },
+  alerta_excluido:     { label: 'Alerta Excluído',      color: 'bg-red-100 text-red-700' },
+  alerta_ativado:      { label: 'Alerta Ativado',       color: 'bg-emerald-100 text-emerald-700' },
+  alerta_desativado:   { label: 'Alerta Desativado',    color: 'bg-slate-100 text-slate-600' },
+  // Usuários/Sistema
+  api_key_gerada:      { label: 'API Key Gerada',       color: 'bg-indigo-100 text-indigo-700' },
+  usuario_convidado:   { label: 'Usuário Convidado',    color: 'bg-purple-100 text-purple-700' },
+  permissao_atualizada:{ label: 'Permissão Atualizada', color: 'bg-indigo-100 text-indigo-700' },
 };
 
 export default function Auditoria() {

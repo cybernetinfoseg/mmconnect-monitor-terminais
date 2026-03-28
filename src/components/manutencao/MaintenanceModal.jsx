@@ -61,13 +61,14 @@ export default function MaintenanceModal({ open, onClose, onSaved, editItem }) {
             ativo: true,
             criado_por: (await base44.auth.me()).email,
         };
+        let result;
         if (editItem) {
-            await base44.entities.MaintenanceWindow.update(editItem.id, data);
+            result = await base44.entities.MaintenanceWindow.update(editItem.id, data);
         } else {
-            await base44.entities.MaintenanceWindow.create(data);
+            result = await base44.entities.MaintenanceWindow.create(data);
         }
         setSaving(false);
-        onSaved();
+        onSaved(result || { ...data, id: editItem?.id });
     };
 
     return (

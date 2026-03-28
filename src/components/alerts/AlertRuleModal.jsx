@@ -73,13 +73,14 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
       condicao_valor: form.condicao_valor ? Number(form.condicao_valor) : undefined,
       cooldown_minutos: Number(form.cooldown_minutos),
     };
+    let result;
     if (isEdit) {
-      await base44.entities.AlertRule.update(rule.id, data);
+      result = await base44.entities.AlertRule.update(rule.id, data);
     } else {
-      await base44.entities.AlertRule.create(data);
+      result = await base44.entities.AlertRule.create(data);
     }
     setSaving(false);
-    onSaved();
+    onSaved(result || { ...data, id: rule?.id });
   };
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
