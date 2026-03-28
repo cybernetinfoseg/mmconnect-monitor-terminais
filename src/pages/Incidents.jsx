@@ -247,23 +247,35 @@ export default function Incidents() {
     setCheckingId(incident.id);
     setCheckError(null);
     try {
-      // Verificar se terminal existe e está online (se não existir, permite resolver mesmo assim)
+      // Verificar se terminal existe
+      let terminalExists = false;
       let terminalOnline = false;
       try {
         const terminal = await base44.entities.Terminal.get(incident.terminal_id);
+        terminalExists = !!terminal;
         terminalOnline = terminal?.status === 'online';
       } catch {
-        // Terminal não existe — permite resolver manualmente
-        terminalOnline = true;
+        terminalExists = false;
       }
 
+      // Terminal não existe → apagar TODOS os incidentes dele
+      if (!terminalExists) {
+        const allFromTerminal = incidents.filter(i => i.terminal_id === incident.terminal_id);
+        for (const inc of allFromTerminal) {
+          await base44.entities.AlertIncident.delete(inc.id);
+        }
+        queryClient.invalidateQueries({ queryKey: ['incidents'] });
+        return;
+      }
+
+      // Terminal existe mas ainda está offline → bloquear
       if (!terminalOnline) {
         setCheckError(incident.id);
         setTimeout(() => setCheckError(null), 4000);
         return;
       }
 
-      // Resolver TODOS os incidentes offline não resolvidos do mesmo terminal
+      // Terminal online → resolver TODOS os incidentes offline não resolvidos
       const agora = new Date().toISOString();
       const allUnresolved = incidents.filter(
         i => i.terminal_id === incident.terminal_id && !i.resolvido && i.tipo === 'offline'
