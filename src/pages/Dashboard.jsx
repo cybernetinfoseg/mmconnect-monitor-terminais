@@ -219,18 +219,15 @@ export default function Dashboard() {
               </p>
             </div>
             {/* Mobile: single refresh button + menu; Desktop: full buttons */}
-            <div className="flex items-center gap-1.5 bg-white/10 border border-white/20 rounded-md px-3 h-8 sm:h-9 text-sm text-white/70 cursor-default select-none">
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Atualizar</span>
-            </div>
             <Button
+              variant="outline"
               size="sm"
               onClick={handleMonitorAll}
               disabled={isMonitoring}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
             >
-              <Activity className={cn("h-4 w-4", isMonitoring && "animate-pulse")} />
-              <span className="hidden sm:inline">Verificar Agora</span>
+              <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
+              <span className="hidden sm:inline">Atualizar</span>
             </Button>
             <Button
               variant="outline"
