@@ -28,10 +28,11 @@ Deno.serve(async (req) => {
 
         const ownerEmail = match.user_email;
 
-        // 4. Retornar apenas os terminais do dono da key
+        // 4. Retornar apenas os terminais ip_local do dono da key
         const terminals = await base44.asServiceRole.entities.Terminal.filter({
             ativo: true,
             created_by: ownerEmail,
+            tipo_conexao: 'ip_local',
         });
 
         const result = terminals.map(t => ({
