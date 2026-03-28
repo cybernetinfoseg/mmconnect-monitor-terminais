@@ -325,7 +325,11 @@ export default function Relatorios() {
                             </TabsTrigger>
                         </TabsList>
                     </Tabs>
-                    <Button onClick={handleExportPDF} variant="outline" size="sm" className="gap-2">
+                    <Button onClick={() => window.print()} variant="outline" size="sm" className="gap-2 print:hidden">
+                        <Printer className="h-4 w-4" />
+                        <span className="hidden sm:inline">Imprimir</span>
+                    </Button>
+                    <Button onClick={handleExportPDF} variant="outline" size="sm" className="gap-2 print:hidden">
                         <Download className="h-4 w-4" />
                         <span className="hidden sm:inline">Exportar PDF</span>
                         <span className="sm:hidden">PDF</span>

@@ -86,3 +86,51 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Ocultar sidebar, header mobile, bottom nav e botões */
+  aside,
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Remover padding do layout */
+  main,
+  .lg\:pl-64 {
+    padding-left: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  body {
+    background: white !important;
+    font-size: 11px;
+  }
+
+  /* Garantir que os cards não quebrem */
+  .rounded-xl {
+    border-radius: 6px !important;
+  }
+
+  /* Forçar cor de fundo branca nos cards */
+  [class*="bg-white"],
+  [class*="bg-slate-50"],
+  [class*="bg-gradient"] {
+    background: white !important;
+    box-shadow: none !important;
+  }
+
+  /* Evitar quebra de página dentro de cards */
+  .space-y-6 > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Titulo de página na impressão */
+  @page {
+    margin: 12mm 10mm;
+    size: A4 portrait;
+  }
+}
