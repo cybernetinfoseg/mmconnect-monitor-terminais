@@ -386,10 +386,7 @@ export default function Configuracoes() {
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Configure as credenciais (CMD como Administrador):</p>
                       <p className="text-xs text-slate-500 mt-1">O agente lê as credenciais do ficheiro <code className="bg-slate-100 px-1 rounded">C:\ProgramData\Base44Agent\config.json</code>. Crie-o com o conteúdo:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto max-w-full break-words whitespace-pre-wrap">{`{
-                      "API_KEY": "SUA_API_KEY",
-                      "APP_ID": "${APP_ID}"
-                      }`}</pre>
+                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto max-w-full break-words whitespace-pre-wrap">{`{\n  "API_KEY": "SUA_API_KEY",\n  "APP_ID": "${APP_ID}"\n}`}</pre>
                       <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
                         Substitua <strong>SUA_API_KEY</strong> pela sua API Key pessoal gerada na secção "Credenciais do Agente" acima.
                       </p>
@@ -400,12 +397,7 @@ export default function Configuracoes() {
                     <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">4</span>
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Instale como serviço Windows com NSSM:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto max-w-full whitespace-pre-wrap break-words">{`nssm install Base44Agent python \
-                      "C:\\Program Files\\Base44Agent\\core_agent.py"
-                      nssm set Base44Agent AppParameters "--interval 30"
-                      nssm set Base44Agent AppDirectory \
-                      "C:\\Program Files\\Base44Agent"
-                      nssm start Base44Agent`}</pre>
+                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto max-w-full whitespace-pre-wrap break-words">{`nssm install Base44Agent python "C:\\Program Files\\Base44Agent\\core_agent.py"\nnssm set Base44Agent AppParameters "--interval 30"\nnssm set Base44Agent AppDirectory "C:\\Program Files\\Base44Agent"\nnssm start Base44Agent`}</pre>
                     </div>
                   </div>
 
@@ -413,8 +405,7 @@ export default function Configuracoes() {
                     <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">5</span>
                     <div className="flex-1">
                       <p className="font-medium text-slate-700">Teste rápido (sem instalar serviço):</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto break-words whitespace-pre-wrap">{`cd "C:\\Program Files\\Base44Agent"
-                      python core_agent.py --once`}</pre>
+                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto break-words whitespace-pre-wrap">{`cd "C:\\Program Files\\Base44Agent"\npython core_agent.py --once`}</pre>
                     </div>
                   </div>
 

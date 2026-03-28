@@ -9,7 +9,10 @@ import {
   Calendar,
   BarChart3,
   Activity,
-  Monitor
+  Monitor,
+  MapPin,
+  Building2,
+  Filter
 } from 'lucide-react';
 import {
   Select,
@@ -28,6 +31,9 @@ import { format, subHours } from 'date-fns';
 export default function History() {
   const [period, setPeriod] = useState('24h');
   const [terminalFilter, setTerminalFilter] = useState('all');
+  const [localFilter, setLocalFilter] = useState('all');
+  const [clienteFilter, setClienteFilter] = useState('all');
+  const [uptimeFilter, setUptimeFilter] = useState('all'); // 'all' | 'critical' | 'warning' | 'good'
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -67,9 +73,12 @@ export default function History() {
   // Calculate uptime per terminal based on period
   const uptimeData = useMemo(() => {
     const periodHours = {
+      '2h': 2,
+      '12h': 12,
       '24h': 24,
       '7d': 168,
-      '30d': 720
+      '30d': 720,
+      '90d': 2160,
     };
 
     const hours = periodHours[period] || 24;
@@ -120,10 +129,21 @@ export default function History() {
   // Get worst performers
   const worstPerformers = uptimeData.filter(t => t.uptime < 99).slice(0, 5);
 
+  const locais = useMemo(() => [...new Set(terminals.map(t => t.local).filter(Boolean))].sort(), [terminals]);
+  const clientes = useMemo(() => [...new Set(terminals.map(t => t.cliente_nome || t.cliente).filter(Boolean))].sort(), [terminals]);
+
   const filteredUptimeData = useMemo(() => {
-    if (terminalFilter === 'all') return uptimeData;
-    return uptimeData.filter(t => t.id === terminalFilter);
-  }, [uptimeData, terminalFilter]);
+    return uptimeData.filter(t => {
+      if (terminalFilter !== 'all' && t.id !== terminalFilter) return false;
+      const terminal = terminals.find(ter => ter.id === t.id);
+      if (localFilter !== 'all' && terminal?.local !== localFilter) return false;
+      if (clienteFilter !== 'all' && (terminal?.cliente_nome || terminal?.cliente) !== clienteFilter) return false;
+      if (uptimeFilter === 'critical' && t.uptime >= 95) return false;
+      if (uptimeFilter === 'warning' && (t.uptime < 95 || t.uptime >= 99)) return false;
+      if (uptimeFilter === 'good' && t.uptime < 99) return false;
+      return true;
+    });
+  }, [uptimeData, terminalFilter, localFilter, clienteFilter, uptimeFilter, terminals]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
@@ -141,7 +161,7 @@ export default function History() {
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <Select value={terminalFilter} onValueChange={setTerminalFilter}>
-              <SelectTrigger className="w-[180px] bg-white shadow-sm">
+              <SelectTrigger className="w-[160px] bg-white shadow-sm">
                 <Monitor className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
                 <SelectValue placeholder="Terminal" />
               </SelectTrigger>
@@ -150,23 +170,50 @@ export default function History() {
                 {terminals.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}
               </SelectContent>
             </Select>
+            {locais.length > 0 && (
+              <Select value={localFilter} onValueChange={setLocalFilter}>
+                <SelectTrigger className="w-[140px] bg-white shadow-sm">
+                  <MapPin className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+                  <SelectValue placeholder="Local" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os locais</SelectItem>
+                  {locais.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            {clientes.length > 0 && (
+              <Select value={clienteFilter} onValueChange={setClienteFilter}>
+                <SelectTrigger className="w-[150px] bg-white shadow-sm">
+                  <Building2 className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+                  <SelectValue placeholder="Cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os clientes</SelectItem>
+                  {clientes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+            <Select value={uptimeFilter} onValueChange={setUptimeFilter}>
+              <SelectTrigger className="w-[140px] bg-white shadow-sm">
+                <Filter className="h-3.5 w-3.5 mr-1.5 text-slate-400 shrink-0" />
+                <SelectValue placeholder="Uptime" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os uptimes</SelectItem>
+                <SelectItem value="critical">Crítico (&lt;95%)</SelectItem>
+                <SelectItem value="warning">Atenção (95-99%)</SelectItem>
+                <SelectItem value="good">Bom (≥99%)</SelectItem>
+              </SelectContent>
+            </Select>
             <Tabs value={period} onValueChange={setPeriod}>
               <TabsList className="bg-white shadow-sm">
-                <TabsTrigger value="24h" className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4" />
-                  <span className="hidden sm:inline">24 horas</span>
-                  <span className="sm:hidden">24h</span>
-                </TabsTrigger>
-                <TabsTrigger value="7d" className="flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4" />
-                  <span className="hidden sm:inline">7 dias</span>
-                  <span className="sm:hidden">7d</span>
-                </TabsTrigger>
-                <TabsTrigger value="30d" className="flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4" />
-                  <span className="hidden sm:inline">30 dias</span>
-                  <span className="sm:hidden">30d</span>
-                </TabsTrigger>
+                <TabsTrigger value="2h" className="text-xs px-2">2h</TabsTrigger>
+                <TabsTrigger value="12h" className="text-xs px-2">12h</TabsTrigger>
+                <TabsTrigger value="24h" className="text-xs px-2">24h</TabsTrigger>
+                <TabsTrigger value="7d" className="text-xs px-2">7d</TabsTrigger>
+                <TabsTrigger value="30d" className="text-xs px-2">30d</TabsTrigger>
+                <TabsTrigger value="90d" className="text-xs px-2">90d</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>

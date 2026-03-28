@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
-import { ClipboardList, Search, Filter, User, Calendar, RefreshCw } from 'lucide-react';
+import { ClipboardList, Search, Filter, User, Calendar, RefreshCw, Download } from 'lucide-react';
+import { jsPDF } from 'jspdf';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,60 @@ export default function Auditoria() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const now = new Date().toLocaleString('pt-PT');
+
+    // Header
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, 297, 20, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('NOC Monitor — Auditoria', 10, 13);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Gerado em: ${now}  |  ${filtered.length} registros`, 160, 13);
+
+    // Table header
+    let y = 28;
+    doc.setFillColor(241, 245, 249);
+    doc.rect(10, y - 5, 277, 8, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(71, 85, 105);
+    doc.text('Data/Hora', 12, y);
+    doc.text('Usuário', 55, y);
+    doc.text('Ação', 115, y);
+    doc.text('Descrição', 175, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'normal');
+    filtered.forEach((log, i) => {
+      if (y > 185) { doc.addPage(); y = 20; }
+      if (i % 2 === 0) {
+        doc.setFillColor(250, 252, 254);
+        doc.rect(10, y - 4, 277, 7, 'F');
+      }
+      doc.setTextColor(30, 30, 50);
+      doc.setFontSize(7.5);
+      doc.text((log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT') : '—').substring(0, 22), 12, y);
+      doc.text((log.usuario_email || '—').substring(0, 30), 55, y);
+      const acaoLabel = ACAO_LABELS[log.acao]?.label || log.acao || '—';
+      doc.text(acaoLabel.substring(0, 25), 115, y);
+      doc.text((log.descricao || '—').substring(0, 45), 175, y);
+      y += 7;
+    });
+
+    // Footer
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text('NOC Monitor — Terminais Biométricos', 10, 200);
+    doc.text(now, 220, 200);
+
+    doc.save(`auditoria-noc-${new Date().toISOString().slice(0,10)}.pdf`);
+  };
 
   const { data: allLogs = [], isLoading, refetch } = useQuery({
     queryKey: ['audit-logs'],
@@ -91,10 +146,16 @@ export default function Auditoria() {
               <p className="text-sm text-slate-500">Registro de ações dos usuários no sistema</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={filtered.length === 0} className="gap-2">
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Exportar PDF</span>
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}

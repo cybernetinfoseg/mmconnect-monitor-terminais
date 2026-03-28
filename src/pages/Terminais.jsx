@@ -177,12 +177,16 @@ export default function Terminais() {
     onError: () => toast.error('Erro ao eliminar terminal'),
   });
 
+  const [refreshingTerminalId, setRefreshingTerminalId] = useState(null);
+
   const monitorMutation = useMutation({
     mutationFn: async (terminal) => {
+      setRefreshingTerminalId(terminal.id);
       const response = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
       return response.data;
     },
     onSuccess: (data, terminal) => {
+      setRefreshingTerminalId(null);
       queryClient.invalidateQueries(['terminals-manage']);
       if (data.success) {
         if (data.status === 'online') {
@@ -192,7 +196,7 @@ export default function Terminais() {
         }
       }
     },
-    onError: (error) => toast.error(`Erro: ${error.message}`),
+    onError: (error) => { setRefreshingTerminalId(null); toast.error(`Erro: ${error.message}`); },
   });
 
   const [showNovoClienteModal, setShowNovoClienteModal] = useState(false);
@@ -416,8 +420,8 @@ export default function Terminais() {
                           <Eye className="h-3 w-3 mr-1" />
                           Detalhes
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => monitorMutation.mutate(terminal)} disabled={monitorMutation.isPending}>
-                          <RefreshCw className={cn("h-3 w-3", monitorMutation.isPending && "animate-spin")} />
+                        <Button size="sm" variant="outline" onClick={() => monitorMutation.mutate(terminal)} disabled={refreshingTerminalId === terminal.id}>
+                           <RefreshCw className={cn("h-3 w-3", refreshingTerminalId === terminal.id && "animate-spin")} />
                         </Button>
                         <Button size="sm" variant="outline" onClick={() => handleEdit(terminal)}>
                           <Pencil className="h-3 w-3" />

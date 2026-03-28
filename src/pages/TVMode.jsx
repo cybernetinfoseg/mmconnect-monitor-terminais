@@ -294,7 +294,7 @@ export default function TVMode() {
                     <div className="flex-1">
                       <p className="text-red-400 font-semibold">Incidentes Ativos</p>
                       <p className="text-sm text-red-400/70">
-                        {alerts.filter((a) => !a.resolvido).length} terminal(is) offline requerem atenção
+                        {stats.offline} terminal(is) offline {stats.offline === 1 ? 'requer' : 'requerem'} atenção
                       </p>
                     </div>
                   </div>

@@ -205,8 +205,45 @@ export default function Relatorios() {
             doc.setFontSize(9);
         });
 
-        // Terminal Ranking
+        // Incidents Trend Table
         let y = 82;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(30, 30, 50);
+        doc.text('Tendência de Incidentes por Período', 14, y);
+        y += 6;
+
+        doc.setFillColor(241, 245, 249);
+        doc.rect(14, y, 182, 7, 'F');
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        doc.text('Período', 16, y + 5);
+        doc.text('Quedas', 100, y + 5);
+        doc.text('Restaurações', 145, y + 5);
+        y += 8;
+
+        incidentsTrendData.forEach((row, i) => {
+            if (y > 270) { doc.addPage(); y = 20; }
+            if (i % 2 === 0) {
+                doc.setFillColor(250, 252, 254);
+                doc.rect(14, y - 2, 182, 7, 'F');
+            }
+            doc.setTextColor(30, 30, 50);
+            doc.setFont('helvetica', 'normal');
+            doc.text(row.label, 16, y + 3);
+            doc.setTextColor(row.offline > 0 ? 239 : 30, row.offline > 0 ? 68 : 30, row.offline > 0 ? 68 : 50);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${row.offline}`, 100, y + 3);
+            doc.setTextColor(row.restored > 0 ? 16 : 30, row.restored > 0 ? 185 : 30, row.restored > 0 ? 129 : 50);
+            doc.text(`${row.restored}`, 145, y + 3);
+            y += 7;
+        });
+
+        y += 6;
+
+        // Terminal Ranking
+        doc.addPage();
+        y = 20;
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(30, 30, 50);
@@ -249,11 +286,15 @@ export default function Relatorios() {
             y += 7;
         });
 
-        // Footer
-        doc.setFontSize(7);
-        doc.setTextColor(148, 163, 184);
-        doc.text('NOC Monitor — Terminais Biométricos', 14, 290);
-        doc.text(`Página 1  |  ${now}`, 160, 290);
+        // Footer on last page
+        const pageCount = doc.getNumberOfPages();
+        for (let p = 1; p <= pageCount; p++) {
+            doc.setPage(p);
+            doc.setFontSize(7);
+            doc.setTextColor(148, 163, 184);
+            doc.text('NOC Monitor — Terminais Biométricos', 14, 290);
+            doc.text(`Página ${p} de ${pageCount}  |  ${now}`, 140, 290);
+        }
 
         doc.save(`relatorio-noc-${period}-${format(new Date(), 'yyyyMMdd')}.pdf`);
     };
