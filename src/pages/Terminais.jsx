@@ -13,7 +13,8 @@ import {
   Globe,
   Server,
   AlertTriangle,
-  Eye
+  Eye,
+  User
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -224,7 +225,8 @@ export default function Terminais() {
       const matchSearch = !searchTerm || 
         t.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         t.local?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase());
+        t.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (isAdmin && t.created_by?.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchTipo = tipoFilter === 'all' || t.tipo_conexao === tipoFilter;
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
       const matchCliente = clienteFilter === 'all' || t.cliente_nome === clienteFilter;
@@ -392,7 +394,12 @@ export default function Terminais() {
                           </CardTitle>
                           <p className="text-sm text-slate-500 mt-1">{terminal.local}</p>
                           {isAdmin && terminal.created_by && (
-                            <p className="text-xs text-slate-400 mt-0.5">{terminal.created_by}</p>
+                            <div className="flex items-center gap-1 mt-1">
+                              <User className="h-3 w-3 text-slate-400 shrink-0" />
+                              <span className="text-xs text-slate-500 truncate" title={terminal.created_by}>
+                                {terminal.created_by}
+                              </span>
+                            </div>
                           )}
                         </div>
                         <StatusBadge status={terminal.status} pulse={false} />
