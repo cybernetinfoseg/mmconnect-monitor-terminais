@@ -43,11 +43,19 @@ Deno.serve(async (req) => {
                     let novoStatus;
                     let latencia_ms = null;
 
+                    // Timestamp real em que o terminal ficou offline (último ping + timeout)
+                    let timestampOffline = agora;
+
                     if (terminal.tipo_conexao === 'ip_local') {
                         // ── Lógica AGENTE LOCAL ──────────────────────────────
                         if (terminal.ultimo_ping) {
-                            const segundosSemPing = Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000);
+                            const ultimoPing = new Date(terminal.ultimo_ping);
+                            const segundosSemPing = Math.floor((agora - ultimoPing) / 1000);
                             novoStatus = segundosSemPing > AGENT_TIMEOUT_SECONDS ? 'offline' : (terminal.status || 'online');
+                            // O terminal ficou offline logo após o timeout do agente
+                            if (novoStatus === 'offline') {
+                                timestampOffline = new Date(ultimoPing.getTime() + AGENT_TIMEOUT_SECONDS * 1000);
+                            }
                             await base44.asServiceRole.entities.Terminal.update(terminal.id, {
                                 status: novoStatus,
                                 segundos_sem_ping: segundosSemPing,
@@ -98,7 +106,7 @@ Deno.serve(async (req) => {
                             local: terminal.local,
                             cliente: terminal.cliente_nome,
                             tipo: 'offline',
-                            timestamp: agora.toISOString(),
+                            timestamp: timestampOffline.toISOString(),
                             resolvido: false,
                             notificado: false,
                         });
@@ -148,11 +156,13 @@ Deno.serve(async (req) => {
                         : HISTORY_THROTTLE_SECONDS + 1;
 
                     if (statusMudou || segundosDesdeUltimoCheck >= HISTORY_THROTTLE_SECONDS) {
+                        // Para mudanças de status, usar o timestamp real; para throttle periódico, usar agora
+                        const tsHistorico = (statusMudou && novoStatus === 'offline') ? timestampOffline : agora;
                         await base44.asServiceRole.entities.StatusHistory.create({
                             terminal_id: terminal.id,
                             terminal_nome: terminal.nome,
                             status: novoStatus === 'warning' ? 'online' : (novoStatus || 'offline'),
-                            timestamp: agora.toISOString(),
+                            timestamp: tsHistorico.toISOString(),
                             local: terminal.local || '',
                             cliente: terminal.cliente_nome || '',
                         }).catch(() => {});
