@@ -46,7 +46,12 @@ Deno.serve(async (req) => {
         const owner = allUsers.find(u => u.email === ownerEmail) || { email: ownerEmail, role: 'user' };
         const isAdmin = owner.role === 'admin';
 
-        if (!isAdmin && terminal.created_by !== ownerEmail) {
+        // Verificar permissão: admin, dono do terminal, ou utilizador com cliente associado ao terminal
+        const temPermissao = isAdmin
+            || terminal.created_by === ownerEmail
+            || (owner.cliente_id && terminal.cliente_id === owner.cliente_id);
+
+        if (!temPermissao) {
             return Response.json({ error: 'Sem permissão para reportar este terminal' }, { status: 403 });
         }
 

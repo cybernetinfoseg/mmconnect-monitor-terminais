@@ -24,6 +24,7 @@ const EMPTY_FORM = {
   email: '',
   role: 'user',
   limite_terminais: 10,
+  cliente_id: '',
 };
 
 export default function Administracao() {
@@ -35,6 +36,11 @@ export default function Administracao() {
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
+
+  const { data: clientes = [] } = useQuery({
+    queryKey: ['clientes-admin'],
+    queryFn: () => base44.entities.Cliente.filter({ ativo: true }),
+  });
 
   const queryClient = useQueryClient();
 
@@ -188,6 +194,7 @@ export default function Administracao() {
       email: user.email,
       role: user.role || 'user',
       limite_terminais: user.limite_terminais ?? 50,
+      cliente_id: user.cliente_id || '',
     });
     setShowForm(true);
   };
@@ -211,6 +218,7 @@ export default function Administracao() {
         data: {
           role: form.role,
           limite_terminais: Number(form.limite_terminais),
+          cliente_id: form.cliente_id || null,
         },
       });
     } else {
@@ -359,6 +367,25 @@ export default function Administracao() {
                       placeholder="10"
                     />
                   </div>
+                  {editingUser && (
+                    <div className="space-y-1.5">
+                      <Label>Cliente Associado</Label>
+                      <Select
+                        value={form.cliente_id || 'none'}
+                        onValueChange={v => setForm(prev => ({ ...prev, cliente_id: v === 'none' ? '' : v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Nenhum cliente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">— Nenhum cliente —</SelectItem>
+                          {clientes.map(c => (
+                            <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-2 pt-2">
@@ -423,6 +450,7 @@ export default function Administracao() {
                       <tr className="bg-slate-50 border-b border-slate-200">
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Email</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Role</th>
+                        <th className="text-left px-4 py-3 font-semibold text-slate-600">Cliente</th>
                         <th className="text-center px-4 py-3 font-semibold text-slate-600">Terminais</th>
                         <th className="text-center px-4 py-3 font-semibold text-slate-600">Ações</th>
                       </tr>
@@ -439,6 +467,9 @@ export default function Administracao() {
                                 {user.role === 'admin' ? '⊙ ' : '👤 '}
                                 {ROLE_LABELS[user.role] || 'Utilizador'}
                               </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-600">
+                              {user.cliente_id ? (clientes.find(c => c.id === user.cliente_id)?.nome || <span className="text-slate-400 text-xs">ID inválido</span>) : <span className="text-slate-400 text-xs">—</span>}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>

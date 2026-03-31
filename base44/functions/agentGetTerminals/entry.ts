@@ -28,12 +28,33 @@ Deno.serve(async (req) => {
 
         const ownerEmail = match.user_email;
 
-        // 4. Retornar apenas os terminais ip_local do dono da key
-        const terminals = await base44.asServiceRole.entities.Terminal.filter({
-            ativo: true,
-            created_by: ownerEmail,
-            tipo_conexao: 'ip_local',
-        });
+        // 4. Verificar se o utilizador tem cliente associado
+        const allUsers = await base44.asServiceRole.entities.User.list();
+        const owner = allUsers.find(u => u.email === ownerEmail) || {};
+        const isAdmin = owner.role === 'admin';
+
+        let terminals;
+        if (isAdmin) {
+            // Admin vê todos os terminais ip_local
+            terminals = await base44.asServiceRole.entities.Terminal.filter({
+                ativo: true,
+                tipo_conexao: 'ip_local',
+            });
+        } else if (owner.cliente_id) {
+            // Utilizador com cliente associado → terminais desse cliente
+            terminals = await base44.asServiceRole.entities.Terminal.filter({
+                ativo: true,
+                tipo_conexao: 'ip_local',
+                cliente_id: owner.cliente_id,
+            });
+        } else {
+            // Sem cliente associado → apenas os terminais criados pelo próprio
+            terminals = await base44.asServiceRole.entities.Terminal.filter({
+                ativo: true,
+                created_by: ownerEmail,
+                tipo_conexao: 'ip_local',
+            });
+        }
 
         const result = terminals.map(t => ({
             id: t.id,
