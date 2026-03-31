@@ -2,22 +2,21 @@
  * agentGetTerminals — devolve os terminais ao Agente Local
  *
  * SEGURANÇA: autenticação EXCLUSIVAMENTE por X-Api-Key pessoal.
- * Usa asServiceRole para queries — mas a key é validada antes de qualquer acesso.
- * Sem key válida → 401 imediato, sem dados expostos.
+ * Cada utilizador vê apenas os terminais que criou (created_by).
+ * Admin vê todos.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 Deno.serve(async (req) => {
     try {
-        // 1. Extrair API Key — EXCLUSIVAMENTE pelo header X-Api-Key
+        // 1. Extrair API Key
         const apiKey = (req.headers.get('X-Api-Key') || req.headers.get('x-api-key') || '').trim();
 
-        // 2. Rejeitar IMEDIATAMENTE — antes de qualquer inicialização de cliente ou query
         if (!apiKey || apiKey.length < 16) {
             return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
-        // 3. Usar asServiceRole exclusivamente — ignora qualquer sessão de utilizador
+        // 2. Validar key
         const base44 = createClientFromRequest(req);
         const allKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
         const match = allKeys.find(k => k.key === apiKey);
@@ -28,31 +27,23 @@ Deno.serve(async (req) => {
 
         const ownerEmail = match.user_email;
 
-        // 4. Verificar se o utilizador tem cliente associado
+        // 3. Verificar role
         const allUsers = await base44.asServiceRole.entities.User.list();
         const owner = allUsers.find(u => u.email === ownerEmail) || {};
         const isAdmin = owner.role === 'admin';
 
+        // 4. Filtrar terminais: admin vê todos, utilizador vê apenas os seus
         let terminals;
         if (isAdmin) {
-            // Admin vê todos os terminais ip_local
             terminals = await base44.asServiceRole.entities.Terminal.filter({
                 ativo: true,
                 tipo_conexao: 'ip_local',
-            });
-        } else if (owner.cliente_id) {
-            // Utilizador com cliente associado → terminais desse cliente
-            terminals = await base44.asServiceRole.entities.Terminal.filter({
-                ativo: true,
-                tipo_conexao: 'ip_local',
-                cliente_id: owner.cliente_id,
             });
         } else {
-            // Sem cliente associado → apenas os terminais criados pelo próprio
             terminals = await base44.asServiceRole.entities.Terminal.filter({
                 ativo: true,
-                created_by: ownerEmail,
                 tipo_conexao: 'ip_local',
+                created_by: ownerEmail,
             });
         }
 

@@ -2,23 +2,21 @@
  * agentReport — endpoint seguro para o Agente Local
  *
  * SEGURANÇA: autenticação EXCLUSIVAMENTE por X-Api-Key pessoal.
- * Usa asServiceRole para queries — mas a key é validada antes de qualquer acesso.
- * Sem key válida → 401 imediato, sem dados expostos.
+ * Cada utilizador só pode reportar os terminais que criou (created_by).
+ * Admin pode reportar qualquer terminal.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 
 Deno.serve(async (req) => {
     try {
-        // 1. Extrair e validar API Key — ÚNICO fator de autenticação
+        // 1. Extrair e validar API Key
         const apiKey = (req.headers.get('X-Api-Key') || req.headers.get('x-api-key') || '').trim();
 
         if (!apiKey || apiKey.length < 16) {
             return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
-        // 2. Usar asServiceRole exclusivamente — ignora qualquer sessão de utilizador
         const base44 = createClientFromRequest(req);
-
         const allApiKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
         const keyRecord = allApiKeys.find(k => k.key === apiKey) || null;
 
@@ -28,7 +26,7 @@ Deno.serve(async (req) => {
 
         const ownerEmail = keyRecord.user_email;
 
-        // 3. Ler payload
+        // 2. Ler payload
         const body = await req.json();
         const { terminal_id, status, latencia_ms, segundos_sem_ping } = body;
 
@@ -36,22 +34,18 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'terminal_id e status são obrigatórios' }, { status: 400 });
         }
 
-        // 4. Verificar que o terminal existe e pertence ao dono da API Key
+        // 3. Verificar que o terminal existe
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id);
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
         }
 
+        // 4. Verificar permissão: admin ou criador do terminal
         const allUsers = await base44.asServiceRole.entities.User.list();
         const owner = allUsers.find(u => u.email === ownerEmail) || { email: ownerEmail, role: 'user' };
         const isAdmin = owner.role === 'admin';
 
-        // Verificar permissão: admin, dono do terminal, ou utilizador com cliente associado ao terminal
-        const temPermissao = isAdmin
-            || terminal.created_by === ownerEmail
-            || (owner.cliente_id && terminal.cliente_id === owner.cliente_id);
-
-        if (!temPermissao) {
+        if (!isAdmin && terminal.created_by !== ownerEmail) {
             return Response.json({ error: 'Sem permissão para reportar este terminal' }, { status: 403 });
         }
 
@@ -72,7 +66,7 @@ Deno.serve(async (req) => {
         const janelasManu = await base44.asServiceRole.entities.MaintenanceWindow.filter({ terminal_id, ativo: true });
         const emManutencao = janelasManu.some(j => j.inicio <= agora && j.fim >= agora);
 
-        // 7. Verificar mudança de status para criar incidentes/alertas
+        // 7. Verificar mudança de status
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
 
@@ -96,6 +90,7 @@ Deno.serve(async (req) => {
                 owner_email: terminal.created_by || '',
             }).catch(() => {});
 
+            // Notificar via Telegram: admin + dono do terminal
             const admins = allUsers.filter(u => u.role === 'admin' || u.email === terminal.created_by);
             for (const u of admins) {
                 if (u.telegram_bot_token && u.telegram_chat_id) {

@@ -1,0 +1,77 @@
+{
+  "name": "Cliente",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do cliente"
+    },
+    "contato_nome": {
+      "type": "string",
+      "description": "Nome do contato principal"
+    },
+    "contato_email": {
+      "type": "string",
+      "description": "Email do contato"
+    },
+    "contato_telefone": {
+      "type": "string",
+      "description": "Telefone do contato"
+    },
+    "endereco": {
+      "type": "string",
+      "description": "Endere\u00e7o completo"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se o cliente est\u00e1 ativo"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es sobre o cliente"
+    }
+  },
+  "required": [
+    "nome"
+  ],
+  "rls": {
+    "create": true,
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
