@@ -53,22 +53,11 @@ export default function ContactMessagesPanel() {
 
     setSendingReply(true);
     try {
-      const currentUser = await base44.auth.me();
-
-      // Envia email de resposta
-      await base44.integrations.Core.SendEmail({
-        to: selectedMessage.from_email,
-        subject: `Re: ${selectedMessage.message.substring(0, 50)}...`,
-        body: replyText,
-      });
-
-      // Marca como respondido e salva a resposta
-      await base44.entities.ContactMessage.update(selectedMessage.id, {
-        respondido: true,
-        lido: true,
-        resposta_texto: replyText,
-        respondido_em: new Date().toISOString(),
-        respondido_por: currentUser?.email || 'admin',
+      await base44.functions.invoke('replyContactMessage', {
+        message_id: selectedMessage.id,
+        reply_text: replyText,
+        to_email: selectedMessage.from_email,
+        original_message: selectedMessage.message,
       });
 
       toast.success('Email enviado com sucesso!');
@@ -77,7 +66,7 @@ export default function ContactMessagesPanel() {
       setReplyText('');
     } catch (error) {
       console.error('Erro ao enviar email:', error);
-      toast.error('Erro ao enviar email');
+      toast.error('Erro ao enviar resposta: ' + (error?.response?.data?.error || error.message));
     } finally {
       setSendingReply(false);
     }
