@@ -34,17 +34,27 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'terminal_id e status são obrigatórios' }, { status: 400 });
         }
 
-        // 3. Verificar que o terminal existe
-        const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id);
-        if (!terminal) {
-            return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
-        }
+        // 3. Verificar que o terminal existe e pertence ao dono da API Key
+        // Estratégia: buscar os terminais do utilizador e verificar que o terminal_id está na lista
+        // Isto garante compatibilidade independente de como o SDK retorna created_by
+        const terminaisDoUtilizador = await base44.asServiceRole.entities.Terminal.filter({
+            ativo: true,
+            created_by: ownerEmail,
+        });
 
-        // 4. Verificar permissão: apenas o criador do terminal pode reportar
-        // (admin é tratado como qualquer outro utilizador — usa a sua própria key e os seus próprios terminais)
-        if (terminal.created_by !== ownerEmail) {
+        const terminal = terminaisDoUtilizador.find(t => t.id === terminal_id);
+
+        if (!terminal) {
+            // Verificar se o terminal existe de todo (para dar erro diferente)
+            const terminalExiste = await base44.asServiceRole.entities.Terminal.get(terminal_id);
+            if (!terminalExiste) {
+                return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
+            }
+            console.error(`[agentReport] 403: terminal ${terminal_id} não pertence a "${ownerEmail}"`);
             return Response.json({ error: 'Sem permissão para reportar este terminal' }, { status: 403 });
         }
+
+        console.log(`[agentReport] OK: ${ownerEmail} → terminal "${terminal.nome}" (${terminal_id})`);
 
         const agora = new Date().toISOString();
         const statusValido = ['online', 'offline', 'warning'].includes(status) ? status : 'offline';
