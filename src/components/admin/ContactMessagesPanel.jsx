@@ -185,7 +185,8 @@ export default function ContactMessagesPanel() {
                   }
                 }}
                 className="text-red-600 hover:bg-red-50"
-                disabled={deleteMutation.isPending}
+                disabled={deleteMutation.isPending || !selectedMessage.respondido}
+                title={!selectedMessage.respondido ? 'Só é possível excluir mensagens respondidas' : 'Excluir mensagem'}
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Excluir
