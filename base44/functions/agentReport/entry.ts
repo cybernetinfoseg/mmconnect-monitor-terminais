@@ -86,23 +86,6 @@ Deno.serve(async (req) => {
                 cliente: terminal.cliente_nome || '',
                 owner_email: terminal.created_by || '',
             }).catch(() => {});
-
-            // Notificar via Telegram: dono do terminal (não fazemos User.list aqui)
-            const admins = [{ email: terminal.created_by, telegram_bot_token: null, telegram_chat_id: null }];
-            for (const u of admins) {
-                if (u.telegram_bot_token && u.telegram_chat_id) {
-                    const msg = `🔴 <b>Terminal Offline</b>\n\n` +
-                        `📟 <b>${terminal.nome}</b>\n` +
-                        `📍 Local: ${terminal.local || '—'}\n` +
-                        `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
-                        `🕐 ${new Date().toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
-                    await base44.asServiceRole.functions.invoke('telegramNotify', {
-                        bot_token: u.telegram_bot_token,
-                        chat_id: u.telegram_chat_id,
-                        message: msg,
-                    }).catch(() => {});
-                }
-            }
         } else if (!emManutencao && cache && cache.ultimo_status === 'offline' && statusEfetivo === 'online') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id,

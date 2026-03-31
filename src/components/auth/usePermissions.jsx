@@ -11,16 +11,15 @@ export const ROLE_COLORS = {
 };
 
 const ALL_PAGES = [
-  'Dashboard', 'TVMode', 'Terminais', 'Clientes', 'History',
-  'Incidents', 'Alertas', 'Mensagens', 'Manutencao', 'Relatorios',
+  'Dashboard', 'TVMode', 'Terminais', 'History',
+  'Incidents', 'Alertas', 'Manutencao', 'Relatorios',
   'Auditoria', 'Configuracoes', 'Administracao',
 ];
 
-const ADMIN_ONLY_PAGES = ['Mensagens', 'Administracao'];
+const ADMIN_ONLY_PAGES = ['Administracao'];
 
 export function resolvePermissions(user) {
   const isAdmin = user?.role === 'admin';
-  const isEditor = false; // reserved for future roles
 
   const paginas_permitidas = isAdmin
     ? ALL_PAGES
@@ -28,11 +27,8 @@ export function resolvePermissions(user) {
 
   return {
     isAdmin,
-    isEditor,
     paginas_permitidas,
-    canEdit: isAdmin,
     pode_editar_terminais: true,
-    pode_editar_clientes: true,
     pode_configurar_alertas: isAdmin,
     limite_terminais: user?.limite_terminais ?? 0,
   };

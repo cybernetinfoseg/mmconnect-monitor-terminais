@@ -187,7 +187,7 @@ export default function Administracao() {
     setForm({
       email: user.email,
       role: user.role || 'user',
-      limite_terminais: user.limite_terminais ?? 50,
+      limite_terminais: user.limite_terminais ?? 10,
     });
     setShowForm(true);
   };
@@ -214,7 +214,7 @@ export default function Administracao() {
         },
       });
     } else {
-      inviteMutation.mutate({ email: form.email, role: form.role === 'admin' ? 'admin' : 'user', limite_terminais: 0 });
+      inviteMutation.mutate({ email: form.email, role: form.role === 'admin' ? 'admin' : 'user', limite_terminais: Number(form.limite_terminais) || 10 });
     }
   };
 

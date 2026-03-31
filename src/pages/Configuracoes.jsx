@@ -457,7 +457,7 @@ export default function Configuracoes() {
                           Confirmar Exclusão de Conta
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                          Esta ação é <strong>permanente e irreversível</strong>. Todos os terminais, clientes, histórico e configurações serão excluídos. Tem certeza?
+                          Esta ação é <strong>permanente e irreversível</strong>. Todos os terminais, histórico e configurações serão excluídos. Tem certeza?
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
