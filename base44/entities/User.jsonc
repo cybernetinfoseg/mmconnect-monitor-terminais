@@ -6,10 +6,9 @@
       "type": "string",
       "enum": [
         "admin",
-        "editor",
-        "viewer"
+        "user"
       ],
-      "default": "viewer",
+      "default": "user",
       "description": "Role do utilizador no sistema"
     },
     "aprovado": {
@@ -32,7 +31,7 @@
     },
     "pais_telefone": {
       "type": "string",
-      "description": "Pa\u00eds para o telefone de contato (c\u00f3digo ou nome)"
+      "description": "Pa\u00eds para o telefone de contato"
     },
     "telefone": {
       "type": "string",
@@ -40,39 +39,12 @@
     },
     "motivo_acesso": {
       "type": "string",
-      "description": "Motivo ou descri\u00e7\u00e3o para solicitar acesso ao sistema"
-    },
-    "paginas_permitidas": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "P\u00e1ginas que o utilizador pode aceder"
-    },
-    "pode_configurar_alertas": {
-      "type": "boolean",
-      "default": false
-    },
-    "pode_gerenciar_usuarios": {
-      "type": "boolean",
-      "default": false
-    },
-    "pode_editar_terminais": {
-      "type": "boolean",
-      "default": false
-    },
-    "pode_editar_clientes": {
-      "type": "boolean",
-      "default": false
+      "description": "Motivo para solicitar acesso ao sistema"
     },
     "limite_terminais": {
       "type": "number",
-      "default": 1,
+      "default": 10,
       "description": "Limite de terminais que o utilizador pode cadastrar"
-    },
-    "cliente_id": {
-      "type": "string",
-      "description": "ID do cliente associado ao utilizador (para controlo de acesso aos terminais)"
     },
     "telegram_bot_token": {
       "type": "string",
@@ -92,7 +64,5 @@
       "description": "API Key pessoal para autentica\u00e7\u00e3o do agente local"
     }
   },
-  "required": [
-    "paginas_permitidas"
-  ]
+  "required": []
 }
