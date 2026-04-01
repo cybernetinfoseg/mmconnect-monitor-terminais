@@ -20,6 +20,7 @@ export default function ContactAdminForm({ user }) {
 
     setLoading(true);
     try {
+      // Send contact message to admin
       await base44.functions.invoke('sendContactMessage', {
         from_email: user.email,
         from_name: `${user.nome || ''} ${user.sobrenome || ''}`.trim(),
@@ -28,18 +29,11 @@ export default function ContactAdminForm({ user }) {
         tipo: 'new_user_inquiry',
       });
 
-      toast.success('Mensagem registada! O admin irá vê-la no painel.');
+      toast.success('Mensagem enviada com sucesso! O admin será notificado.');
       setMessage('');
     } catch (error) {
       console.error('Erro:', error);
-      // Mesmo com erro de email, a mensagem pode ter sido guardada na BD
-      const errMsg = error?.response?.data?.error || error.message || '';
-      if (errMsg.includes('integration_credits') || errMsg.includes('limit')) {
-        toast.warning('Mensagem registada, mas a notificação por email falhou. O admin verá no painel.');
-        setMessage('');
-      } else {
-        toast.error('Erro ao enviar mensagem. Tente novamente.');
-      }
+      toast.error('Erro ao enviar mensagem');
     } finally {
       setLoading(false);
     }
