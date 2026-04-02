@@ -42,14 +42,14 @@ export default function TVMode() {
 
   // Fetch monitor config to get actual refresh interval
   useEffect(() => {
-    base44.entities.MonitorConfig.list()
-      .then((configs) => {
-        const config = configs[0];
-        if (config?.intervalo_sync_minutos) {
-          setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
-        }
-      })
-      .catch(() => setRefreshInterval(5000));
+    base44.entities.MonitorConfig.list().
+    then((configs) => {
+      const config = configs[0];
+      if (config?.intervalo_sync_minutos) {
+        setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
+      }
+    }).
+    catch(() => setRefreshInterval(5000));
   }, []);
 
   const perms = resolvePermissions(currentUser);
