@@ -43,6 +43,7 @@ export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
   const [clienteFilter, setClienteFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
+  const [userFilter, setUserFilter] = useState(null);
   const [sortBy, setSortBy] = useState('status');
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isMonitoring, setIsMonitoring] = useState(false);
@@ -145,12 +146,18 @@ export default function Dashboard() {
     [terminals]
   );
 
+  const usuarios = useMemo(() =>
+    [...new Set(terminals.map(t => t.created_by).filter(Boolean))].sort(),
+    [terminals]
+  );
+
   // Apply filters
   const filteredTerminals = useMemo(() => {
     let list = terminals.filter(t => {
       if (localFilter && t.local !== localFilter) return false;
       if (clienteFilter && t.cliente_nome !== clienteFilter && t.cliente !== clienteFilter) return false;
       if (statusFilter && t.status !== statusFilter) return false;
+      if (userFilter && t.created_by !== userFilter) return false;
       return true;
     });
     if (sortBy === 'status') {
@@ -179,7 +186,7 @@ export default function Dashboard() {
 
   // Sync filters to localStorage so TV Mode mirrors them in real-time
   useEffect(() => {
-    const filters = { local: localFilter, cliente: clienteFilter, status: statusFilter, sort: sortBy };
+    const filters = { local: localFilter, cliente: clienteFilter, status: statusFilter, sort: sortBy, user: userFilter };
     localStorage.setItem('dashboard-filters', JSON.stringify(filters));
   }, [localFilter, clienteFilter, statusFilter, sortBy]);
 
@@ -286,7 +293,7 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col gap-3 sm:gap-4"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canSeeAll ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-2 sm:gap-3`}>
             <FilterDropdown
               label="Filtrar por Local"
               icon={MapPin}
@@ -303,6 +310,16 @@ export default function Dashboard() {
               options={clientes}
               placeholder="Todos os clientes"
             />
+            {canSeeAll && (
+              <FilterDropdown
+                label="Filtrar por Utilizador"
+                icon={User}
+                value={userFilter}
+                onChange={setUserFilter}
+                options={usuarios}
+                placeholder="Todos os utilizadores"
+              />
+            )}
             <FilterDropdown
               label="Status"
               icon={Activity}
@@ -328,11 +345,11 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-            {(localFilter || clienteFilter || statusFilter) && (
+            {(localFilter || clienteFilter || statusFilter || userFilter) && (
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => { setLocalFilter(null); setClienteFilter(null); setStatusFilter(null); }}
+                onClick={() => { setLocalFilter(null); setClienteFilter(null); setStatusFilter(null); setUserFilter(null); }}
                 className="text-slate-500 hover:text-slate-700"
               >
                 Limpar filtros

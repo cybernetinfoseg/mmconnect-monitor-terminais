@@ -353,7 +353,7 @@ export default function Terminais() {
                             {!terminal.ativo && <Badge variant="outline" className="text-xs">Inativo</Badge>}
                           </CardTitle>
                           <p className="text-sm text-slate-500 mt-1">{terminal.local}</p>
-                          {isAdmin && terminal.created_by && (
+                          {terminal.created_by && (
                             <p className="text-xs text-slate-400 mt-0.5">{terminal.created_by}</p>
                           )}
                         </div>
