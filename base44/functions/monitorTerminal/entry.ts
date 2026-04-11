@@ -13,7 +13,8 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const { terminal_id } = await req.json().catch(() => ({}));
+        const body = await req.json().catch(() => ({}));
+        const terminal_id = body.terminal_id || body.terminalId;
         if (!terminal_id) {
             return Response.json({ error: 'terminal_id obrigatório' }, { status: 400 });
         }
