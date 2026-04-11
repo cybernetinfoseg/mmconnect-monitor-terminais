@@ -116,19 +116,25 @@ export default function Terminais() {
       }
       return base44.entities.Terminal.create(data);
     },
-    onSuccess: (result, data) => {
+    onSuccess: async (result, data) => {
       const isEdit = !!editingTerminal;
       const nome = data.nome || editingTerminal?.nome || '';
+      const terminalId = editingTerminal?.id || result?.id || '';
       logAudit(
         isEdit ? 'terminal_editado' : 'terminal_criado',
-        editingTerminal?.id || result?.id || '',
+        terminalId,
         isEdit ? `Terminal "${nome}" editado` : `Terminal "${nome}" criado`
       );
-      queryClient.invalidateQueries(['terminals-manage']);
       setDialogOpen(false);
       setEditingTerminal(null);
       setFormData({});
       toast.success(isEdit ? 'Terminal atualizado' : 'Terminal criado');
+      // Para tipos não-locais, verificar status imediatamente após criação/edição
+      const tipo = data.tipo_conexao || 'ip_local';
+      if (tipo !== 'ip_local' && terminalId) {
+        await base44.functions.invoke('monitorTerminal', { terminalId }).catch(() => {});
+      }
+      queryClient.invalidateQueries(['terminals-manage']);
     },
     onError: (error) => toast.error(`Erro: ${error.message}`),
   });
@@ -149,18 +155,24 @@ export default function Terminais() {
   const monitorMutation = useMutation({
     mutationFn: async (terminal) => {
       setRefreshingTerminalId(terminal.id);
+      if (terminal.tipo_conexao === 'ip_local') {
+        // ip_local: apenas recarregar dados sem chamar monitorTerminal
+        return { success: true, status: terminal.status, info: 'ip_local usa agente local' };
+      }
       const response = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
       return response.data;
     },
     onSuccess: (data, terminal) => {
       setRefreshingTerminalId(null);
       queryClient.invalidateQueries(['terminals-manage']);
-      if (data.success) {
+      if (data?.success) {
         if (data.status === 'online') {
-          toast.success(`${terminal.nome}: ✅ ONLINE (${data.latencia}ms)`);
+          toast.success(`${terminal.nome}: ✅ ONLINE${data.latencia ? ' (' + data.latencia + 'ms)' : ''}`);
         } else {
           toast.error(`${terminal.nome}: ❌ OFFLINE${data.error ? ' - ' + data.error : ''}`);
         }
+      } else if (data?.error) {
+        toast.info(`${terminal.nome}: ${data.error}`);
       }
     },
     onError: (error) => { setRefreshingTerminalId(null); toast.error(`Erro: ${error.message}`); },

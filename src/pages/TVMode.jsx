@@ -122,14 +122,21 @@ export default function TVMode() {
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  // Fetch alerts
+  // Fetch alerts — filtrar apenas incidentes dos terminais visíveis ao utilizador
   const { data: alerts = [] } = useQuery({
-    queryKey: ['alerts-tv'],
-    queryFn: () => base44.entities.AlertIncident.filter(
-      { resolvido: false },
-      '-created_date',
-      10
-    ),
+    queryKey: ['alerts-tv', currentUser?.email, canSeeAll],
+    queryFn: async () => {
+      const allAlerts = await base44.entities.AlertIncident.filter(
+        { resolvido: false },
+        '-created_date',
+        50
+      );
+      if (canSeeAll) return allAlerts.slice(0, 10);
+      // Filtrar apenas incidentes de terminais do utilizador
+      const myTerminalIds = new Set(allTerminalsRaw.map(t => t.id));
+      return allAlerts.filter(a => myTerminalIds.has(a.terminal_id)).slice(0, 10);
+    },
+    enabled: !!currentUser,
     refetchInterval: 10000
   });
 

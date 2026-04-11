@@ -42,9 +42,9 @@ export default function CompletarPerfil() {
 
   const handleProfileSuccess = () => {
     setSubmitted(true);
-    // Aguarda um momento para mostrar confirmação
+    // Recarrega a página após 2s para limpar estado e redirecionar corretamente
     setTimeout(() => {
-      navigate('/');
+      window.location.href = '/';
     }, 2000);
   };
 

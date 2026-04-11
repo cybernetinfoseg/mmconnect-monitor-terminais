@@ -8,12 +8,9 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-        const isAuthenticated = await base44.auth.isAuthenticated();
-        if (isAuthenticated) {
-            const user = await base44.auth.me();
-            if (user?.role !== 'admin') {
-                return Response.json({ error: 'Forbidden' }, { status: 403 });
-            }
+        const user = await base44.auth.me();
+        if (!user) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
         const { terminal_id } = await req.json().catch(() => ({}));
@@ -24,6 +21,11 @@ Deno.serve(async (req) => {
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id);
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
+        }
+
+        // Verificar posse: apenas admin ou dono do terminal
+        if (user.role !== 'admin' && terminal.created_by !== user.email) {
+            return Response.json({ error: 'Forbidden: não é dono deste terminal' }, { status: 403 });
         }
 
         // Terminais ip_local dependem do agente — não monitorar activamente aqui
@@ -106,7 +108,7 @@ Deno.serve(async (req) => {
             cliente: terminal.cliente_nome || '',
         }).catch(() => {});
 
-        return Response.json({ success: true, terminal_id, status: novoStatus, latencia_ms: result.latencia_ms, statusMudou });
+        return Response.json({ success: true, terminal_id, status: novoStatus, latencia: result.latencia_ms, latencia_ms: result.latencia_ms, statusMudou });
     } catch (error) {
         console.error('Erro monitorTerminal:', error);
         return Response.json({ success: false, error: error.message }, { status: 500 });
