@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, CheckCircle, Clock, MapPin, Building2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import moment from 'moment';
 
@@ -72,10 +72,7 @@ export default function AlertsList({ alerts, maxItems = 5 }) {
                     <MapPin className="h-3 w-3" />
                     {alert.local}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Building2 className="h-3 w-3" />
-                    {alert.cliente}
-                  </span>
+
                 </div>
                 
                 <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">

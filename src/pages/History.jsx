@@ -11,7 +11,6 @@ import {
   Activity,
   Monitor,
   MapPin,
-  Building2,
   Filter,
   X
 } from 'lucide-react';
@@ -32,7 +31,7 @@ import { format, subHours, parseISO, startOfDay, endOfDay } from 'date-fns';
 export default function History() {
   const [terminalFilter, setTerminalFilter] = useState('all');
   const [localFilter, setLocalFilter] = useState('all');
-  const [clienteFilter, setClienteFilter] = useState('all');
+
   const [uptimeFilter, setUptimeFilter] = useState('all');
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
@@ -91,7 +90,6 @@ export default function History() {
         id: t.id,
         nome: t.nome,
         local: t.local,
-        cliente: t.cliente,
         totalRecords: 0,
         onlineRecords: 0,
         uptime: 100
@@ -127,20 +125,20 @@ export default function History() {
   const worstPerformers = uptimeData.filter(t => t.uptime < 99).slice(0, 5);
 
   const locais = useMemo(() => [...new Set(terminals.map(t => t.local).filter(Boolean))].sort(), [terminals]);
-  const clientes = useMemo(() => [...new Set(terminals.map(t => t.cliente_nome || t.cliente).filter(Boolean))].sort(), [terminals]);
+
 
   const filteredUptimeData = useMemo(() => {
     return uptimeData.filter(t => {
       if (terminalFilter !== 'all' && t.id !== terminalFilter) return false;
       const terminal = terminals.find(ter => ter.id === t.id);
       if (localFilter !== 'all' && terminal?.local !== localFilter) return false;
-      if (clienteFilter !== 'all' && (terminal?.cliente_nome || terminal?.cliente) !== clienteFilter) return false;
+
       if (uptimeFilter === 'critical' && t.uptime >= 95) return false;
       if (uptimeFilter === 'warning' && (t.uptime < 95 || t.uptime >= 99)) return false;
       if (uptimeFilter === 'good' && t.uptime < 99) return false;
       return true;
     });
-  }, [uptimeData, terminalFilter, localFilter, clienteFilter, uptimeFilter, terminals]);
+  }, [uptimeData, terminalFilter, localFilter, uptimeFilter, terminals]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-6">
@@ -193,18 +191,7 @@ export default function History() {
                   </SelectContent>
                 </Select>
               )}
-              {clientes.length > 0 && (
-                <Select value={clienteFilter} onValueChange={setClienteFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px] bg-white shadow-sm text-xs h-8">
-                    <Building2 className="h-3 w-3 mr-1 text-slate-400 shrink-0" />
-                    <SelectValue placeholder="Cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os clientes</SelectItem>
-                    {clientes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
+
               <Select value={uptimeFilter} onValueChange={setUptimeFilter}>
                 <SelectTrigger className="w-full sm:w-[140px] bg-white shadow-sm text-xs h-8">
                   <Filter className="h-3 w-3 mr-1 text-slate-400 shrink-0" />
@@ -367,7 +354,7 @@ export default function History() {
                           {terminal.nome}
                         </p>
                         <p className="text-xs text-slate-500 truncate">
-                          {terminal.local} • {terminal.cliente}
+                          {terminal.local}
                         </p>
                       </div>
                       <div className="text-right">

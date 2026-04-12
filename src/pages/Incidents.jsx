@@ -7,8 +7,7 @@ import {
   AlertTriangle, 
   CheckCircle, 
   Clock, 
-  MapPin, 
-  Building2,
+  MapPin,
   Filter,
   RefreshCw,
   Bell,
@@ -184,8 +183,7 @@ export default function Incidents() {
     const cols = [
       { label: 'Terminal', x: margin, w: 42 },
       { label: 'Tipo', x: margin + 42, w: 22 },
-      { label: 'Local', x: margin + 64, w: 38 },
-      { label: 'Cliente', x: margin + 102, w: 38 },
+      { label: 'Local', x: margin + 64, w: 76 },
       { label: 'Data/Hora', x: margin + 140, w: 30 },
       { label: 'Duração', x: margin + 170, w: 26 },
     ];
@@ -229,10 +227,9 @@ export default function Incidents() {
       doc.text(truncate(incident.terminal_nome, 22), cols[0].x + 1, y + 4.8);
       doc.text(tipo + status, cols[1].x + 1, y + 4.8);
       doc.setTextColor(51, 65, 85);
-      doc.text(truncate(incident.local, 20), cols[2].x + 1, y + 4.8);
-      doc.text(truncate(incident.cliente, 20), cols[3].x + 1, y + 4.8);
-      doc.text(data, cols[4].x + 1, y + 4.8);
-      doc.text(duracao, cols[5].x + 1, y + 4.8);
+      doc.text(truncate(incident.local, 40), cols[2].x + 1, y + 4.8);
+      doc.text(data, cols[3].x + 1, y + 4.8);
+      doc.text(duracao, cols[4].x + 1, y + 4.8);
       y += 7;
     });
 
@@ -517,10 +514,7 @@ export default function Incidents() {
                               <MapPin className="h-3 w-3" />
                               {incident.local}
                             </span>
-                            <span className="flex items-center gap-1">
-                              <Building2 className="h-3 w-3" />
-                              {incident.cliente}
-                            </span>
+
                           </div>
                           
                           <div className="flex items-center gap-4 text-xs text-slate-400 mt-2">
