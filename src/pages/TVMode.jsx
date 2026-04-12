@@ -25,7 +25,7 @@ const DEFAULT_SETTINGS = {
   cardSize: 'md',
   onlyOffline: false,
   showLocal: true,
-  showCliente: true,
+  showConexao: true,
   showLastPing: true,
   showLatencia: false,
   showKPIs: true,
@@ -90,7 +90,7 @@ export default function TVMode() {
   // URL params override localStorage
   const urlParams = new URLSearchParams(window.location.search);
   const localFilter = urlParams.get('local') || mirrorFilters.local || null;
-  const clienteFilter = urlParams.get('cliente') || mirrorFilters.cliente || null;
+
   const statusFilterMirror = mirrorFilters.status || null;
 
   // Fetch terminals with auto-refresh based on config
@@ -144,12 +144,11 @@ export default function TVMode() {
   const terminals = useMemo(() => {
     return allTerminals.filter((t) => {
       if (localFilter && t.local !== localFilter) return false;
-      if (clienteFilter && t.cliente_nome !== clienteFilter && t.cliente !== clienteFilter) return false;
       if (statusFilterMirror && t.status !== statusFilterMirror) return false;
       if (tvSettings.onlyOffline && t.status !== 'offline') return false;
       return true;
     });
-  }, [allTerminals, localFilter, clienteFilter, tvSettings.onlyOffline]);
+  }, [allTerminals, localFilter, tvSettings.onlyOffline]);
 
   // Sort terminals - offline first, then by time without ping
   const sortedTerminals = useMemo(() => {
@@ -199,9 +198,9 @@ export default function TVMode() {
             <div className="min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold tracking-tight truncate">NOC Monitor</h1>
               <p className="text-xs sm:text-sm text-slate-400 truncate">
-                Terminais{(localFilter || clienteFilter) &&
+                Terminais{localFilter &&
                 <span className="hidden sm:inline ml-2">
-                    {[localFilter, clienteFilter].filter(Boolean).join(' • ')}
+                    {localFilter}
                   </span>
                 }
               </p>
@@ -358,11 +357,21 @@ export default function TVMode() {
                             <span className="text-slate-500">Local:</span> {terminal.local}
                           </p>
                       }
-                        {tvSettings.showCliente !== false &&
-                      <p className="text-slate-400 truncate">
-                            <span className="text-slate-500">Cliente:</span> {terminal.cliente_nome || terminal.cliente}
-                          </p>
-                      }
+                        {tvSettings.showConexao !== false && (() => {
+                          const tipo = terminal.tipo_conexao;
+                          let conexaoLabel = null;
+                          let conexaoVal = null;
+                          if (tipo === 'ip_local' && terminal.ip_local) { conexaoLabel = 'IP Local'; conexaoVal = `${terminal.ip_local}:${terminal.porta || 5005}`; }
+                          else if (tipo === 'ip_publico' && terminal.ip_publico) { conexaoLabel = 'IP Público'; conexaoVal = `${terminal.ip_publico}:${terminal.porta || 5005}`; }
+                          else if (tipo === 'dns' && terminal.dns) { conexaoLabel = 'DNS'; conexaoVal = `${terminal.dns}:${terminal.porta || 5005}`; }
+                          else if (tipo === 'p2s' && terminal.ip_local) { conexaoLabel = 'VPN'; conexaoVal = terminal.ip_local; }
+                          else if (tipo === 'api' && terminal.api_endpoint) { conexaoLabel = 'API'; conexaoVal = terminal.api_endpoint; }
+                          return conexaoVal ? (
+                            <p className="text-slate-400 truncate">
+                              <span className="text-slate-500">{conexaoLabel}:</span> <span className="font-mono text-xs text-emerald-300">{conexaoVal}</span>
+                            </p>
+                          ) : null;
+                        })()}
                         {tvSettings.showLatencia && terminal.latencia_ms &&
                       <p className="text-slate-400 truncate">
                             <span className="text-slate-500">Latência:</span> {terminal.latencia_ms}ms
