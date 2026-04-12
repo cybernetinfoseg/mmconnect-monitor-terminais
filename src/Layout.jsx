@@ -24,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import PushNotificationManager from './components/notifications/PushNotificationManager';
+
 import PendingApproval from './components/auth/PendingApproval';
 import { useRequireAuth } from './components/auth/useRequireAuth';
 
@@ -160,7 +160,7 @@ export default function Layout({ children, currentPageName }) {
         ))}
       </nav>
       <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
-        <PushNotificationManager />
+
         {currentUser && (
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
             <User className="h-4 w-4 text-slate-400 shrink-0" />
