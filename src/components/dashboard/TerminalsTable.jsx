@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Monitor, MapPin, Building2, Clock, AlertTriangle } from 'lucide-react';
+import { Monitor, MapPin, Clock, AlertTriangle } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { cn } from '@/lib/utils';
 import { formatDateTimePT, formatTimePT } from '@/lib/localization';
@@ -54,7 +54,6 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
               </div>
               <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
                 {terminal.local && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{terminal.local}</span>}
-                {terminal.cliente && <span className="flex items-center gap-1"><Building2 className="h-3 w-3" />{terminal.cliente}</span>}
               </div>
             </motion.div>
           ))}
@@ -72,9 +71,7 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
               <th className={cn("text-left font-semibold text-slate-600 uppercase tracking-wider", compact ? "px-4 py-3 text-xs" : "px-6 py-4 text-xs")}>
                 <div className="flex items-center gap-2"><MapPin className="h-4 w-4" />Local</div>
               </th>
-              <th className={cn("text-left font-semibold text-slate-600 uppercase tracking-wider", compact ? "px-4 py-3 text-xs" : "px-6 py-4 text-xs")}>
-                <div className="flex items-center gap-2"><Building2 className="h-4 w-4" />Cliente</div>
-              </th>
+
               <th className={cn("text-center font-semibold text-slate-600 uppercase tracking-wider", compact ? "px-4 py-3 text-xs" : "px-6 py-4 text-xs")}>Status</th>
               <th className={cn("text-left font-semibold text-slate-600 uppercase tracking-wider", compact ? "px-4 py-3 text-xs" : "px-6 py-4 text-xs")}>
                 <div className="flex items-center gap-2"><Clock className="h-4 w-4" />Último Ping</div>
@@ -97,7 +94,7 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
                 >
                   <td className={cn("font-medium text-slate-900", compact ? "px-4 py-3 text-sm" : "px-6 py-4")}>{terminal.nome}</td>
                   <td className={cn("text-slate-600", compact ? "px-4 py-3 text-sm" : "px-6 py-4")}>{terminal.local}</td>
-                  <td className={cn("text-slate-600", compact ? "px-4 py-3 text-sm" : "px-6 py-4")}>{terminal.cliente}</td>
+
                   <td className={cn("text-center", compact ? "px-4 py-3" : "px-6 py-4")}><StatusBadge status={terminal.status} /></td>
                   <td className={cn("text-slate-500", compact ? "px-4 py-3 text-sm" : "px-6 py-4")}>
                     {terminal.ultimo_ping ? formatDateTimePT(terminal.ultimo_ping) : '—'}

@@ -7,7 +7,6 @@ import {
   Wifi, 
   WifiOff, 
   MapPin, 
-  Building2, 
   RefreshCw,
   Activity,
   AlertTriangle,
@@ -41,7 +40,6 @@ const DEFAULT_WIDGETS = {
 
 export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
-  const [clienteFilter, setClienteFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [userFilter, setUserFilter] = useState(null);
   const [sortBy, setSortBy] = useState('status');
@@ -141,11 +139,6 @@ export default function Dashboard() {
     [terminals]
   );
 
-  const clientes = useMemo(() => 
-    [...new Set(terminals.map(t => t.cliente_nome || t.cliente).filter(Boolean))].sort(),
-    [terminals]
-  );
-
   const usuarios = useMemo(() =>
     [...new Set(terminals.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort(),
     [terminals]
@@ -155,7 +148,7 @@ export default function Dashboard() {
   const filteredTerminals = useMemo(() => {
     let list = terminals.filter(t => {
       if (localFilter && t.local !== localFilter) return false;
-      if (clienteFilter && t.cliente_nome !== clienteFilter && t.cliente !== clienteFilter) return false;
+
       if (statusFilter && t.status !== statusFilter) return false;
       if (userFilter && (t.usuario_email || t.created_by) !== userFilter) return false;
       return true;
@@ -168,7 +161,7 @@ export default function Dashboard() {
       list = [...list].sort((a, b) => (b.segundos_sem_ping || 0) - (a.segundos_sem_ping || 0));
     }
     return list;
-  }, [terminals, localFilter, clienteFilter, statusFilter, userFilter, sortBy]);
+  }, [terminals, localFilter, statusFilter, userFilter, sortBy]);
 
   // Calculate KPIs
   const stats = useMemo(() => {
@@ -186,9 +179,9 @@ export default function Dashboard() {
 
   // Sync filters to localStorage so TV Mode mirrors them in real-time
   useEffect(() => {
-    const filters = { local: localFilter, cliente: clienteFilter, status: statusFilter, sort: sortBy, user: userFilter };
+    const filters = { local: localFilter, status: statusFilter, sort: sortBy, user: userFilter };
     localStorage.setItem('dashboard-filters', JSON.stringify(filters));
-  }, [localFilter, clienteFilter, statusFilter, sortBy]);
+  }, [localFilter, statusFilter, sortBy]);
 
   const handlePullRefresh = async () => {
     await refetch();
@@ -293,7 +286,7 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col gap-3 sm:gap-4"
         >
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canSeeAll ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-2 sm:gap-3`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canSeeAll ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2 sm:gap-3`}>
             <FilterDropdown
               label="Filtrar por Local"
               icon={MapPin}
@@ -302,14 +295,7 @@ export default function Dashboard() {
               options={locais}
               placeholder="Todos os locais"
             />
-            <FilterDropdown
-              label="Filtrar por Cliente"
-              icon={Building2}
-              value={clienteFilter}
-              onChange={setClienteFilter}
-              options={clientes}
-              placeholder="Todos os clientes"
-            />
+
             {canSeeAll && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
@@ -353,18 +339,18 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
-            {(localFilter || clienteFilter || statusFilter || userFilter) && (
+            {(localFilter || statusFilter || userFilter) && (
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => { setLocalFilter(null); setClienteFilter(null); setStatusFilter(null); setUserFilter(null); }}
+                onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }}
                 className="text-slate-500 hover:text-slate-700"
               >
                 Limpar filtros
               </Button>
             )}
             <Link
-              to={`/TVMode${localFilter || clienteFilter ? `?${new URLSearchParams([...(localFilter ? [['local', localFilter]] : []), ...(clienteFilter ? [['cliente', clienteFilter]] : [])]).toString()}` : ''}`}
+              to={`/TVMode${localFilter ? `?local=${encodeURIComponent(localFilter)}` : ''}`}
               className="w-full sm:w-auto"
             >
               <Button variant="outline" size="sm" className="gap-1.5 text-slate-600 w-full sm:w-auto">
