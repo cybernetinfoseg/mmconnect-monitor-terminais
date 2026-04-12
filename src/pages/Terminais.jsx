@@ -255,6 +255,17 @@ export default function Terminais() {
     return labels[tipo] || tipo;
   };
 
+  const getConexaoEndereco = (terminal) => {
+    switch (terminal.tipo_conexao) {
+      case 'ip_local': return terminal.ip_local ? `${terminal.ip_local}:${terminal.porta || 5005}` : null;
+      case 'ip_publico': return terminal.ip_publico ? `${terminal.ip_publico}:${terminal.porta || 5005}` : null;
+      case 'dns': return terminal.dns ? `${terminal.dns}:${terminal.porta || 5005}` : null;
+      case 'p2s': return terminal.ip_local ? `VPN: ${terminal.ip_local}` : null;
+      case 'api': return terminal.api_endpoint || null;
+      default: return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-3 sm:p-6">
       <div className="max-w-[1920px] mx-auto space-y-6">
@@ -396,13 +407,11 @@ export default function Terminais() {
                     <CardContent className="space-y-3">
                       <div className="flex items-center gap-2 text-sm">
                         <TipoIcon className="h-4 w-4 text-slate-400" />
-                        <span className="text-slate-600">{getTipoLabel(terminal.tipo_conexao)}</span>
-                        <span className="text-slate-400">•</span>
-                        <span className="text-slate-600 font-mono text-xs">:{terminal.porta || 5005}</span>
+                        <span className="text-slate-600 font-medium">{getTipoLabel(terminal.tipo_conexao)}</span>
                       </div>
-                      {terminal.cliente_nome && (
-                        <div className="text-sm text-slate-600">
-                          <span className="text-slate-500">Cliente:</span> {terminal.cliente_nome}
+                      {getConexaoEndereco(terminal) && (
+                        <div className="text-sm text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded truncate">
+                          {getConexaoEndereco(terminal)}
                         </div>
                       )}
                       {terminal.latencia_ms && (
@@ -493,10 +502,6 @@ export default function Terminais() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Cliente / Referência</Label>
-              <Input value={formData.cliente_nome || ''} onChange={(e) => setFormData({...formData, cliente_nome: e.target.value})} placeholder="Nome do cliente ou referência (opcional)" />
-            </div>
 
             <div className="space-y-2">
               <Label>Utilizador do Sistema</Label>
