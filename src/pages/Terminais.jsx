@@ -50,6 +50,7 @@ import StatusBadge from '../components/dashboard/StatusBadge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
+import { User as UserIcon } from 'lucide-react';
 
 export default function Terminais() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -354,7 +355,10 @@ export default function Terminais() {
                           </CardTitle>
                           <p className="text-sm text-slate-500 mt-1">{terminal.local}</p>
                           {terminal.created_by && (
-                            <p className="text-xs text-slate-400 mt-0.5">{terminal.created_by}</p>
+                            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                              <UserIcon className="h-3 w-3 shrink-0" />
+                              {terminal.created_by}
+                            </p>
                           )}
                         </div>
                         <StatusBadge status={terminal.status} pulse={false} />

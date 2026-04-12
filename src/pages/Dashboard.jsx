@@ -311,14 +311,22 @@ export default function Dashboard() {
               placeholder="Todos os clientes"
             />
             {canSeeAll && (
-              <FilterDropdown
-                label="Filtrar por Utilizador"
-                icon={User}
-                value={userFilter}
-                onChange={setUserFilter}
-                options={usuarios}
-                placeholder="Todos os utilizadores"
-              />
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" />
+                  Filtrar por Utilizador
+                </label>
+                <select
+                  value={userFilter || ''}
+                  onChange={e => setUserFilter(e.target.value || null)}
+                  className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 w-full"
+                >
+                  <option value="">Todos os utilizadores</option>
+                  {usuarios.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
+                </select>
+              </div>
             )}
             <FilterDropdown
               label="Status"
