@@ -36,7 +36,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
+
 import TelegramConfig from '../components/configuracoes/TelegramConfig';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
@@ -357,63 +357,6 @@ export default function Configuracoes() {
                 </div>
               </div>
 
-              {/* Instalação */}
-              <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                  <Terminal className="h-4 w-4" /> Instalação Passo a Passo
-                </p>
-                <div className="space-y-3 text-sm">
-
-                  <div className="flex gap-3 items-start">
-                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-700">Baixe o NSSM (gerenciador de serviços Windows)</p>
-                      <a href="https://nssm.cc/download" target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs">nssm.cc/download</a>
-                      <p className="text-xs text-slate-500 mt-1">Extraia e copie <code className="bg-slate-100 px-1 rounded">nssm.exe</code> para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\</code></p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 items-start">
-                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-700">Coloque os arquivos do agente em <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\</code></p>
-                      <p className="text-xs text-slate-500 mt-1">Copie o código fonte abaixo para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\core_agent.py</code></p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 items-start">
-                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-700">Configure as credenciais (CMD como Administrador):</p>
-                      <p className="text-xs text-slate-500 mt-1">O agente lê as credenciais do ficheiro <code className="bg-slate-100 px-1 rounded">C:\ProgramData\Base44Agent\config.json</code>. Crie-o com o conteúdo:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto max-w-full break-words whitespace-pre-wrap">{`{\n  "API_KEY": "SUA_API_KEY",\n  "APP_ID": "${APP_ID}"\n}`}</pre>
-                      <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                        Substitua <strong>SUA_API_KEY</strong> pela sua API Key pessoal gerada na secção "Credenciais do Agente" acima.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 items-start">
-                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">4</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-700">Instale como serviço Windows com NSSM:</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto max-w-full whitespace-pre-wrap break-words">{`nssm install Base44Agent python "C:\\Program Files\\Base44Agent\\core_agent.py"\nnssm set Base44Agent AppParameters "--interval 30"\nnssm set Base44Agent AppDirectory "C:\\Program Files\\Base44Agent"\nnssm start Base44Agent`}</pre>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 items-start">
-                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">5</span>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-700">Teste rápido (sem instalar serviço):</p>
-                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto break-words whitespace-pre-wrap">{`cd "C:\\Program Files\\Base44Agent"\npython core_agent.py --once`}</pre>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* Código fonte do agente */}
-              <AgentSourceCode />
 
             </CardContent>
           </Card>

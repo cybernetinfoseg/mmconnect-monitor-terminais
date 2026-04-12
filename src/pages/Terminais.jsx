@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Monitor, 
@@ -182,6 +183,22 @@ export default function Terminais() {
   });
 
   const [selectedTerminal, setSelectedTerminal] = useState(null);
+  const [newLocalInput, setNewLocalInput] = useState('');
+  const [showNewLocalInput, setShowNewLocalInput] = useState(false);
+
+  const { data: locaisDB = [], refetch: refetchLocais } = useQuery({
+    queryKey: ['locais'],
+    queryFn: () => base44.entities.Local.list('nome'),
+  });
+
+  const handleCreateLocal = async () => {
+    if (!newLocalInput.trim()) return;
+    await base44.entities.Local.create({ nome: newLocalInput.trim(), ativo: true });
+    setFormData(prev => ({ ...prev, local: newLocalInput.trim() }));
+    setNewLocalInput('');
+    setShowNewLocalInput(false);
+    refetchLocais();
+  };
 
   const [verificandoTodos, setVerificandoTodos] = useState(false);
   const verificarTodos = async () => {
@@ -475,7 +492,33 @@ export default function Terminais() {
               </div>
               <div className="space-y-2">
                 <Label>Local *</Label>
-                <Input value={formData.local || ''} onChange={(e) => setFormData({...formData, local: e.target.value})} placeholder="Matriz - Recepção" />
+                <div className="flex gap-2">
+                  <select
+                    value={formData.local || ''}
+                    onChange={(e) => setFormData({...formData, local: e.target.value})}
+                    className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Selecionar local...</option>
+                    {locaisDB.filter(l => l.ativo).map(l => (
+                      <option key={l.id} value={l.nome}>{l.nome}</option>
+                    ))}
+                  </select>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowNewLocalInput(v => !v)} title="Novo local">
+                    <MapPin className="h-4 w-4" />
+                  </Button>
+                </div>
+                {showNewLocalInput && (
+                  <div className="flex gap-2">
+                    <Input
+                      value={newLocalInput}
+                      onChange={e => setNewLocalInput(e.target.value)}
+                      placeholder="Nome do novo local..."
+                      onKeyDown={e => e.key === 'Enter' && handleCreateLocal()}
+                      autoFocus
+                    />
+                    <Button type="button" size="sm" onClick={handleCreateLocal} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">Criar</Button>
+                  </div>
+                )}
               </div>
             </div>
 
