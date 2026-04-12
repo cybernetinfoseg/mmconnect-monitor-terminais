@@ -25,7 +25,6 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
     gatilho: 'terminal_offline',
     condicao_valor: '',
     filtro_local: '',
-    filtro_cliente: '',
     canal: 'email',
     destinatarios_email: '',
     slack_webhook_url: '',
@@ -40,7 +39,6 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
         gatilho: rule.gatilho || 'terminal_offline',
         condicao_valor: rule.condicao_valor || '',
         filtro_local: rule.filtro_local || '',
-        filtro_cliente: rule.filtro_cliente || '',
         canal: rule.canal || 'email',
         destinatarios_email: rule.destinatarios_email || '',
         slack_webhook_url: rule.slack_webhook_url || '',
@@ -55,7 +53,6 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
   });
 
   const locais = [...new Set(terminals.map(t => t.local).filter(Boolean))].sort();
-  const clientes = [...new Set(terminals.map(t => t.cliente_nome || t.cliente).filter(Boolean))].sort();
 
   const needsValue = form.gatilho === 'sem_ping_minutos' || form.gatilho === 'multiplos_offline';
   const needsEmail = form.canal === 'email' || form.canal === 'ambos';
@@ -152,7 +149,7 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
           )}
 
           {/* Filtros */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
               <Label>Filtrar por local</Label>
               <Select value={form.filtro_local || 'todos'} onValueChange={v => set('filtro_local', v === 'todos' ? '' : v)}>
@@ -160,16 +157,6 @@ export default function AlertRuleModal({ rule, onClose, onSaved }) {
                 <SelectContent>
                   <SelectItem value="todos">Todos os locais</SelectItem>
                   {locais.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Filtrar por cliente</Label>
-              <Select value={form.filtro_cliente || 'todos'} onValueChange={v => set('filtro_cliente', v === 'todos' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="Todos os clientes" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os clientes</SelectItem>
-                  {clientes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
