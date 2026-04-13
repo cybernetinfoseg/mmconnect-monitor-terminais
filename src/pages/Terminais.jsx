@@ -190,6 +190,12 @@ export default function Terminais() {
     enabled: !!currentUser,
   });
 
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users-for-assign'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: !!currentUser && isAdmin,
+  });
+
 
 
   const [verificandoTodos, setVerificandoTodos] = useState(false);
@@ -234,7 +240,7 @@ export default function Terminais() {
       return;
     }
     setEditingTerminal(null);
-    setFormData({ tipo_conexao: 'ip_local', porta: 5005, ativo: true });
+    setFormData({ tipo_conexao: 'ip_local', porta: 5005, ativo: true, usuario_email: currentUser?.email });
     setDialogOpen(true);
   };
 
@@ -505,11 +511,28 @@ export default function Terminais() {
 
             <div className="space-y-2">
               <Label>Utilizador do Sistema</Label>
-              <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-slate-50 text-sm text-slate-600">
-                <UserIcon className="h-4 w-4 text-slate-400 shrink-0" />
-                {currentUser?.email || '—'}
-              </div>
-              <p className="text-xs text-slate-400">Preenchido automaticamente — identifica o responsável pelo terminal</p>
+              {isAdmin ? (
+                <Select
+                  value={formData.usuario_email || currentUser?.email || ''}
+                  onValueChange={(v) => setFormData(f => ({ ...f, usuario_email: v }))}
+                >
+                  <SelectTrigger>
+                    <UserIcon className="h-4 w-4 text-slate-400 shrink-0 mr-2" />
+                    <SelectValue placeholder="Selecionar utilizador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allUsers.map(u => (
+                      <SelectItem key={u.id} value={u.email}>{u.full_name ? `${u.full_name} (${u.email})` : u.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-slate-50 text-sm text-slate-600">
+                  <UserIcon className="h-4 w-4 text-slate-400 shrink-0" />
+                  {currentUser?.email || '—'}
+                </div>
+              )}
+              <p className="text-xs text-slate-400">{isAdmin ? 'Selecione o utilizador responsável pelo terminal' : 'Preenchido automaticamente — identifica o responsável pelo terminal'}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
