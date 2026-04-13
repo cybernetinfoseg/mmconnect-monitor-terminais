@@ -1,120 +1,152 @@
 import React, { useState } from 'react';
-import { Copy, Check, Code2 } from 'lucide-react';
+import { Copy, Check, Code2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const AGENT_CODE = `# core_agent.py — Agente Local NOC Monitor
 # Instalacao: C:\\Program Files\\Base44Agent\\core_agent.py
-# Config:     C:\\ProgramData\\Base44Agent\\config.json
+# Config:     C:\\ProgramData\\Base44Agent\\config.json  (veja exemplo abaixo)
 # Logs:       C:\\ProgramData\\Base44Agent\\agent.log
 #
+# config.json exemplo:
+# {
+#   "API_KEY": "a_sua_api_key_pessoal",
+#   "APP_ID":  "697aa46c9998c30665e2e19a"
+# }
+#
 # MODO P2S:
-#   O agente expoe um servidor HTTP local (porta 9444) que recebe eventos
-#   do SmartTerm quando terminais P2S conectam/desconectam.
+#   O agente expoe um servidor HTTP local na porta 9444.
 #   O SmartTerm deve fazer POST para http://127.0.0.1:9444/p2s com:
-#     { "terminal_id": "<id>", "event": "connected" | "disconnected" }
-#   O agente mantem o estado e reporta ao NOC Monitor.
-#   Tambem monitoriza a porta TCP P2S para saber se o servidor SDK esta activo.
+#     { "terminal_id": "<id_base44>", "event": "connected" | "disconnected" }
+#   O agente mantem o estado em memoria e reporta ao NOC Monitor a cada ciclo.
+#   Tambem pode verificar se o servidor SDK esta activo na porta configurada.
+#
+# INICIAR COMO SERVICO WINDOWS (NSSM):
+#   nssm install Base44Agent "C:\\Python311\\python.exe" "C:\\Program Files\\Base44Agent\\core_agent.py"
+#   nssm set Base44Agent AppDirectory "C:\\Program Files\\Base44Agent"
+#   nssm start Base44Agent
+
 import os, sys, json, time, socket, logging, threading
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 
-PROGRAMDATA = os.environ.get("PROGRAMDATA", r"C:\\\\ProgramData")
-APP_DIR     = os.path.join(PROGRAMDATA, "Base44Agent")
-CONFIG_FILE = os.path.join(APP_DIR, "config.json")
-LOG_FILE    = os.path.join(APP_DIR, "agent.log")
-LOCK_FILE   = os.path.join(APP_DIR, "agent.lock")
-P2S_STATUS_FILE = os.path.join(APP_DIR, "p2s_status.json")
+# ──────────────────────────────────────────────────────────────
+# Paths e Constantes
+# ──────────────────────────────────────────────────────────────
+PROGRAMDATA = os.environ.get("PROGRAMDATA", r"C:\\ProgramData")
+APP_DIR      = os.path.join(PROGRAMDATA, "Base44Agent")
+CONFIG_FILE  = os.path.join(APP_DIR, "config.json")
+LOG_FILE     = os.path.join(APP_DIR, "agent.log")
+LOCK_FILE    = os.path.join(APP_DIR, "agent.lock")
 
-DEFAULT_INTERVAL = 30
-TIMEOUT          = 3
-UPDATE_EVERY     = timedelta(hours=6)
-P2S_TIMEOUT_SECS = 120  # terminal P2S considerado offline se sem ping ha mais de 2 min
-P2S_HTTP_PORT    = 9444  # porta do servidor HTTP local para eventos P2S
+DEFAULT_INTERVAL = 30       # segundos entre ciclos
+TIMEOUT          = 3        # timeout TCP/HTTP por terminal
+P2S_TIMEOUT_SECS = 120      # terminal P2S -> offline se sem evento ha mais de 2 min
+P2S_HTTP_PORT    = 9444     # porta do servidor HTTP local para eventos P2S
 
-logger = logging.getLogger("base44agent")
+BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
-# Estado global P2S: { terminal_id: { "last_seen": timestamp, "event": "connected"|"disconnected" } }
-p2s_state = {}
+logger   = logging.getLogger("base44agent")
+p2s_state = {}   # { terminal_id: { "last_seen": float, "event": str } }
 p2s_lock  = threading.Lock()
 
 
+# ──────────────────────────────────────────────────────────────
+# Logging
+# ──────────────────────────────────────────────────────────────
 def setup_logging(level=logging.INFO):
     os.makedirs(APP_DIR, exist_ok=True)
-    h = RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    h   = RotatingFileHandler(LOG_FILE, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
     fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S")
     logger.handlers.clear()
-    h.setFormatter(fmt); logger.addHandler(h); logger.setLevel(level)
+    h.setFormatter(fmt)
+    logger.addHandler(h)
+    logger.setLevel(level)
     if sys.stdout.isatty() or sys.stderr.isatty():
-        sh = logging.StreamHandler(); sh.setFormatter(fmt); sh.setLevel(level)
+        sh = logging.StreamHandler()
+        sh.setFormatter(fmt)
         logger.addHandler(sh)
 
 
+# ──────────────────────────────────────────────────────────────
+# Instancia unica (evitar dupla execucao)
+# ──────────────────────────────────────────────────────────────
 class SingleInstance:
-    def __init__(self, path): self.path = path; self.fp = None
+    def __init__(self, path):
+        self.path = path
+        self.fp   = None
+
     def acquire(self):
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         self.fp = open(self.path, "a+")
         try:
             import msvcrt
             msvcrt.locking(self.fp.fileno(), msvcrt.LK_NBLCK, 1)
-            self.fp.seek(0); self.fp.truncate(); self.fp.write(str(os.getpid())); self.fp.flush()
+            self.fp.seek(0); self.fp.truncate()
+            self.fp.write(str(os.getpid())); self.fp.flush()
             return True
         except Exception:
             if self.fp: self.fp.close(); self.fp = None
             return False
+
     def release(self):
         try:
             if self.fp:
-                try:
-                    import msvcrt
-                    self.fp.seek(0); self.fp.truncate()
-                    msvcrt.locking(self.fp.fileno(), msvcrt.LK_UNLCK, 1)
-                finally: self.fp.close()
-        except Exception: pass
+                import msvcrt
+                self.fp.seek(0); self.fp.truncate()
+                msvcrt.locking(self.fp.fileno(), msvcrt.LK_UNLCK, 1)
+                self.fp.close()
+        except Exception:
+            pass
 
 
+# ──────────────────────────────────────────────────────────────
+# Configuracao
+# ──────────────────────────────────────────────────────────────
 def load_config():
+    """Carrega config de variaveis de ambiente ou config.json."""
     api_key = os.environ.get("BASE44_API_KEY", "").strip()
     app_id  = os.environ.get("BASE44_APP_ID",  "").strip()
     if api_key and app_id and len(api_key) >= 16:
         return {"API_KEY": api_key, "APP_ID": app_id}
+
     if os.path.exists(CONFIG_FILE):
         try:
-            cfg = json.loads(open(CONFIG_FILE, encoding="utf-8").read())
-            key = (cfg.get("API_KEY") or "").strip()
-            aid = (cfg.get("APP_ID")  or "").strip()
-            if key and aid and len(key) >= 16:
-                return {"API_KEY": key, "APP_ID": aid}
-            if aid and not key:
-                logger.error("SEGURANCA: API_KEY esta vazia no config.json — agente bloqueado.")
-            elif key and len(key) < 16:
-                logger.error("SEGURANCA: API_KEY demasiado curta — agente bloqueado.")
+            cfg     = json.load(open(CONFIG_FILE, encoding="utf-8"))
+            api_key = (cfg.get("API_KEY") or "").strip()
+            app_id  = (cfg.get("APP_ID")  or "").strip()
+            if api_key and app_id and len(api_key) >= 16:
+                return {"API_KEY": api_key, "APP_ID": app_id}
+            logger.error("config.json invalido: API_KEY ou APP_ID ausentes/curtos.")
         except Exception as e:
             logger.error(f"Falha ao ler config.json: {e}")
     return None
 
 
-def _headers(api_key: str) -> dict:
+# ──────────────────────────────────────────────────────────────
+# API Helpers
+# ──────────────────────────────────────────────────────────────
+def _headers(api_key):
     return {"X-Api-Key": api_key, "Content-Type": "application/json"}
 
 
-def listar_terminais(session, app_id: str, api_key: str) -> list:
-    url = f"https://app.base44.app/api/apps/{app_id}/functions/agentGetTerminals"
-    r = session.post(url, headers=_headers(api_key), json={"api_key": api_key}, timeout=10)
+def listar_terminais(session, app_id, api_key):
+    """Busca terminais do utilizador via agentGetTerminals."""
+    url = f"{BASE_URL.format(app_id=app_id)}/agentGetTerminals"
+    r   = session.post(url, headers=_headers(api_key), json={}, timeout=10)
     r.raise_for_status()
     data = r.json()
     if not data.get("success"):
-        raise ValueError(f"agentGetTerminals: {data}")
+        raise ValueError(f"agentGetTerminals erro: {data}")
     return data.get("terminals", [])
 
 
-def reportar_terminal(session, app_id: str, api_key: str,
-                      terminal_id: str, status: str, latencia_ms,
-                      segundos_sem_ping: int = 0):
-    url = f"https://app.base44.app/api/apps/{app_id}/functions/agentReport"
+def reportar_terminal(session, app_id, api_key, terminal_id,
+                      status, latencia_ms, segundos_sem_ping=0):
+    """Reporta status de um terminal via agentReport."""
+    url     = f"{BASE_URL.format(app_id=app_id)}/agentReport"
     payload = {
         "terminal_id":       terminal_id,
         "status":            status,
@@ -126,47 +158,42 @@ def reportar_terminal(session, app_id: str, api_key: str,
     return r.json()
 
 
-def testar_http(session, host, porta):
-    t = time.time()
-    try:
-        session.get(f"http://{host}:{porta}", timeout=TIMEOUT)
-        return True, int((time.time()-t)*1000)
-    except Exception: return False, None
-
-
+# ──────────────────────────────────────────────────────────────
+# Testes de Conectividade
+# ──────────────────────────────────────────────────────────────
 def testar_tcp(host, porta):
     t = time.time()
     try:
         with socket.create_connection((host, int(porta)), timeout=TIMEOUT):
-            return True, int((time.time()-t)*1000)
-    except Exception: return False, None
+            return True, int((time.time() - t) * 1000)
+    except Exception:
+        return False, None
+
+
+def testar_http(session, host, porta):
+    t = time.time()
+    try:
+        r = session.get(f"http://{host}:{porta}", timeout=TIMEOUT)
+        return True, int((time.time() - t) * 1000)
+    except Exception:
+        return False, None
 
 
 def testar_api_endpoint(session, url):
     t = time.time()
     try:
         r = session.get(url, timeout=TIMEOUT)
-        return r.status_code < 500, int((time.time()-t)*1000)
-    except Exception: return False, None
-
-
-def testar_p2s_porta(porta):
-    """Verifica se o servidor SDK P2S esta activo na porta local."""
-    t = time.time()
-    try:
-        with socket.create_connection(("127.0.0.1", int(porta)), timeout=TIMEOUT):
-            return True, int((time.time()-t)*1000)
-    except ConnectionRefusedError:
-        return False, None
+        return r.status_code < 500, int((time.time() - t) * 1000)
     except Exception:
         return False, None
 
 
-def verificar_p2s_terminal(terminal_id: str, porta: int):
+def verificar_p2s_terminal(terminal_id, porta):
     """
-    Estado P2S do terminal:
-    1. Se o SmartTerm enviou evento via HTTP -> usa esse estado
-    2. Senao verifica se o servidor SDK esta activo na porta
+    Determina status P2S:
+    1. Se SmartTerm enviou evento recente -> usa esse estado
+    2. Fallback: verifica se o servidor SDK esta activo na porta local
+    Retorna (online: bool, latencia_ms: int|None, segundos_sem_ping: int)
     """
     agora = time.time()
     with p2s_lock:
@@ -176,23 +203,22 @@ def verificar_p2s_terminal(terminal_id: str, porta: int):
         last_seen = estado.get("last_seen", 0)
         event     = estado.get("event", "disconnected")
         segundos  = int(agora - last_seen)
-
         if event == "connected" and segundos <= P2S_TIMEOUT_SECS:
             return True, None, segundos
         else:
             return False, None, segundos
 
-    # Fallback: verificar se o servidor SDK esta a escuta na porta
-    activo, latencia = testar_p2s_porta(porta)
+    # Fallback: porta local do servidor P2S (SmartTerm SDK)
+    activo, latencia = testar_tcp("127.0.0.1", porta)
     return activo, latencia, 0
 
 
-# ──────────────────────────────────────────────────────────────────
-#  Servidor HTTP local para receber eventos P2S do SmartTerm
-# ──────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────
+# Servidor HTTP Local — Recebe eventos P2S do SmartTerm
+# ──────────────────────────────────────────────────────────────
 class P2SEventHandler(BaseHTTPRequestHandler):
-    def log_message(self, format, *args):
-        pass  # silenciar logs HTTP padrao
+    def log_message(self, fmt, *args):
+        pass  # silenciar logs HTTP internos
 
     def do_POST(self):
         if self.path != "/p2s":
@@ -201,18 +227,22 @@ class P2SEventHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body   = json.loads(self.rfile.read(length))
             tid    = body.get("terminal_id", "").strip()
-            event  = body.get("event", "").strip()  # "connected" ou "disconnected"
+            event  = body.get("event", "").strip()
+
             if not tid or event not in ("connected", "disconnected"):
                 self.send_response(400); self.end_headers()
-                self.wfile.write(b\'\'{"error": "terminal_id e event sao obrigatorios"}\'\'\')
+                self.wfile.write(b'{"error": "terminal_id e event sao obrigatorios"}')
                 return
+
             with p2s_lock:
                 p2s_state[tid] = {"last_seen": time.time(), "event": event}
-            logger.info(f"P2S evento: terminal={tid} event={event}")
+
+            logger.info(f"[P2S] Evento recebido: terminal={tid} event={event}")
             self.send_response(200); self.end_headers()
             self.wfile.write(json.dumps({"ok": True}).encode())
+
         except Exception as e:
-            logger.error(f"Erro no servidor P2S HTTP: {e}")
+            logger.error(f"[P2S] Erro ao processar evento: {e}")
             self.send_response(500); self.end_headers()
 
     def do_GET(self):
@@ -228,35 +258,100 @@ class P2SEventHandler(BaseHTTPRequestHandler):
 
 
 def start_p2s_http_server():
-    """Inicia o servidor HTTP P2S em thread separada."""
     try:
         server = HTTPServer(("127.0.0.1", P2S_HTTP_PORT), P2SEventHandler)
-        logger.info(f"Servidor HTTP P2S activo em http://127.0.0.1:{P2S_HTTP_PORT}/p2s")
-        t = threading.Thread(target=server.serve_forever, daemon=True)
-        t.start()
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        logger.info(f"[P2S] Servidor HTTP activo em http://127.0.0.1:{P2S_HTTP_PORT}/p2s")
         return server
     except OSError as e:
-        logger.warning(f"Nao foi possivel iniciar servidor P2S HTTP na porta {P2S_HTTP_PORT}: {e}")
+        logger.warning(f"[P2S] Falha ao iniciar servidor HTTP na porta {P2S_HTTP_PORT}: {e}")
         return None
 
 
-def escolher_host(t):
-    return t.get("ip_local") or t.get("ip_publico") or t.get("dns")
+# ──────────────────────────────────────────────────────────────
+# Loop Principal
+# ──────────────────────────────────────────────────────────────
+def ciclo_monitoramento(session, app_id, api_key):
+    """Executa um ciclo completo: busca terminais, testa cada um, reporta."""
+    try:
+        terminais = listar_terminais(session, app_id, api_key)
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "?"
+        if code in (401, 403):
+            logger.error(f"Autenticacao falhada ({code}): verifique a API_KEY no config.json.")
+        else:
+            logger.error(f"Erro ao listar terminais (HTTP {code}): {e}")
+        return
+    except Exception as e:
+        logger.error(f"Erro ao listar terminais: {e}")
+        return
+
+    logger.info(f"Ciclo iniciado — {len(terminais)} terminal(is) a monitorizar")
+
+    for t in terminais:
+        if not t.get("ativo", True):
+            continue
+
+        tid  = t["id"]
+        nome = t.get("nome", tid)
+        tipo = t.get("tipo_conexao", "ip_local")
+        porta_raw = t.get("porta") or 5005
+
+        try:
+            if tipo == "p2s":
+                porta = int(porta_raw)
+                online, latencia, seg_sem_ping = verificar_p2s_terminal(tid, porta)
+                status = "online" if online else "offline"
+                logger.info(
+                    f"[P2S] {nome} porta={porta} -> {status.upper()} | sem_ping={seg_sem_ping}s"
+                )
+
+            elif tipo == "api":
+                endpoint = t.get("api_endpoint", "")
+                if not endpoint:
+                    logger.debug(f"{nome}: api_endpoint vazio, ignorado.")
+                    continue
+                online, latencia = testar_api_endpoint(session, endpoint)
+                seg_sem_ping = 0
+                status = "online" if online else "offline"
+                logger.info(f"{nome} (api) -> {status.upper()} | latencia={latencia}ms")
+
+            else:
+                # ip_local, ip_publico, dns
+                host = t.get("ip_local") or t.get("ip_publico") or t.get("dns")
+                if not host:
+                    logger.debug(f"{nome}: sem host configurado, ignorado.")
+                    continue
+                porta = int(porta_raw)
+                online, latencia = testar_http(session, host, porta)
+                if not online:
+                    online, latencia = testar_tcp(host, porta)
+                seg_sem_ping = 0 if online else TIMEOUT
+                status = "online" if online else "offline"
+                logger.info(f"{nome} ({host}:{porta}) -> {status.upper()} | latencia={latencia}ms")
+
+            reportar_terminal(session, app_id, api_key,
+                              terminal_id=tid,
+                              status=status,
+                              latencia_ms=latencia,
+                              segundos_sem_ping=seg_sem_ping)
+
+        except requests.HTTPError as e:
+            code = e.response.status_code if e.response is not None else "?"
+            logger.error(f"Erro ao reportar {nome} (HTTP {code})")
+        except Exception as e:
+            logger.error(f"Erro no terminal {nome}: {e}")
 
 
-def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
-              stop_event=None, check_update_safe=None):
+def run_agent(intervalo=DEFAULT_INTERVAL, once=False, stop_event=None):
     os.makedirs(APP_DIR, exist_ok=True)
     lock = SingleInstance(LOCK_FILE)
     if not lock.acquire():
         logger.error("Outra instancia ja esta em execucao. Encerrando.")
         return 2
 
-    # Iniciar servidor HTTP P2S
     start_p2s_http_server()
-
     session = requests.Session()
-    last_update_check = datetime.min.replace(tzinfo=timezone.utc)
 
     try:
         while True:
@@ -265,116 +360,45 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
 
             config = load_config()
             if not config:
-                logger.warning("Configuracao ausente. Aguardando...")
+                logger.warning("config.json ausente ou invalido. A aguardar 10s...")
                 for _ in range(10):
                     if stop_event and stop_event.is_set(): return 0
                     time.sleep(1)
                 if once: break
                 continue
 
-            api_key = config["API_KEY"]
-            app_id  = config["APP_ID"]
+            ciclo_monitoramento(session, config["APP_ID"], config["API_KEY"])
 
-            agora = datetime.now(timezone.utc)
-            if enable_update and check_update_safe and (agora - last_update_check) >= UPDATE_EVERY:
-                try:
-                    if check_update_safe(): return 0
-                except Exception as e: logger.error(f"Erro update: {e}")
-                finally: last_update_check = agora
+            if once:
+                break
 
-            try:
-                terminais = listar_terminais(session, app_id, api_key)
-            except requests.HTTPError as e:
-                code = e.response.status_code if e.response is not None else "?"
-                if code in (401, 403):
-                    logger.error(f"Auth falhada ({code}): verifique a sua API_KEY pessoal.")
-                else:
-                    logger.error(f"Falha ao listar terminais (HTTP {code}): {e}")
-                for _ in range(intervalo):
-                    if stop_event and stop_event.is_set(): return 0
-                    time.sleep(1)
-                if once: break
-                continue
-            except Exception as e:
-                logger.error(f"Falha ao listar terminais: {e}")
-                for _ in range(intervalo):
-                    if stop_event and stop_event.is_set(): return 0
-                    time.sleep(1)
-                if once: break
-                continue
-
-            t0_ciclo = time.time()
-            for t in terminais:
-                if stop_event and stop_event.is_set(): return 0
-                try:
-                    if not t.get("ativo", True): continue
-
-                    tipo         = t.get("tipo_conexao", "ip_local")
-                    api_endpoint = t.get("api_endpoint")
-
-                    if tipo == "api" and api_endpoint:
-                        sucesso, latencia = testar_api_endpoint(session, api_endpoint)
-                        segundos_sem_ping = 0
-                        host_desc = api_endpoint
-
-                    elif tipo == "p2s":
-                        porta = int(t.get("porta") or 5005)
-                        sucesso, latencia, segundos_sem_ping = verificar_p2s_terminal(t["id"], porta)
-                        host_desc = f"P2S porta={porta}"
-                        logger.info(
-                            f"[P2S] {t.get('nome', t.get('id'))} porta={porta} "
-                            f"-> {'ONLINE' if sucesso else 'OFFLINE'} | sem_ping={segundos_sem_ping}s"
-                        )
-
-                    else:
-                        host = escolher_host(t)
-                        if not host:
-                            logger.debug(f"Terminal {t.get('id')} sem host. Pulando.")
-                            continue
-                        porta = t.get("porta") or 80
-                        sucesso, latencia = testar_http(session, host, porta)
-                        if not sucesso:
-                            sucesso, latencia = testar_tcp(host, porta)
-                        segundos_sem_ping = int(time.time() - t0_ciclo) if not sucesso else 0
-                        host_desc = f"{host}:{porta}"
-
-                    status = "online" if sucesso else "offline"
-                    reportar_terminal(session, app_id, api_key,
-                                      terminal_id=t["id"],
-                                      status=status,
-                                      latencia_ms=latencia,
-                                      segundos_sem_ping=segundos_sem_ping)
-                    if tipo != "p2s":
-                        logger.info(
-                            f"Testando {t.get('nome', t.get('id'))} ({host_desc})"
-                            f" -> {status} | latencia={latencia} ms"
-                        )
-                except requests.HTTPError as e:
-                    code = e.response.status_code if e.response is not None else "?"
-                    logger.error(f"Erro ao reportar terminal {t.get('id')} (HTTP {code}): verifique a sua API_KEY.")
-                except Exception as e:
-                    logger.error(f"Erro terminal {t.get('id')}: {e}")
-
+            # Aguardar intervalo com suporte a stop_event
             for _ in range(intervalo):
                 if stop_event and stop_event.is_set(): return 0
                 time.sleep(1)
-            if once: break
+
         return 0
     finally:
         lock.release()
 
 
+# ──────────────────────────────────────────────────────────────
+# Entry Point
+# ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="NOC Monitor — Agente Local")
-    parser.add_argument("--interval", type=int, default=DEFAULT_INTERVAL, help="Intervalo em segundos (default: 30)")
-    parser.add_argument("--once", action="store_true", help="Executar apenas um ciclo e sair")
-    parser.add_argument("--debug", action="store_true", help="Ativar logging detalhado")
+    parser = argparse.ArgumentParser(description="NOC Monitor - Agente Local")
+    parser.add_argument("--interval", type=int, default=DEFAULT_INTERVAL,
+                        help="Intervalo em segundos entre ciclos (default: 30)")
+    parser.add_argument("--once",  action="store_true",
+                        help="Executar apenas um ciclo e sair")
+    parser.add_argument("--debug", action="store_true",
+                        help="Ativar logging detalhado (DEBUG)")
     args = parser.parse_args()
 
     setup_logging(logging.DEBUG if args.debug else logging.INFO)
-    logger.info(f"Agente iniciado | intervalo={args.interval}s | once={args.once}")
-    sys.exit(run_agent(intervalo=args.interval, enable_update=False, once=args.once))
+    logger.info(f"Agente iniciado | intervalo={args.interval}s | once={args.once} | debug={args.debug}")
+    sys.exit(run_agent(intervalo=args.interval, once=args.once))
 `;
 
 export default function AgentSourceCode() {
@@ -384,18 +408,34 @@ export default function AgentSourceCode() {
   const handleCopy = () => {
     navigator.clipboard.writeText(AGENT_CODE);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    toast.success('Código copiado!');
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([AGENT_CODE], { type: 'text/plain' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'core_agent.py';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('core_agent.py descarregado!');
   };
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <Code2 className="h-4 w-4" /> Código fonte — core_agent.py
         </p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => setExpanded(v => !v)}>
             {expanded ? 'Ocultar' : 'Ver código'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+            Download
           </Button>
           <Button variant="outline" size="sm" onClick={handleCopy}>
             {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
@@ -404,15 +444,15 @@ export default function AgentSourceCode() {
         </div>
       </div>
 
-      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
-        <strong>Segurança:</strong> Este agente autentica-se exclusivamente pela <code className="bg-emerald-100 px-1 rounded">X-Api-Key</code> pessoal.
-        Qualquer pedido sem ela ou com key inválida é rejeitado com <strong>401</strong>.
-        O servidor isola automaticamente os terminais de cada utilizador.
+      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 space-y-1">
+        <p><strong>Suporte a tipos de conexão:</strong> ip_local · ip_publico · dns · p2s · api</p>
+        <p><strong>P2S:</strong> servidor HTTP na porta 9444 recebe eventos do SmartTerm em tempo real.</p>
+        <p><strong>Segurança:</strong> autentica via <code className="bg-emerald-100 px-1 rounded font-mono">X-Api-Key</code> pessoal — cada agente acede apenas aos seus terminais.</p>
       </div>
 
       {expanded && (
         <div className="relative">
-          <pre className="bg-slate-900 text-emerald-400 p-4 rounded-lg text-xs overflow-x-auto max-h-96 overflow-y-auto font-mono leading-relaxed">
+          <pre className="bg-slate-900 text-emerald-400 p-4 rounded-lg text-xs overflow-x-auto max-h-[500px] overflow-y-auto font-mono leading-relaxed whitespace-pre">
             {AGENT_CODE}
           </pre>
         </div>
