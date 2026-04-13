@@ -18,7 +18,9 @@ import {
   EyeOff,
   CheckCircle,
   XCircle,
-  Plug
+  Plug,
+  Radio,
+  Code
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -358,6 +360,75 @@ export default function Configuracoes() {
               </div>
 
 
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* P2S Integration Guide */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Radio className="h-5 w-5 text-purple-600" />
+                Integração P2S (Push to Server)
+              </CardTitle>
+              <CardDescription>
+                Como integrar o SmartTerm para reportar eventos de terminais P2S ao agente local.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg text-sm text-purple-800 space-y-2">
+                <p className="font-semibold">📡 Como funciona</p>
+                <ul className="list-disc list-inside space-y-1 text-xs leading-relaxed">
+                  <li>O agente expõe um servidor HTTP local na porta <code className="bg-purple-100 px-1 rounded font-mono">9444</code></li>
+                  <li>O SmartTerm (C#) faz POST para <code className="bg-purple-100 px-1 rounded font-mono">http://127.0.0.1:9444/p2s</code> quando um terminal conecta ou desconecta</li>
+                  <li>O agente mantém o estado e reporta ao NOC Monitor a cada ciclo</li>
+                  <li>Se não houver evento há mais de 2 minutos, o terminal é marcado como offline</li>
+                </ul>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <Code className="h-4 w-4" /> Chamada HTTP no SmartTerm (C#)
+                </p>
+                <pre className="bg-slate-900 text-emerald-400 p-3 rounded-lg text-xs overflow-x-auto font-mono leading-relaxed">{`// Quando o terminal P2S conecta:
+await PostP2SEvent(terminalId, "connected");
+
+// Quando o terminal P2S desconecta:
+await PostP2SEvent(terminalId, "disconnected");
+
+// Metodo auxiliar:
+private async Task PostP2SEvent(string terminalId, string eventType)
+{
+    using var client = new HttpClient();
+    var payload = JsonSerializer.Serialize(new {
+        terminal_id = terminalId,
+        @event = eventType
+    });
+    var content = new StringContent(payload, Encoding.UTF8, "application/json");
+    await client.PostAsync("http://127.0.0.1:9444/p2s", content);
+}`}</pre>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-slate-700">📋 Onde usar no SmartTerm</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                    <p className="font-semibold text-emerald-800 mb-1">✅ Terminal conectou</p>
+                    <p className="text-emerald-700">Chamar após <code className="bg-emerald-100 px-1 rounded">OpenCommPort()</code> retornar <code className="bg-emerald-100 px-1 rounded">true</code> no modo P2S</p>
+                  </div>
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="font-semibold text-red-800 mb-1">❌ Terminal desconectou</p>
+                    <p className="text-red-700">Chamar após <code className="bg-red-100 px-1 rounded">CloseCommPort()</code> ou quando a ligação é perdida</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 space-y-1">
+                <p className="font-semibold">🔑 O terminal_id</p>
+                <p>Use o ID do terminal conforme está registado neste sistema (visível em Gestão de Terminais → detalhes do terminal). É o UUID interno, não o nome.</p>
+                <p className="mt-1">Para verificar o estado atual via GET: <code className="bg-blue-100 px-1 rounded font-mono">http://127.0.0.1:9444/p2s/status</code></p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

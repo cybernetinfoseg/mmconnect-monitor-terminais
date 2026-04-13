@@ -7,10 +7,18 @@ const AGENT_CODE = `# core_agent.py — Agente Local NOC Monitor
 # Instalacao: C:\\Program Files\\Base44Agent\\core_agent.py
 # Config:     C:\\ProgramData\\Base44Agent\\config.json
 # Logs:       C:\\ProgramData\\Base44Agent\\agent.log
-# Autenticacao: apenas X-Api-Key pessoal. Sem ela, todos os pedidos sao rejeitados.
-import os, sys, json, time, socket, logging
+#
+# MODO P2S:
+#   O agente expoe um servidor HTTP local (porta 9444) que recebe eventos
+#   do SmartTerm quando terminais P2S conectam/desconectam.
+#   O SmartTerm deve fazer POST para http://127.0.0.1:9444/p2s com:
+#     { "terminal_id": "<id>", "event": "connected" | "disconnected" }
+#   O agente mantem o estado e reporta ao NOC Monitor.
+#   Tambem monitoriza a porta TCP P2S para saber se o servidor SDK esta activo.
+import os, sys, json, time, socket, logging, threading
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone, timedelta
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 
 PROGRAMDATA = os.environ.get("PROGRAMDATA", r"C:\\\\ProgramData")
@@ -18,12 +26,19 @@ APP_DIR     = os.path.join(PROGRAMDATA, "Base44Agent")
 CONFIG_FILE = os.path.join(APP_DIR, "config.json")
 LOG_FILE    = os.path.join(APP_DIR, "agent.log")
 LOCK_FILE   = os.path.join(APP_DIR, "agent.lock")
+P2S_STATUS_FILE = os.path.join(APP_DIR, "p2s_status.json")
 
 DEFAULT_INTERVAL = 30
 TIMEOUT          = 3
 UPDATE_EVERY     = timedelta(hours=6)
+P2S_TIMEOUT_SECS = 120  # terminal P2S considerado offline se sem ping ha mais de 2 min
+P2S_HTTP_PORT    = 9444  # porta do servidor HTTP local para eventos P2S
 
 logger = logging.getLogger("base44agent")
+
+# Estado global P2S: { terminal_id: { "last_seen": timestamp, "event": "connected"|"disconnected" } }
+p2s_state = {}
+p2s_lock  = threading.Lock()
 
 
 def setup_logging(level=logging.INFO):
@@ -74,7 +89,7 @@ def load_config():
             if key and aid and len(key) >= 16:
                 return {"API_KEY": key, "APP_ID": aid}
             if aid and not key:
-                logger.error("SEGURANCA: API_KEY esta vazia no config.json — agente bloqueado ate configuracao valida.")
+                logger.error("SEGURANCA: API_KEY esta vazia no config.json — agente bloqueado.")
             elif key and len(key) < 16:
                 logger.error("SEGURANCA: API_KEY demasiado curta — agente bloqueado.")
         except Exception as e:
@@ -82,19 +97,11 @@ def load_config():
     return None
 
 
-# ──────────────────────────────────────────────────────────────────
-#  Autenticacao: APENAS X-Api-Key pessoal.
-#  O servidor rejeita (401) qualquer pedido sem ela ou com key invalida.
-# ──────────────────────────────────────────────────────────────────
 def _headers(api_key: str) -> dict:
-    return {
-        "X-Api-Key":     api_key,
-        "Content-Type":  "application/json",
-    }
+    return {"X-Api-Key": api_key, "Content-Type": "application/json"}
 
 
 def listar_terminais(session, app_id: str, api_key: str) -> list:
-    """POST agentGetTerminals — lista terminais do utilizador."""
     url = f"https://app.base44.app/api/apps/{app_id}/functions/agentGetTerminals"
     r = session.post(url, headers=_headers(api_key), json={"api_key": api_key}, timeout=10)
     r.raise_for_status()
@@ -107,7 +114,6 @@ def listar_terminais(session, app_id: str, api_key: str) -> list:
 def reportar_terminal(session, app_id: str, api_key: str,
                       terminal_id: str, status: str, latencia_ms,
                       segundos_sem_ping: int = 0):
-    """POST agentReport — envia estado do terminal."""
     url = f"https://app.base44.app/api/apps/{app_id}/functions/agentReport"
     payload = {
         "terminal_id":       terminal_id,
@@ -144,21 +150,94 @@ def testar_api_endpoint(session, url):
     except Exception: return False, None
 
 
-def testar_p2s(porta):
-    """
-    Modo P2S: o terminal conecta-se ao servidor (conexao inversa).
-    O agente verifica se o servidor SDK esta a escuta na porta local.
-    Se a porta estiver aberta em localhost, o servico esta activo.
-    """
+def testar_p2s_porta(porta):
+    """Verifica se o servidor SDK P2S esta activo na porta local."""
     t = time.time()
     try:
         with socket.create_connection(("127.0.0.1", int(porta)), timeout=TIMEOUT):
             return True, int((time.time()-t)*1000)
     except ConnectionRefusedError:
-        # Porta nao esta a escuta — servidor SDK nao esta activo
         return False, None
     except Exception:
         return False, None
+
+
+def verificar_p2s_terminal(terminal_id: str, porta: int):
+    """
+    Estado P2S do terminal:
+    1. Se o SmartTerm enviou evento via HTTP -> usa esse estado
+    2. Senao verifica se o servidor SDK esta activo na porta
+    """
+    agora = time.time()
+    with p2s_lock:
+        estado = p2s_state.get(terminal_id)
+
+    if estado:
+        last_seen = estado.get("last_seen", 0)
+        event     = estado.get("event", "disconnected")
+        segundos  = int(agora - last_seen)
+
+        if event == "connected" and segundos <= P2S_TIMEOUT_SECS:
+            return True, None, segundos
+        else:
+            return False, None, segundos
+
+    # Fallback: verificar se o servidor SDK esta a escuta na porta
+    activo, latencia = testar_p2s_porta(porta)
+    return activo, latencia, 0
+
+
+# ──────────────────────────────────────────────────────────────────
+#  Servidor HTTP local para receber eventos P2S do SmartTerm
+# ──────────────────────────────────────────────────────────────────
+class P2SEventHandler(BaseHTTPRequestHandler):
+    def log_message(self, format, *args):
+        pass  # silenciar logs HTTP padrao
+
+    def do_POST(self):
+        if self.path != "/p2s":
+            self.send_response(404); self.end_headers(); return
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            body   = json.loads(self.rfile.read(length))
+            tid    = body.get("terminal_id", "").strip()
+            event  = body.get("event", "").strip()  # "connected" ou "disconnected"
+            if not tid or event not in ("connected", "disconnected"):
+                self.send_response(400); self.end_headers()
+                self.wfile.write(b\'\'{"error": "terminal_id e event sao obrigatorios"}\'\'\')
+                return
+            with p2s_lock:
+                p2s_state[tid] = {"last_seen": time.time(), "event": event}
+            logger.info(f"P2S evento: terminal={tid} event={event}")
+            self.send_response(200); self.end_headers()
+            self.wfile.write(json.dumps({"ok": True}).encode())
+        except Exception as e:
+            logger.error(f"Erro no servidor P2S HTTP: {e}")
+            self.send_response(500); self.end_headers()
+
+    def do_GET(self):
+        if self.path == "/p2s/status":
+            with p2s_lock:
+                data = dict(p2s_state)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+        else:
+            self.send_response(404); self.end_headers()
+
+
+def start_p2s_http_server():
+    """Inicia o servidor HTTP P2S em thread separada."""
+    try:
+        server = HTTPServer(("127.0.0.1", P2S_HTTP_PORT), P2SEventHandler)
+        logger.info(f"Servidor HTTP P2S activo em http://127.0.0.1:{P2S_HTTP_PORT}/p2s")
+        t = threading.Thread(target=server.serve_forever, daemon=True)
+        t.start()
+        return server
+    except OSError as e:
+        logger.warning(f"Nao foi possivel iniciar servidor P2S HTTP na porta {P2S_HTTP_PORT}: {e}")
+        return None
 
 
 def escolher_host(t):
@@ -172,6 +251,9 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
     if not lock.acquire():
         logger.error("Outra instancia ja esta em execucao. Encerrando.")
         return 2
+
+    # Iniciar servidor HTTP P2S
+    start_p2s_http_server()
 
     session = requests.Session()
     last_update_check = datetime.min.replace(tzinfo=timezone.utc)
@@ -227,23 +309,23 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
                 try:
                     if not t.get("ativo", True): continue
 
-                    tipo = t.get("tipo_conexao", "ip_local")
+                    tipo         = t.get("tipo_conexao", "ip_local")
                     api_endpoint = t.get("api_endpoint")
 
-                    # Terminais tipo "api": usar endpoint directamente
                     if tipo == "api" and api_endpoint:
                         sucesso, latencia = testar_api_endpoint(session, api_endpoint)
+                        segundos_sem_ping = 0
                         host_desc = api_endpoint
+
                     elif tipo == "p2s":
-                        # P2S: terminal conecta-se ao servidor (conexao inversa)
-                        # Verificamos se o servidor SDK esta a escuta na porta local
-                        porta = t.get("porta") or 5005
-                        sucesso, latencia = testar_p2s(porta)
-                        host_desc = f"localhost:{porta} (P2S)"
-                        if sucesso:
-                            logger.debug(f"P2S servidor activo na porta {porta}")
-                        else:
-                            logger.warning(f"P2S porta {porta} nao esta a escuta — servidor SDK inactivo?")
+                        porta = int(t.get("porta") or 5005)
+                        sucesso, latencia, segundos_sem_ping = verificar_p2s_terminal(t["id"], porta)
+                        host_desc = f"P2S porta={porta}"
+                        logger.info(
+                            f"[P2S] {t.get('nome', t.get('id'))} porta={porta} "
+                            f"-> {'ONLINE' if sucesso else 'OFFLINE'} | sem_ping={segundos_sem_ping}s"
+                        )
+
                     else:
                         host = escolher_host(t)
                         if not host:
@@ -253,10 +335,8 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
                         sucesso, latencia = testar_http(session, host, porta)
                         if not sucesso:
                             sucesso, latencia = testar_tcp(host, porta)
+                        segundos_sem_ping = int(time.time() - t0_ciclo) if not sucesso else 0
                         host_desc = f"{host}:{porta}"
-
-                    # Calcular segundos_sem_ping reais desde inicio do ciclo
-                    segundos_sem_ping = int(time.time() - t0_ciclo) if not sucesso else 0
 
                     status = "online" if sucesso else "offline"
                     reportar_terminal(session, app_id, api_key,
@@ -264,10 +344,11 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
                                       status=status,
                                       latencia_ms=latencia,
                                       segundos_sem_ping=segundos_sem_ping)
-                    logger.info(
-                        f"Testando {t.get('nome', t.get('id'))} ({host_desc})\\n"
-                        f"-> {status} | latencia={latencia} ms"
-                    )
+                    if tipo != "p2s":
+                        logger.info(
+                            f"Testando {t.get('nome', t.get('id'))} ({host_desc})"
+                            f" -> {status} | latencia={latencia} ms"
+                        )
                 except requests.HTTPError as e:
                     code = e.response.status_code if e.response is not None else "?"
                     logger.error(f"Erro ao reportar terminal {t.get('id')} (HTTP {code}): verifique a sua API_KEY.")
