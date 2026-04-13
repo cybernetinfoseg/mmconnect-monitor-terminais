@@ -197,12 +197,11 @@ export default function TVMode() {
             </div>
             <div className="min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold tracking-tight truncate">NOC Monitor</h1>
-              <p className="text-xs sm:text-sm text-slate-400 truncate">
-                Terminais{localFilter &&
-                <span className="hidden sm:inline ml-2">
-                    {localFilter}
-                  </span>
-                }
+              <p className="text-xs sm:text-sm text-slate-400 truncate flex items-center gap-2">
+                <span>{localFilter ? localFilter : 'Terminais Biométricos'}</span>
+                <span className="px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 text-xs font-semibold tabular-nums">
+                  {stats.total} terminal{stats.total !== 1 ? 'is' : ''}
+                </span>
               </p>
             </div>
             
