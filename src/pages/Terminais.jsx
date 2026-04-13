@@ -118,7 +118,7 @@ export default function Terminais() {
         return base44.entities.Terminal.update(editingTerminal.id, data);
       }
       // Preencher automaticamente o email do utilizador ao criar
-      return base44.entities.Terminal.create({ ...data, usuario_email: currentUser?.email });
+      return base44.entities.Terminal.create({ ...data, usuario_email: data.usuario_email || currentUser?.email });
     },
     onSuccess: async (result, data) => {
       const isEdit = !!editingTerminal;
