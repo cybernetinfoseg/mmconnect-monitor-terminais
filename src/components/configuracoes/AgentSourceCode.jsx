@@ -144,6 +144,23 @@ def testar_api_endpoint(session, url):
     except Exception: return False, None
 
 
+def testar_p2s(porta):
+    """
+    Modo P2S: o terminal conecta-se ao servidor (conexao inversa).
+    O agente verifica se o servidor SDK esta a escuta na porta local.
+    Se a porta estiver aberta em localhost, o servico esta activo.
+    """
+    t = time.time()
+    try:
+        with socket.create_connection(("127.0.0.1", int(porta)), timeout=TIMEOUT):
+            return True, int((time.time()-t)*1000)
+    except ConnectionRefusedError:
+        # Porta nao esta a escuta — servidor SDK nao esta activo
+        return False, None
+    except Exception:
+        return False, None
+
+
 def escolher_host(t):
     return t.get("ip_local") or t.get("ip_publico") or t.get("dns")
 
@@ -217,6 +234,16 @@ def run_agent(intervalo=DEFAULT_INTERVAL, enable_update=True, once=False,
                     if tipo == "api" and api_endpoint:
                         sucesso, latencia = testar_api_endpoint(session, api_endpoint)
                         host_desc = api_endpoint
+                    elif tipo == "p2s":
+                        # P2S: terminal conecta-se ao servidor (conexao inversa)
+                        # Verificamos se o servidor SDK esta a escuta na porta local
+                        porta = t.get("porta") or 5005
+                        sucesso, latencia = testar_p2s(porta)
+                        host_desc = f"localhost:{porta} (P2S)"
+                        if sucesso:
+                            logger.debug(f"P2S servidor activo na porta {porta}")
+                        else:
+                            logger.warning(f"P2S porta {porta} nao esta a escuta — servidor SDK inactivo?")
                     else:
                         host = escolher_host(t)
                         if not host:
