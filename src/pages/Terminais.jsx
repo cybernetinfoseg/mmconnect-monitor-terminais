@@ -266,7 +266,7 @@ export default function Terminais() {
       case 'ip_local': return terminal.ip_local ? `${terminal.ip_local}:${terminal.porta || 5005}` : null;
       case 'ip_publico': return terminal.ip_publico ? `${terminal.ip_publico}:${terminal.porta || 5005}` : null;
       case 'dns': return terminal.dns ? `${terminal.dns}:${terminal.porta || 5005}` : null;
-      case 'p2s': return terminal.ip_local ? `VPN: ${terminal.ip_local}` : null;
+      case 'p2s': return `Escuta TCP :${terminal.porta || 5005}`;
       case 'api': return terminal.api_endpoint || null;
       default: return null;
     }
@@ -547,15 +547,17 @@ export default function Terminais() {
                     <SelectItem value="ip_local">IP Local</SelectItem>
                     <SelectItem value="ip_publico">IP Público</SelectItem>
                     <SelectItem value="dns">DNS/No-IP</SelectItem>
-                    <SelectItem value="p2s">P2S VPN</SelectItem>
+                    <SelectItem value="p2s">P2S (Push to Server)</SelectItem>
                     <SelectItem value="api">API</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Porta</Label>
-                <Input type="number" value={formData.porta || 5005} onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})} />
-              </div>
+              {formData.tipo_conexao !== 'p2s' && (
+                <div className="space-y-2">
+                  <Label>Porta</Label>
+                  <Input type="number" value={formData.porta || 5005} onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})} />
+                </div>
+              )}
             </div>
 
             {formData.tipo_conexao === 'ip_local' && (
@@ -581,21 +583,32 @@ export default function Terminais() {
             )}
             {formData.tipo_conexao === 'p2s' && (
               <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label>IP Local (rede VPN) <span className="text-red-500">*</span></Label>
-                  <Input value={formData.ip_local || ''} onChange={(e) => setFormData({...formData, ip_local: e.target.value})} placeholder="10.8.0.10" />
-                  <p className="text-xs text-slate-500">IP do terminal dentro do túnel VPN P2S (ex: 10.8.0.x atribuído pelo servidor VPN)</p>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 space-y-1">
+                  <p className="font-semibold">📡 Modo P2S — Push to Server (conexão inversa)</p>
+                  <p>Neste modo, o <strong>terminal biométrico conecta-se ao servidor</strong> do agente local na porta TCP configurada abaixo.</p>
+                  <p>O agente chama internamente <code className="bg-blue-100 px-1 rounded">SetServerPortandtick(porta, 7)</code> e fica à escuta. Não é necessário saber o IP do terminal.</p>
+                  <p className="text-blue-600">⚙️ Certifique-se que a porta TCP está aberta no firewall do servidor onde o agente corre.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label>Configuração P2S (JSON)</Label>
+                  <Label>Porta TCP do Servidor <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="number"
+                    value={formData.porta || 5005}
+                    onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})}
+                    placeholder="5005"
+                  />
+                  <p className="text-xs text-slate-500">Porta TCP onde o agente local escuta. O terminal conecta-se a esta porta (ex: 5005). Corresponde ao valor usado em <code>SetServerPortandtick(porta, 7)</code>.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Observações / Identificação do Terminal</Label>
                   <Textarea
                     value={formData.p2s_config || ''}
                     onChange={(e) => setFormData({...formData, p2s_config: e.target.value})}
-                    rows={4}
-                    placeholder={`{\n  "server": "vpn.empresa.com",\n  "port": 1194,\n  "protocol": "udp"\n}`}
-                    className="font-mono text-xs"
+                    rows={2}
+                    placeholder="Número de série, modelo, ou outras notas de identificação do terminal..."
+                    className="text-xs"
                   />
-                  <p className="text-xs text-slate-500">Opcional. Informações de referência da ligação VPN em formato JSON (não é usada para autenticação — apenas documentação)</p>
+                  <p className="text-xs text-slate-500">Opcional. Informação de identificação do terminal (número de série, modelo, etc.).</p>
                 </div>
               </div>
             )}
