@@ -58,6 +58,14 @@ export default function Terminais() {
   const [tipoFilter, setTipoFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
+
+  // Limpar filtros ao montar a página (evita persistência ao navegar)
+  useEffect(() => {
+    setSearchTerm('');
+    setTipoFilter('all');
+    setStatusFilter('all');
+    setUserFilter('all');
+  }, []);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTerminal, setEditingTerminal] = useState(null);

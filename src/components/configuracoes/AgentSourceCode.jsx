@@ -27,6 +27,7 @@ const AGENT_CODE = `# core_agent.py — Agente Local NOC Monitor
 #   nssm start Base44Agent
 
 import os, sys, json, time, socket, logging, threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -42,7 +43,8 @@ LOG_FILE     = os.path.join(APP_DIR, "agent.log")
 LOCK_FILE    = os.path.join(APP_DIR, "agent.lock")
 
 DEFAULT_INTERVAL = 30       # segundos entre ciclos
-TIMEOUT          = 3        # timeout TCP/HTTP por terminal
+TIMEOUT          = 5        # timeout TCP/HTTP por terminal
+MAX_WORKERS      = 20       # threads paralelas para monitorar terminais
 P2S_TIMEOUT_SECS = 120      # terminal P2S -> offline se sem evento ha mais de 2 min
 P2S_HTTP_PORT    = 9444     # porta do servidor HTTP local para eventos P2S
 
@@ -269,12 +271,79 @@ def start_p2s_http_server():
 
 
 # ──────────────────────────────────────────────────────────────
-# Loop Principal
+# Loop Principal — monitoramento paralelo
 # ──────────────────────────────────────────────────────────────
-def ciclo_monitoramento(session, app_id, api_key):
-    """Executa um ciclo completo: busca terminais, testa cada um, reporta."""
+def testar_e_reportar(t, app_id, api_key):
+    """Testa um terminal e reporta o status. Executado em thread separada."""
+    # Cada thread tem a sua propria sessao HTTP para evitar problemas de concorrencia
+    sess = requests.Session()
+    tid  = t["id"]
+    nome = t.get("nome", tid)
+    tipo = t.get("tipo_conexao", "ip_local")
+    porta_raw = t.get("porta") or 5005
+
     try:
-        terminais = listar_terminais(session, app_id, api_key)
+        if tipo == "p2s":
+            # P2S: estado determinado por eventos do SmartTerm (porta 9444)
+            # nao faz sentido testar por rede — apenas consulta o estado em memoria
+            porta = int(porta_raw)
+            online, latencia, seg_sem_ping = verificar_p2s_terminal(tid, porta)
+            status = "online" if online else "offline"
+            logger.info(f"[P2S] {nome} -> {status.upper()} | sem_evento={seg_sem_ping}s")
+
+        elif tipo == "api":
+            endpoint = t.get("api_endpoint", "")
+            if not endpoint:
+                logger.debug(f"{nome}: api_endpoint vazio, ignorado.")
+                return
+            online, latencia = testar_api_endpoint(sess, endpoint)
+            seg_sem_ping = 0
+            status = "online" if online else "offline"
+            logger.info(f"{nome} [api] -> {status.upper()} | latencia={latencia}ms")
+
+        else:
+            # ip_local, ip_publico, dns — testa TCP direto ao terminal
+            if tipo == "ip_local":
+                host = t.get("ip_local")
+            elif tipo == "ip_publico":
+                host = t.get("ip_publico")
+            else:  # dns
+                host = t.get("dns")
+
+            if not host:
+                logger.debug(f"{nome}: host nao configurado para tipo={tipo}, ignorado.")
+                return
+
+            porta = int(porta_raw)
+            # Tenta TCP primeiro (mais rapido e fiavel para terminais biometricos)
+            online, latencia = testar_tcp(host, porta)
+            if not online:
+                # Fallback HTTP
+                online, latencia = testar_http(sess, host, porta)
+            seg_sem_ping = 0 if online else int(TIMEOUT)
+            status = "online" if online else "offline"
+            logger.info(f"{nome} [{tipo}] {host}:{porta} -> {status.upper()} | latencia={latencia}ms")
+
+        reportar_terminal(sess, app_id, api_key,
+                          terminal_id=tid,
+                          status=status,
+                          latencia_ms=latencia,
+                          segundos_sem_ping=seg_sem_ping)
+
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "?"
+        logger.error(f"Erro ao reportar {nome} (HTTP {code})")
+    except Exception as e:
+        logger.error(f"Erro no terminal {nome}: {e}")
+    finally:
+        sess.close()
+
+
+def ciclo_monitoramento(app_id, api_key):
+    """Executa um ciclo completo: busca terminais e testa TODOS em paralelo."""
+    sess = requests.Session()
+    try:
+        terminais = listar_terminais(sess, app_id, api_key)
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
         if code in (401, 403):
@@ -285,62 +354,27 @@ def ciclo_monitoramento(session, app_id, api_key):
     except Exception as e:
         logger.error(f"Erro ao listar terminais: {e}")
         return
+    finally:
+        sess.close()
 
-    logger.info(f"Ciclo iniciado — {len(terminais)} terminal(is) a monitorizar")
+    ativos = [t for t in terminais if t.get("ativo", True)]
+    if not ativos:
+        logger.info("Nenhum terminal ativo a monitorizar.")
+        return
 
-    for t in terminais:
-        if not t.get("ativo", True):
-            continue
+    logger.info(f"Ciclo iniciado — {len(ativos)} terminal(is) em paralelo (workers={MAX_WORKERS})")
+    t0 = time.time()
 
-        tid  = t["id"]
-        nome = t.get("nome", tid)
-        tipo = t.get("tipo_conexao", "ip_local")
-        porta_raw = t.get("porta") or 5005
+    with ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(ativos))) as executor:
+        futures = {executor.submit(testar_e_reportar, t, app_id, api_key): t for t in ativos}
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                t = futures[future]
+                logger.error(f"Thread erro para {t.get('nome', t.get('id'))}: {e}")
 
-        try:
-            if tipo == "p2s":
-                porta = int(porta_raw)
-                online, latencia, seg_sem_ping = verificar_p2s_terminal(tid, porta)
-                status = "online" if online else "offline"
-                logger.info(
-                    f"[P2S] {nome} porta={porta} -> {status.upper()} | sem_ping={seg_sem_ping}s"
-                )
-
-            elif tipo == "api":
-                endpoint = t.get("api_endpoint", "")
-                if not endpoint:
-                    logger.debug(f"{nome}: api_endpoint vazio, ignorado.")
-                    continue
-                online, latencia = testar_api_endpoint(session, endpoint)
-                seg_sem_ping = 0
-                status = "online" if online else "offline"
-                logger.info(f"{nome} (api) -> {status.upper()} | latencia={latencia}ms")
-
-            else:
-                # ip_local, ip_publico, dns
-                host = t.get("ip_local") or t.get("ip_publico") or t.get("dns")
-                if not host:
-                    logger.debug(f"{nome}: sem host configurado, ignorado.")
-                    continue
-                porta = int(porta_raw)
-                online, latencia = testar_http(session, host, porta)
-                if not online:
-                    online, latencia = testar_tcp(host, porta)
-                seg_sem_ping = 0 if online else TIMEOUT
-                status = "online" if online else "offline"
-                logger.info(f"{nome} ({host}:{porta}) -> {status.upper()} | latencia={latencia}ms")
-
-            reportar_terminal(session, app_id, api_key,
-                              terminal_id=tid,
-                              status=status,
-                              latencia_ms=latencia,
-                              segundos_sem_ping=seg_sem_ping)
-
-        except requests.HTTPError as e:
-            code = e.response.status_code if e.response is not None else "?"
-            logger.error(f"Erro ao reportar {nome} (HTTP {code})")
-        except Exception as e:
-            logger.error(f"Erro no terminal {nome}: {e}")
+    logger.info(f"Ciclo concluido em {time.time()-t0:.1f}s")
 
 
 def run_agent(intervalo=DEFAULT_INTERVAL, once=False, stop_event=None):
@@ -351,7 +385,6 @@ def run_agent(intervalo=DEFAULT_INTERVAL, once=False, stop_event=None):
         return 2
 
     start_p2s_http_server()
-    session = requests.Session()
 
     try:
         while True:
@@ -367,7 +400,7 @@ def run_agent(intervalo=DEFAULT_INTERVAL, once=False, stop_event=None):
                 if once: break
                 continue
 
-            ciclo_monitoramento(session, config["APP_ID"], config["API_KEY"])
+            ciclo_monitoramento(config["APP_ID"], config["API_KEY"])
 
             if once:
                 break
@@ -445,8 +478,9 @@ export default function AgentSourceCode() {
       </div>
 
       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 space-y-1">
-        <p><strong>Suporte a tipos de conexão:</strong> ip_local · ip_publico · dns · p2s · api</p>
-        <p><strong>P2S:</strong> servidor HTTP na porta 9444 recebe eventos do SmartTerm em tempo real.</p>
+        <p><strong>Tipos suportados:</strong> ip_local · ip_publico · dns · p2s · api</p>
+        <p><strong>⚡ Paralelo:</strong> todos os terminais são testados simultaneamente (até 20 threads) — sem lentidão independente do número de terminais.</p>
+        <p><strong>P2S:</strong> o SmartTerm reporta eventos via POST <code className="bg-emerald-100 px-1 rounded font-mono">http://127.0.0.1:9444/p2s</code> quando conecta/desconecta.</p>
         <p><strong>Segurança:</strong> autentica via <code className="bg-emerald-100 px-1 rounded font-mono">X-Api-Key</code> pessoal — cada agente acede apenas aos seus terminais.</p>
       </div>
 
