@@ -40,6 +40,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 import TelegramConfig from '../components/configuracoes/TelegramConfig';
+import HeartbeatServerCode from '../components/configuracoes/HeartbeatServerCode';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
 
@@ -429,6 +430,24 @@ private async Task PostP2SEvent(string terminalId, string eventType)
                 <p>Use o ID do terminal conforme está registado neste sistema (visível em Gestão de Terminais → detalhes do terminal). É o UUID interno, não o nome.</p>
                 <p className="mt-1">Para verificar o estado atual via GET: <code className="bg-blue-100 px-1 rounded font-mono">http://127.0.0.1:9444/p2s/status</code></p>
               </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Heartbeat Server */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Radio className="h-5 w-5 text-violet-600" />
+                Heartbeat Server (Windows Server)
+              </CardTitle>
+              <CardDescription>
+                Serviço para monitorar terminais via Heartbeat TCP — ideal para terminais apontados ao servidor Windows com IP público.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <HeartbeatServerCode />
             </CardContent>
           </Card>
         </motion.div>

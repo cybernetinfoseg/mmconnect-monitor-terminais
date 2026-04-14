@@ -265,7 +265,7 @@ export default function Terminais() {
   };
 
   const getTipoLabel = (tipo) => {
-    const labels = { ip_local: 'IP Local', ip_publico: 'IP Público', dns: 'DNS/No-IP', p2s: 'P2S VPN', api: 'API' };
+    const labels = { ip_local: 'IP Local', ip_publico: 'IP Público', dns: 'DNS/No-IP', p2s: 'P2S VPN', heartbeat: 'Heartbeat', api: 'API' };
     return labels[tipo] || tipo;
   };
 
@@ -275,6 +275,7 @@ export default function Terminais() {
       case 'ip_publico': return terminal.ip_publico ? `${terminal.ip_publico}:${terminal.porta || 5005}` : null;
       case 'dns': return terminal.dns ? `${terminal.dns}:${terminal.porta || 5005}` : null;
       case 'p2s': return `Escuta TCP :${terminal.porta || 5005}`;
+      case 'heartbeat': return `${terminal.ip_publico || '51.91.219.145'}:${terminal.porta || 5005}`;
       case 'api': return terminal.api_endpoint || null;
       default: return null;
     }
@@ -359,6 +360,7 @@ export default function Terminais() {
                   <SelectItem value="ip_publico">IP Público</SelectItem>
                   <SelectItem value="dns">DNS/No-IP</SelectItem>
                   <SelectItem value="p2s">P2S VPN</SelectItem>
+                  <SelectItem value="heartbeat">Heartbeat</SelectItem>
                   <SelectItem value="api">API</SelectItem>
                 </SelectContent>
               </Select>
@@ -556,6 +558,7 @@ export default function Terminais() {
                     <SelectItem value="ip_publico">IP Público</SelectItem>
                     <SelectItem value="dns">DNS/No-IP</SelectItem>
                     <SelectItem value="p2s">P2S (Push to Server)</SelectItem>
+                    <SelectItem value="heartbeat">Heartbeat (Windows Server)</SelectItem>
                     <SelectItem value="api">API</SelectItem>
                   </SelectContent>
                 </Select>
@@ -617,6 +620,35 @@ export default function Terminais() {
                     className="text-xs"
                   />
                   <p className="text-xs text-slate-500">Opcional. Informação de identificação do terminal (número de série, modelo, etc.).</p>
+                </div>
+              </div>
+            )}
+            {formData.tipo_conexao === 'heartbeat' && (
+              <div className="space-y-3">
+                <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg text-xs text-violet-700 space-y-1">
+                  <p className="font-semibold">📡 Modo Heartbeat — Windows Server com IP Público</p>
+                  <p>O <strong>Heartbeat Server</strong> corre no Windows Server (<code className="bg-violet-100 px-1 rounded">51.91.219.145</code>) e escuta na porta configurada abaixo.</p>
+                  <p>O terminal <strong>já aponta para o IP do servidor</strong> — o serviço recebe a conexão e reporta online/offline ao painel.</p>
+                  <p className="text-violet-600">⚙️ Certifique-se que a porta está aberta no firewall do Windows Server.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>IP Público do Servidor</Label>
+                  <Input
+                    value={formData.ip_publico || ''}
+                    onChange={(e) => setFormData({...formData, ip_publico: e.target.value})}
+                    placeholder="51.91.219.145"
+                  />
+                  <p className="text-xs text-slate-500">IP público do Windows Server onde corre o Heartbeat Server (informativo)</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Porta TCP <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="number"
+                    value={formData.porta || 5005}
+                    onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})}
+                    placeholder="5005"
+                  />
+                  <p className="text-xs text-slate-500">Porta específica deste terminal no servidor (cada terminal usa uma porta diferente).</p>
                 </div>
               </div>
             )}

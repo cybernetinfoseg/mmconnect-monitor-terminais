@@ -29,6 +29,7 @@
         "ip_publico",
         "dns",
         "p2s",
+        "heartbeat",
         "api"
       ],
       "default": "ip_local",
@@ -49,7 +50,7 @@
     "porta": {
       "type": "number",
       "default": 5005,
-      "description": "Porta de conex\u00e3o"
+      "description": "Porta de conex\u00e3o / Porta TCP do Heartbeat Server"
     },
     "p2s_config": {
       "type": "string",
