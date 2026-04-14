@@ -30,6 +30,8 @@
         "dns",
         "p2s",
         "heartbeat",
+        "adms_push",
+        "sdk_tcp",
         "api"
       ],
       "default": "ip_local",
@@ -50,7 +52,29 @@
     "porta": {
       "type": "number",
       "default": 5005,
-      "description": "Porta de conex\u00e3o / Porta TCP do Heartbeat Server"
+      "description": "Porta de conex\u00e3o / Porta TCP do servidor"
+    },
+    "numero_serie": {
+      "type": "string",
+      "description": "N\u00famero de s\u00e9rie do terminal (SN) \u2014 usado em ADMS/Push e SDK"
+    },
+    "modelo": {
+      "type": "string",
+      "description": "Modelo do terminal (ex: ZKTeco MB20, ZKTeco F22, Suprema BioStation)"
+    },
+    "fabricante": {
+      "type": "string",
+      "enum": [
+        "zkteco",
+        "suprema",
+        "anviz",
+        "hikvision",
+        "dahua",
+        "nitgen",
+        "outro"
+      ],
+      "default": "zkteco",
+      "description": "Fabricante do terminal"
     },
     "p2s_config": {
       "type": "string",

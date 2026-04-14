@@ -40,7 +40,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 import TelegramConfig from '../components/configuracoes/TelegramConfig';
-import HeartbeatServerCode from '../components/configuracoes/HeartbeatServerCode';
+import NocServerCode from '../components/configuracoes/NocServerCode';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
 
@@ -440,14 +440,14 @@ private async Task PostP2SEvent(string terminalId, string eventType)
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Radio className="h-5 w-5 text-violet-600" />
-                Heartbeat Server (Windows Server)
+                NOC Server — Windows Server (51.91.219.145)
               </CardTitle>
               <CardDescription>
-                Serviço para monitorar terminais via Heartbeat TCP — ideal para terminais apontados ao servidor Windows com IP público.
+                Servidor unificado para terminais biométricos: Heartbeat TCP, ADMS/Push (ZKTeco, Anviz) e SDK-TCP. Instale no Windows Server para monitorar todos os tipos.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <HeartbeatServerCode />
+              <NocServerCode />
             </CardContent>
           </Card>
         </motion.div>
