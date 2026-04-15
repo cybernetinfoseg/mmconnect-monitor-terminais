@@ -81,12 +81,13 @@ export default function Configuracoes() {
     setTestingConn(true);
     setTestResult(null);
     try {
-      const res = await base44.functions.invoke('agentGetTerminals', {});
+      // Testar a API Key diretamente chamando agentGetTerminals com a key no payload
+      const res = await base44.functions.invoke('testApiKey', { api_key: currentUser?.api_key });
       const data = res.data;
       if (data?.success) {
-        setTestResult({ ok: true, msg: `Ligação OK — ${data.terminals?.length ?? 0} terminal(is) encontrado(s)` });
+        setTestResult({ ok: true, msg: `API Key válida — ${data.terminals ?? 0} terminal(is) associado(s)` });
       } else {
-        setTestResult({ ok: false, msg: data?.error || 'Resposta inesperada' });
+        setTestResult({ ok: false, msg: data?.error || 'API Key inválida ou sem terminais' });
       }
     } catch (e) {
       setTestResult({ ok: false, msg: e.message || 'Erro de ligação' });
