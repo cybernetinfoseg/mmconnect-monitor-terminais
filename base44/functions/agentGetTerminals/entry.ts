@@ -1,11 +1,13 @@
 /**
  * agentGetTerminals — devolve os terminais ao Agente Local
  *
+ * Tipos geridos pelo agente: ip_local, ip_publico, dns, api
  * SEGURANÇA: autenticação EXCLUSIVAMENTE por X-Api-Key pessoal.
  * Cada utilizador vê apenas os terminais que criou (created_by).
- * Admin vê todos.
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.23';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+const AGENT_TYPES = ['ip_local', 'ip_publico', 'dns', 'api'];
 
 Deno.serve(async (req) => {
     try {
@@ -27,13 +29,13 @@ Deno.serve(async (req) => {
 
         const ownerEmail = match.user_email;
 
-        // 3. Filtrar terminais pelo dono da API Key (sempre por created_by)
-        // Cada utilizador, incluindo admin, vê apenas os seus próprios terminais via agente
-        const terminals = await base44.asServiceRole.entities.Terminal.filter({
+        // 3. Filtrar terminais do dono — apenas tipos geridos pelo agente local
+        const allTerminals = await base44.asServiceRole.entities.Terminal.filter({
             ativo: true,
-            tipo_conexao: 'ip_local',
             created_by: ownerEmail,
         });
+
+        const terminals = allTerminals.filter(t => AGENT_TYPES.includes(t.tipo_conexao));
 
         const result = terminals.map(t => ({
             id: t.id,
@@ -48,7 +50,7 @@ Deno.serve(async (req) => {
             ativo: t.ativo,
         }));
 
-        console.log(`agentGetTerminals OK: ${ownerEmail} → ${result.length} terminais`);
+        console.log(`agentGetTerminals OK: ${ownerEmail} → ${result.length} terminais (${result.map(t=>t.tipo_conexao).join(', ')})`);
         return Response.json({ success: true, terminals: result, owner: ownerEmail });
 
     } catch (error) {

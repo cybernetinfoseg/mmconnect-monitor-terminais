@@ -1,9 +1,17 @@
 /**
- * monitorTerminal — monitoramento ativo via HTTP/TCP para terminais não-locais.
- * Usado apenas para terminais com tipo_conexao != 'ip_local'.
- * Terminais ip_local dependem exclusivamente do Agente Local (agentReport).
+ * monitorTerminal — verificação manual/pontual de terminal via HTTP/TCP.
+ *
+ * Apenas terminais ATIVOS (ip_publico, dns, api) podem ser sondados diretamente.
+ * Terminais PASSIVOS dependem de push externo e não podem ser sondados aqui:
+ *   - ip_local   → Agente Local (agentReport)
+ *   - heartbeat  → NOC Server (heartbeatReport)
+ *   - adms_push  → NOC Server (nocServerReport)
+ *   - sdk_tcp    → NOC Server (nocServerReport)
+ *   - p2s        → P2S Server (p2sReport)
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.21';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+const PASSIVE_TYPES = ['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s'];
 
 Deno.serve(async (req) => {
     try {
@@ -29,9 +37,13 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Forbidden: não é dono deste terminal' }, { status: 403 });
         }
 
-        // Terminais ip_local dependem do agente — não monitorar activamente aqui
-        if (terminal.tipo_conexao === 'ip_local') {
-            return Response.json({ error: 'Terminais ip_local são monitorizados pelo Agente Local' }, { status: 400 });
+        // Terminais passivos dependem de push externo — não sondáveis diretamente
+        if (PASSIVE_TYPES.includes(terminal.tipo_conexao)) {
+            const agente = terminal.tipo_conexao === 'ip_local' ? 'Agente Local' :
+                           terminal.tipo_conexao === 'p2s' ? 'P2S Server' : 'NOC Server';
+            return Response.json({
+                error: `Terminais do tipo "${terminal.tipo_conexao}" são monitorizados pelo ${agente} (push) — não é possível sondagem direta.`
+            }, { status: 400 });
         }
 
         const result = await checkTerminal(terminal);

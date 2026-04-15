@@ -730,7 +730,7 @@ export default function Terminais() {
                   onChange={(e) => setFormData({...formData, api_endpoint: e.target.value})}
                   placeholder="https://api.exemplo.com/terminal/ping"
                 />
-                <p className="text-xs text-slate-500">URL HTTP/HTTPS que o Agente Local irá chamar (GET) para verificar se o terminal está online. Deve retornar HTTP 200 quando operacional.</p>
+                <p className="text-xs text-slate-500">URL HTTP/HTTPS acessível publicamente (GET). O sistema verifica periodicamente se retorna HTTP 2xx/3xx — considera online se sim. Útil para terminais com API REST própria.</p>
               </div>
             )}
 

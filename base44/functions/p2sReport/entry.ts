@@ -42,7 +42,11 @@ Deno.serve(async (req) => {
     }
 
     const agora = new Date().toISOString();
-    const statusAnterior = terminal.status;
+
+    // Usar StatusCache como fonte de verdade do estado anterior (consistente com outros endpoints)
+    const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
+    const cache = cacheResults.length > 0 ? cacheResults[0] : null;
+    const statusAnterior = cache?.ultimo_status || terminal.status || 'offline';
 
     // Verificar janela de manutenção activa
     const manutencoes = await base44.asServiceRole.entities.MaintenanceWindow.filter({
@@ -90,9 +94,8 @@ Deno.serve(async (req) => {
       });
 
       // Actualizar StatusCache
-      const caches = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
-      if (caches.length > 0) {
-        await base44.asServiceRole.entities.StatusCache.update(caches[0].id, {
+      if (cache) {
+        await base44.asServiceRole.entities.StatusCache.update(cache.id, {
           ultimo_status: status,
           atualizado_em: agora,
         });

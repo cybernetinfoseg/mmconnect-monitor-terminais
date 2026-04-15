@@ -126,7 +126,7 @@ def listar_terminais(session, app_id, api_key):
     return data.get("terminals", [])
 
 def reportar_status(session, app_id, api_key, terminal_id, status, latencia_ms=None, segundos_sem_ping=0):
-    url = f"{BASE_URL.format(app_id=app_id)}/heartbeatReport"
+    url = f"{BASE_URL.format(app_id=app_id)}/nocServerReport"
     payload = {
         "terminal_id":       terminal_id,
         "status":            status,

@@ -1,10 +1,17 @@
 /**
- * heartbeatReport — recebe relatório de status do Heartbeat Server (Windows)
+ * nocServerReport — endpoint unificado de reporte para o NOC Server (Windows)
+ *
+ * Usado pelo noc_server.py para reportar status de terminais:
+ *   - heartbeat  (TCP Heartbeat)
+ *   - adms_push  (ADMS/Push ZKTeco, Anviz)
+ *   - sdk_tcp    (SDK polling porta 4370)
  *
  * Autenticação: X-Api-Key pessoal
- * Payload: { terminal_id, status, latencia_ms?, porta? }
+ * Payload: { terminal_id, status, latencia_ms?, segundos_sem_ping? }
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+
+const NOC_TYPES = ['heartbeat', 'adms_push', 'sdk_tcp'];
 
 Deno.serve(async (req) => {
     try {
@@ -30,6 +37,9 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'terminal_id e status são obrigatórios' }, { status: 400 });
         }
 
+        const statusValido = ['online', 'offline', 'warning'].includes(status) ? status : 'offline';
+        const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
+
         // Verificar ownership
         const terminaisDoUtilizador = await base44.asServiceRole.entities.Terminal.filter({
             ativo: true,
@@ -46,9 +56,12 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Sem permissão para reportar este terminal' }, { status: 403 });
         }
 
+        // Validar tipo — apenas tipos NOC Server
+        if (!NOC_TYPES.includes(terminal.tipo_conexao)) {
+            return Response.json({ error: `Tipo "${terminal.tipo_conexao}" não é gerido pelo NOC Server` }, { status: 400 });
+        }
+
         const agora = new Date().toISOString();
-        const statusValido = ['online', 'offline', 'warning'].includes(status) ? status : 'offline';
-        const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
 
         // Atualizar terminal
         await base44.asServiceRole.entities.Terminal.update(terminal_id, {
@@ -86,6 +99,7 @@ Deno.serve(async (req) => {
                 cliente: terminal.cliente_nome || '',
                 owner_email: terminal.created_by || '',
             }).catch(() => {});
+
         } else if (!emManutencao && cache && cache.ultimo_status === 'offline' && statusEfetivo === 'online') {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id,
@@ -129,11 +143,11 @@ Deno.serve(async (req) => {
             cliente: terminal.cliente_nome,
         });
 
-        console.log(`[heartbeatReport] ${ownerEmail} → "${terminal.nome}" → ${statusValido}`);
+        console.log(`[nocServerReport] ${ownerEmail} → "${terminal.nome}" (${terminal.tipo_conexao}) → ${statusValido}`);
         return Response.json({ success: true, terminal: terminal.nome, status: statusValido });
 
     } catch (error) {
-        console.error('heartbeatReport erro:', error);
+        console.error('nocServerReport erro:', error);
         return Response.json({ error: error.message }, { status: 500 });
     }
 });
