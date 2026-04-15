@@ -14,12 +14,8 @@ const AGENT_CODE = `# core_agent.py — Agente Local NOC Monitor
 #   "APP_ID":  "697aa46c9998c30665e2e19a"
 # }
 #
-# MODO P2S:
-#   O agente expoe um servidor HTTP local na porta 9444.
-#   O SmartTerm deve fazer POST para http://127.0.0.1:9444/p2s com:
-#     { "terminal_id": "<id_base44>", "event": "connected" | "disconnected" }
-#   O agente mantem o estado em memoria e reporta ao NOC Monitor a cada ciclo.
-#   Tambem pode verificar se o servidor SDK esta activo na porta configurada.
+# Tipos de conexao suportados: ip_local, ip_publico, dns, api
+# Para terminais P2S (conexao inversa), use o p2s_server.py dedicado.
 #
 # INICIAR COMO SERVICO WINDOWS (NSSM):
 #   nssm install Base44Agent "C:\\Python311\\python.exe" "C:\\Program Files\\Base44Agent\\core_agent.py"
@@ -29,8 +25,6 @@ const AGENT_CODE = `# core_agent.py — Agente Local NOC Monitor
 import os, sys, json, time, socket, logging, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from logging.handlers import RotatingFileHandler
-from datetime import datetime, timezone, timedelta
-from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 
 # ──────────────────────────────────────────────────────────────
@@ -45,14 +39,10 @@ LOCK_FILE    = os.path.join(APP_DIR, "agent.lock")
 DEFAULT_INTERVAL = 30       # segundos entre ciclos
 TIMEOUT          = 5        # timeout TCP/HTTP por terminal
 MAX_WORKERS      = 20       # threads paralelas para monitorar terminais
-P2S_TIMEOUT_SECS = 120      # terminal P2S -> offline se sem evento ha mais de 2 min
-P2S_HTTP_PORT    = 9444     # porta do servidor HTTP local para eventos P2S
 
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
-logger   = logging.getLogger("base44agent")
-p2s_state = {}   # { terminal_id: { "last_seen": float, "event": str } }
-p2s_lock  = threading.Lock()
+logger = logging.getLogger("base44agent")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -190,86 +180,6 @@ def testar_api_endpoint(session, url):
         return False, None
 
 
-def verificar_p2s_terminal(terminal_id, porta):
-    """
-    Determina status P2S:
-    1. Se SmartTerm enviou evento recente -> usa esse estado
-    2. Fallback: verifica se o servidor SDK esta activo na porta local
-    Retorna (online: bool, latencia_ms: int|None, segundos_sem_ping: int)
-    """
-    agora = time.time()
-    with p2s_lock:
-        estado = p2s_state.get(terminal_id)
-
-    if estado:
-        last_seen = estado.get("last_seen", 0)
-        event     = estado.get("event", "disconnected")
-        segundos  = int(agora - last_seen)
-        if event == "connected" and segundos <= P2S_TIMEOUT_SECS:
-            return True, None, segundos
-        else:
-            return False, None, segundos
-
-    # Fallback: porta local do servidor P2S (SmartTerm SDK)
-    activo, latencia = testar_tcp("127.0.0.1", porta)
-    return activo, latencia, 0
-
-
-# ──────────────────────────────────────────────────────────────
-# Servidor HTTP Local — Recebe eventos P2S do SmartTerm
-# ──────────────────────────────────────────────────────────────
-class P2SEventHandler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        pass  # silenciar logs HTTP internos
-
-    def do_POST(self):
-        if self.path != "/p2s":
-            self.send_response(404); self.end_headers(); return
-        try:
-            length = int(self.headers.get("Content-Length", 0))
-            body   = json.loads(self.rfile.read(length))
-            tid    = body.get("terminal_id", "").strip()
-            event  = body.get("event", "").strip()
-
-            if not tid or event not in ("connected", "disconnected"):
-                self.send_response(400); self.end_headers()
-                self.wfile.write(b'{"error": "terminal_id e event sao obrigatorios"}')
-                return
-
-            with p2s_lock:
-                p2s_state[tid] = {"last_seen": time.time(), "event": event}
-
-            logger.info(f"[P2S] Evento recebido: terminal={tid} event={event}")
-            self.send_response(200); self.end_headers()
-            self.wfile.write(json.dumps({"ok": True}).encode())
-
-        except Exception as e:
-            logger.error(f"[P2S] Erro ao processar evento: {e}")
-            self.send_response(500); self.end_headers()
-
-    def do_GET(self):
-        if self.path == "/p2s/status":
-            with p2s_lock:
-                data = dict(p2s_state)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps(data).encode())
-        else:
-            self.send_response(404); self.end_headers()
-
-
-def start_p2s_http_server():
-    try:
-        server = HTTPServer(("127.0.0.1", P2S_HTTP_PORT), P2SEventHandler)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
-        logger.info(f"[P2S] Servidor HTTP activo em http://127.0.0.1:{P2S_HTTP_PORT}/p2s")
-        return server
-    except OSError as e:
-        logger.warning(f"[P2S] Falha ao iniciar servidor HTTP na porta {P2S_HTTP_PORT}: {e}")
-        return None
-
-
 # ──────────────────────────────────────────────────────────────
 # Loop Principal — monitoramento paralelo
 # ──────────────────────────────────────────────────────────────
@@ -283,15 +193,7 @@ def testar_e_reportar(t, app_id, api_key):
     porta_raw = t.get("porta") or 5005
 
     try:
-        if tipo == "p2s":
-            # P2S: estado determinado por eventos do SmartTerm (porta 9444)
-            # nao faz sentido testar por rede — apenas consulta o estado em memoria
-            porta = int(porta_raw)
-            online, latencia, seg_sem_ping = verificar_p2s_terminal(tid, porta)
-            status = "online" if online else "offline"
-            logger.info(f"[P2S] {nome} -> {status.upper()} | sem_evento={seg_sem_ping}s")
-
-        elif tipo == "api":
+        if tipo == "api":
             endpoint = t.get("api_endpoint", "")
             if not endpoint:
                 logger.debug(f"{nome}: api_endpoint vazio, ignorado.")
@@ -383,8 +285,6 @@ def run_agent(intervalo=DEFAULT_INTERVAL, once=False, stop_event=None):
     if not lock.acquire():
         logger.error("Outra instancia ja esta em execucao. Encerrando.")
         return 2
-
-    start_p2s_http_server()
 
     try:
         while True:
@@ -478,10 +378,10 @@ export default function AgentSourceCode() {
       </div>
 
       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 space-y-1">
-        <p><strong>Tipos suportados:</strong> ip_local · ip_publico · dns · p2s · api</p>
+        <p><strong>Tipos suportados:</strong> ip_local · ip_publico · dns · api</p>
         <p><strong>⚡ Paralelo:</strong> todos os terminais são testados simultaneamente (até 20 threads) — sem lentidão independente do número de terminais.</p>
-        <p><strong>P2S:</strong> o SmartTerm reporta eventos via POST <code className="bg-emerald-100 px-1 rounded font-mono">http://127.0.0.1:9444/p2s</code> quando conecta/desconecta.</p>
         <p><strong>Segurança:</strong> autentica via <code className="bg-emerald-100 px-1 rounded font-mono">X-Api-Key</code> pessoal — cada agente acede apenas aos seus terminais.</p>
+        <p><strong>P2S:</strong> use o <strong>p2s_server.py</strong> dedicado (disponível em Administração → P2S Server).</p>
       </div>
 
       {expanded && (

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, UserPlus, Pencil, X, Check, Clock, UserCheck, Settings, Activity, AlertCircle, Mail, Trash2, Ban, Terminal, Bot, Key } from 'lucide-react';
+import { Shield, UserPlus, Pencil, X, Check, Clock, UserCheck, Settings, Activity, AlertCircle, Mail, Trash2, Ban, Terminal, Bot, Key, Radio, Save } from 'lucide-react';
 import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
+import NocServerCode from '../components/configuracoes/NocServerCode';
+import P2sServerCode from '../components/configuracoes/P2sServerCode';
 import PendingUserRow from '../components/admin/PendingUserRow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,8 @@ export default function Administracao() {
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [currentUser, setCurrentUser] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState('5');
+  const [savingInterval, setSavingInterval] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -152,10 +156,34 @@ export default function Administracao() {
   });
 
   // Fetch system config
-  const { data: monitorConfig = [] } = useQuery({
+  const { data: monitorConfig = [], refetch: refetchMonitorConfig } = useQuery({
     queryKey: ['monitor-config-admin'],
     queryFn: () => base44.entities.MonitorConfig.list(),
   });
+
+  useEffect(() => {
+    if (monitorConfig[0]?.intervalo_sync_minutos) {
+      setRefreshInterval(String(monitorConfig[0].intervalo_sync_minutos));
+    }
+  }, [monitorConfig]);
+
+  const handleSaveInterval = async () => {
+    setSavingInterval(true);
+    try {
+      const interval = Math.max(1, parseInt(refreshInterval) || 5);
+      if (monitorConfig[0]?.id) {
+        await base44.entities.MonitorConfig.update(monitorConfig[0].id, { intervalo_sync_minutos: interval });
+      } else {
+        await base44.entities.MonitorConfig.create({ tipo: 'api_externa', intervalo_sync_minutos: interval, ativo: true });
+      }
+      toast.success('Intervalo de sincronização atualizado!');
+      refetchMonitorConfig();
+    } catch {
+      toast.error('Erro ao salvar configuração');
+    } finally {
+      setSavingInterval(false);
+    }
+  };
 
   const { data: alertRules = [] } = useQuery({
     queryKey: ['alert-rules-admin'],
@@ -469,6 +497,62 @@ export default function Administracao() {
             )}
           </CardContent>
         </Card>
+      {/* Intervalo de Sincronização */}
+      <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5 text-blue-600" />
+            Intervalo de Sincronização
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-slate-500">Frequência de atualização dos dados em Dashboard, Terminais e Modo TV.</p>
+          <div className="flex items-center gap-3">
+            <Input
+              type="number"
+              min="1"
+              max="60"
+              value={refreshInterval}
+              onChange={(e) => setRefreshInterval(e.target.value)}
+              className="max-w-[120px]"
+            />
+            <span className="text-sm text-slate-500">minuto(s)</span>
+            <Button onClick={handleSaveInterval} disabled={savingInterval} size="sm" className="bg-blue-600 hover:bg-blue-700 gap-2">
+              <Save className="h-4 w-4" />
+              {savingInterval ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* NOC Server */}
+      <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Radio className="h-5 w-5 text-violet-600" />
+            NOC Server — Windows Server (51.91.219.145)
+          </CardTitle>
+          <p className="text-sm text-slate-500">Servidor unificado para terminais: Heartbeat TCP, ADMS/Push (ZKTeco, Anviz) e SDK-TCP.</p>
+        </CardHeader>
+        <CardContent>
+          <NocServerCode />
+        </CardContent>
+      </Card>
+
+      {/* P2S Server */}
+      <Card className="bg-white/80 backdrop-blur-sm border-violet-200/60">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Radio className="h-5 w-5 text-violet-600" />
+            P2S Server — Push to Server (Windows Server)
+          </CardTitle>
+          <p className="text-sm text-slate-500">Serviço dedicado para terminais P2S: ZKTeco, Anviz, Suprema, Hikvision, Dahua, Nitgen.</p>
+        </CardHeader>
+        <CardContent>
+          <P2sServerCode />
+        </CardContent>
+      </Card>
+
       {/* Agent Installation Guide — admin only */}
       <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
         <CardHeader>
