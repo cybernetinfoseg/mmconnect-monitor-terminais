@@ -428,15 +428,21 @@ export default function TVMode() {
 
         {/* Terminals Grid */}
         {(() => {
-          const cols = tvSettings.gridCols;
-          const gridClass = cols === 'auto' ?
-          'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5' :
-          `grid-cols-${cols}`;
-          const cardPad = tvSettings.cardSize === 'sm' ? 'p-3' : tvSettings.cardSize === 'lg' ? 'p-7' : 'p-5';
-          const titleSize = tvSettings.cardSize === 'sm' ? 'text-base' : tvSettings.cardSize === 'lg' ? 'text-2xl' : 'text-lg';
+           const cols = tvSettings.gridCols;
+           const gridColsMap = {
+             auto: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
+             2: 'grid-cols-2',
+             3: 'grid-cols-3',
+             4: 'grid-cols-4',
+             5: 'grid-cols-5',
+             6: 'grid-cols-6',
+           };
+           const gridClass = gridColsMap[cols] || gridColsMap.auto;
+           const cardPad = tvSettings.cardSize === 'sm' ? 'p-3' : tvSettings.cardSize === 'lg' ? 'p-7' : 'p-5';
+           const titleSize = tvSettings.cardSize === 'sm' ? 'text-base' : tvSettings.cardSize === 'lg' ? 'text-2xl' : 'text-lg';
 
-          return (
-            <div className={cn('grid gap-3 sm:gap-4', gridClass)}>
+           return (
+             <div className={cn('grid gap-3 sm:gap-4', gridClass)}>
               <AnimatePresence mode="popLayout">
                 {sortedTerminals.map((terminal, index) =>
                 <motion.div
