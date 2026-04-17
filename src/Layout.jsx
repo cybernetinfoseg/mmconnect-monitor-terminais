@@ -264,7 +264,13 @@ export default function Layout({ children, currentPageName }) {
                 return (
                   <button
                     key={item.page}
-                    onClick={() => navigate(createPageUrl(item.page), { replace: isActive })}
+                    onClick={() => {
+                      if (isActive) {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      } else {
+                        navigate(createPageUrl(item.page), { replace: false });
+                      }
+                    }}
                     className={cn(
                       "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
                       isActive
