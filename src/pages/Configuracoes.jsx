@@ -259,14 +259,14 @@ export default function Configuracoes() {
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Endpoint — Obter Terminais</Label>
                     <div className="flex gap-2">
-                      <Input readOnly value="/api/functions/agentGetTerminals" className="bg-slate-50 text-xs font-mono min-w-0 break-all" />
+                      <Input readOnly value="/api/functions/agentGetTerminals" className="bg-slate-50 text-xs font-mono min-w-0 truncate" />
                       <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentGetTerminals', 'Endpoint')} className="shrink-0"><Copy className="h-3 w-3 sm:h-4 sm:w-4" /></Button>
                     </div>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-slate-500">Endpoint — Reportar Status</Label>
                     <div className="flex gap-2">
-                      <Input readOnly value="/api/functions/agentReport" className="bg-slate-50 text-xs font-mono min-w-0 break-all" />
+                      <Input readOnly value="/api/functions/agentReport" className="bg-slate-50 text-xs font-mono min-w-0 truncate" />
                       <Button variant="outline" size="sm" onClick={() => copyToClipboard('/api/functions/agentReport', 'Endpoint')} className="shrink-0"><Copy className="h-3 w-3 sm:h-4 sm:w-4" /></Button>
                     </div>
                   </div>
