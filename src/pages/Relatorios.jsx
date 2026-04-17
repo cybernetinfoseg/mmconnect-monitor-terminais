@@ -37,7 +37,7 @@ export default function Relatorios() {
     }, []);
 
     const perms = resolvePermissions(currentUser);
-    const canSeeAll = perms.isAdmin || perms.isEditor;
+    const canSeeAll = perms.isAdmin;
 
     const { data: allHistory = [], isLoading: historyLoading } = useQuery({
         queryKey: ['rel-history'],

@@ -8,13 +8,15 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
+        // Permite chamadas do scheduler (sem user) OU de admins autenticados
         const isAuthenticated = await base44.auth.isAuthenticated();
         if (isAuthenticated) {
             const user = await base44.auth.me();
             if (user?.role !== 'admin') {
-                return Response.json({ error: 'Forbidden' }, { status: 403 });
+                return Response.json({ error: 'Forbidden: apenas admins' }, { status: 403 });
             }
         }
+        // Se não autenticado, assume chamada do scheduler — prossegue
 
         const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 

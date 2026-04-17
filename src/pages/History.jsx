@@ -42,7 +42,7 @@ export default function History() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
-  const canSeeAll = perms.isAdmin || perms.isEditor;
+  const canSeeAll = perms.isAdmin;
 
   // Fetch terminals
   const { data: allTerminals = [] } = useQuery({
