@@ -265,7 +265,7 @@ export default function Terminais() {
   };
 
   const getTipoLabel = (tipo) => {
-    const labels = { ip_local: 'IP Local', ip_publico: 'IP Público', dns: 'DNS/No-IP', p2s: 'P2S VPN', heartbeat: 'Heartbeat TCP', adms_push: 'ADMS/Push', sdk_tcp: 'SDK-TCP', api: 'API' };
+    const labels = { ip_local: 'IP Local', ip_publico: 'IP Público', dns: 'DNS/No-IP', p2s: 'P2S VPN', heartbeat: 'Heartbeat TCP', adms_push: 'ADMS/Push', sdk_tcp: 'SDK-TCP', websocket_cloud: 'WebSocket Cloud', api: 'API' };
     return labels[tipo] || tipo;
   };
 
@@ -278,6 +278,7 @@ export default function Terminais() {
       case 'heartbeat': return `${terminal.ip_publico || '51.91.219.145'}:${terminal.porta || 5005}`;
       case 'adms_push': return terminal.numero_serie ? `SN: ${terminal.numero_serie} | ADMS :8080` : 'ADMS :8080 (sem SN)';
       case 'sdk_tcp': return terminal.ip_publico ? `${terminal.ip_publico}:${terminal.porta || 4370}` : null;
+      case 'websocket_cloud': return terminal.numero_serie ? `SN: ${terminal.numero_serie} | WS :${terminal.porta || 7788}` : `WS :${terminal.porta || 7788} (sem SN)`;
       case 'api': return terminal.api_endpoint || null;
       default: return null;
     }
@@ -365,6 +366,7 @@ export default function Terminais() {
                   <SelectItem value="heartbeat">Heartbeat TCP</SelectItem>
                   <SelectItem value="adms_push">ADMS / Push</SelectItem>
                   <SelectItem value="sdk_tcp">SDK-TCP</SelectItem>
+                  <SelectItem value="websocket_cloud">WebSocket Cloud</SelectItem>
                   <SelectItem value="api">API</SelectItem>
                 </SelectContent>
               </Select>
@@ -555,7 +557,17 @@ export default function Terminais() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Tipo de Conexão *</Label>
-                <Select value={formData.tipo_conexao || 'ip_local'} onValueChange={(v) => setFormData({...formData, tipo_conexao: v})}>
+                <Select
+                  value={formData.tipo_conexao || 'ip_local'}
+                  onValueChange={(v) => {
+                    const defaults = {
+                      websocket_cloud: { fabricante: 'timmy', porta: 7788 },
+                      sdk_tcp: { fabricante: 'zkteco', porta: 4370 },
+                      adms_push: { fabricante: 'zkteco' },
+                    };
+                    setFormData({ ...formData, tipo_conexao: v, ...(defaults[v] || {}) });
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ip_local">IP Local</SelectItem>
@@ -565,11 +577,12 @@ export default function Terminais() {
                     <SelectItem value="heartbeat">Heartbeat TCP (Windows Server)</SelectItem>
                     <SelectItem value="adms_push">ADMS / Push (ZKTeco, Anviz)</SelectItem>
                     <SelectItem value="sdk_tcp">SDK-TCP (ZKTeco porta 4370)</SelectItem>
+                    <SelectItem value="websocket_cloud">WebSocket Cloud (Timmy/THbio)</SelectItem>
                     <SelectItem value="api">API</SelectItem>
                     </SelectContent>
                     </Select>
                     </div>
-                    {formData.tipo_conexao !== 'p2s' && formData.tipo_conexao !== 'adms_push' && (
+                    {formData.tipo_conexao !== 'p2s' && formData.tipo_conexao !== 'adms_push' && formData.tipo_conexao !== 'websocket_cloud' && (
                 <div className="space-y-2">
                   <Label>Porta</Label>
                   <Input type="number" value={formData.porta || 5005} onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})} />
@@ -670,6 +683,7 @@ export default function Terminais() {
                     <select value={formData.fabricante || 'zkteco'} onChange={(e) => setFormData({...formData, fabricante: e.target.value})}
                       className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
                       <option value="zkteco">ZKTeco</option>
+                      <option value="timmy">Timmy / THbio</option>
                       <option value="anviz">Anviz</option>
                       <option value="hikvision">Hikvision</option>
                       <option value="dahua">Dahua</option>
@@ -719,6 +733,65 @@ export default function Terminais() {
                     <Label>Modelo</Label>
                     <Input value={formData.modelo || ''} onChange={(e) => setFormData({...formData, modelo: e.target.value})} placeholder="ZKTeco F22" />
                   </div>
+                </div>
+              </div>
+            )}
+            {formData.tipo_conexao === 'websocket_cloud' && (
+              <div className="space-y-3">
+                <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg text-xs text-violet-700 space-y-1">
+                  <p className="font-semibold">📡 WebSocket Cloud — Timmy / THbio</p>
+                  <p>O terminal conecta-se ao servidor via <strong>WebSocket persistente</strong> (protocolo JSON). Compatível com: <strong>Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50</strong> e outros modelos THbio.</p>
+                  <p>O servidor <code className="bg-violet-100 px-1 rounded">timmy_ws_server.py</code> corre no Windows Server e escuta na porta configurada (padrão: 7788).</p>
+                  <p className="text-violet-600">⚠️ O <strong>Número de Série (SN)</strong> é obrigatório — é como o servidor identifica o terminal. Aceda via: <em>MENU → Sys Info → Info → SN</em></p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Número de Série (SN) <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={formData.numero_serie || ''}
+                      onChange={(e) => setFormData({...formData, numero_serie: e.target.value})}
+                      placeholder="ABC1234567890"
+                    />
+                    <p className="text-xs text-slate-500">Visível em: MENU → Sys Info → Info → SN</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Porta WebSocket</Label>
+                    <Input
+                      type="number"
+                      value={formData.porta || 7788}
+                      onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})}
+                      placeholder="7788"
+                    />
+                    <p className="text-xs text-slate-500">Porta configurada no timmy_ws_server.py (padrão: 7788)</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Modelo do Terminal</Label>
+                    <Input
+                      value={formData.modelo || ''}
+                      onChange={(e) => setFormData({...formData, modelo: e.target.value})}
+                      placeholder="TM-AI07F, TM-AIFace11F, TFS30..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Fabricante</Label>
+                    <select
+                      value={formData.fabricante || 'timmy'}
+                      onChange={(e) => setFormData({...formData, fabricante: e.target.value})}
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="timmy">Timmy / THbio</option>
+                      <option value="outro">Outro</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
+                  <p className="font-sans text-slate-600 font-semibold mb-1">Configuração no terminal Timmy:</p>
+                  <p className="text-slate-700">MENU → Comm Set → Server</p>
+                  <p className="text-violet-700">Server Req: <strong>Yes</strong> | Use domainNm: <strong>Yes</strong></p>
+                  <p className="text-violet-700">DomainNm: <strong>IP_DO_SERVIDOR</strong> | SerPortNo: <strong>7788</strong></p>
+                  <p className="text-violet-700">Heartbeat: <strong>3s</strong> | Server approval: <strong>No</strong></p>
                 </div>
               </div>
             )}
