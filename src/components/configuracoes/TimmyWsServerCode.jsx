@@ -235,7 +235,6 @@ async def handle_terminal(websocket):
 def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
     """Thread de reporte periódico para o NOC Monitor."""
     logger.info(f"[REPORT-WS] Ciclo de reporte activo — intervalo={intervalo}s")
-    sess = requests.Session()
     while not (stop_event and stop_event.is_set()):
         time.sleep(intervalo)
         with ws_lock:
@@ -248,8 +247,11 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
             last_seen = estado.get("last_seen", 0)
             latencia  = estado.get("latencia_ms")
 
-            # Verificar timeout
-            if connected and (time.time() - last_seen) > OFFLINE_TIMEOUT:
+            if not tid:
+                continue
+
+            # Verificar timeout de heartbeat
+            if connected and last_seen > 0 and (time.time() - last_seen) > OFFLINE_TIMEOUT:
                 with ws_lock:
                     if sn in ws_state:
                         ws_state[sn]["connected"] = False
@@ -258,16 +260,12 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
             seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
             status = "online" if connected else "offline"
 
-            if not tid:
-                continue
-
             try:
                 reportar_status_ws(app_id, api_key, tid, status, latencia, seg_offline)
                 logger.info(f"[REPORT-WS] '{nome}' (SN={sn}) → {status.upper()}"
                             + (f" offline={seg_offline}s" if seg_offline else ""))
             except Exception as e:
                 logger.error(f"[REPORT-WS] Erro ao reportar '{nome}': {e}")
-    sess.close()
 
 
 # ──────────────────────────────────────────────────────────────

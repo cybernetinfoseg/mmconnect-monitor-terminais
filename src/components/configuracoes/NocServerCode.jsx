@@ -458,8 +458,9 @@ def run_noc_server(stop_event=None):
         hb_terminais   = [t for t in terminais if t.get("tipo_conexao") == "heartbeat"]
         adms_terminais = [t for t in terminais if t.get("tipo_conexao") == "adms_push"]
         sdk_terminais  = [t for t in terminais if t.get("tipo_conexao") == "sdk_tcp"]
+        ws_terminais   = [t for t in terminais if t.get("tipo_conexao") == "websocket_cloud"]
 
-        logger.info(f"Terminais: {len(hb_terminais)} Heartbeat | {len(adms_terminais)} ADMS/Push | {len(sdk_terminais)} SDK-TCP")
+        logger.info(f"Terminais: {len(hb_terminais)} Heartbeat | {len(adms_terminais)} ADMS/Push | {len(sdk_terminais)} SDK-TCP | {len(ws_terminais)} WebSocket Cloud")
 
         # Construir mapa SN → terminal_id para ADMS
         global sn_to_terminal
@@ -487,9 +488,16 @@ def run_noc_server(stop_event=None):
         # Iniciar threads SDK-TCP (1 por terminal)
         for t in sdk_terminais:
             th = threading.Thread(target=sdk_tcp_poller, args=(t, stop_event, intervalo),
-                                  name=f"sdk-{t['nome']}", daemon=True)
+                                   name=f"sdk-{t['nome']}", daemon=True)
             th.start()
             logger.info(f"  [SDK-TCP] Poller iniciado para '{t['nome']}'")
+
+        # Aviso sobre terminais WebSocket Cloud
+        if ws_terminais:
+            logger.info(f"  [WS] {len(ws_terminais)} terminal(is) WebSocket Cloud detectado(s).")
+            logger.info(f"  [WS] Estes terminais são geridos pelo timmy_ws_server.py — certifique-se que está a correr.")
+            for t in ws_terminais:
+                logger.info(f"    - '{t['nome']}' SN={t.get('numero_serie','?')}")
 
         # Loop de reporte (bloqueia aqui até stop_event)
         ciclo_reporte(terminais, app_id, api_key, stop_event, intervalo)
