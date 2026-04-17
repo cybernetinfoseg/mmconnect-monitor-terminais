@@ -294,6 +294,20 @@ Deno.serve(async (req) => {
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }
 
+    const ts = new Date().toISOString();
+
+    // Log de operação detalhado
+    await base44.asServiceRole.entities.OperationLog.create({
+      terminal_id,
+      terminal_nome: terminal.nome,
+      acao: action,
+      executado_por: user.email,
+      sucesso: result.success !== false,
+      mensagem: result.message || result.error || (result.success ? 'Operação executada' : 'Operação falhou'),
+      resposta_raw: JSON.stringify(result),
+      timestamp: ts,
+    }).catch(() => {});
+
     // Log auditoria
     await base44.asServiceRole.entities.AuditLog.create({
       usuario_email: user.email,
@@ -301,7 +315,7 @@ Deno.serve(async (req) => {
       entidade: 'Terminal',
       entidade_id: terminal_id,
       descricao: `Ação remota "${action}" no terminal "${terminal.nome}": ${result.success ? 'sucesso' : 'falha'}`,
-      timestamp: new Date().toISOString(),
+      timestamp: ts,
     }).catch(() => {});
 
     return Response.json({ success: result.success, ...result });

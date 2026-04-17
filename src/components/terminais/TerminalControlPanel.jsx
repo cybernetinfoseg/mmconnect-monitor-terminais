@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import OperationLogsList from './OperationLogsList';
 import {
   Dialog,
   DialogContent,
@@ -288,6 +289,10 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
               </div>
             </div>
           )}
+
+          <div className="border-t border-slate-100 pt-4">
+            <OperationLogsList terminalId={terminal.id} />
+          </div>
 
           <p className="text-xs text-slate-400 text-center">
             Todas as ações são registadas no Audit Log

@@ -1,0 +1,54 @@
+{
+  "name": "OperationLog",
+  "type": "object",
+  "properties": {
+    "terminal_id": {
+      "type": "string",
+      "description": "ID do terminal"
+    },
+    "terminal_nome": {
+      "type": "string",
+      "description": "Nome do terminal (cache)"
+    },
+    "acao": {
+      "type": "string",
+      "enum": [
+        "settime",
+        "getlogs",
+        "opendoor",
+        "reboot",
+        "getdevinfo",
+        "lockctrl"
+      ],
+      "description": "A\u00e7\u00e3o executada"
+    },
+    "executado_por": {
+      "type": "string",
+      "description": "Email do utilizador que executou"
+    },
+    "sucesso": {
+      "type": "boolean",
+      "description": "Se a opera\u00e7\u00e3o teve sucesso"
+    },
+    "mensagem": {
+      "type": "string",
+      "description": "Mensagem de resultado (sucesso ou erro)"
+    },
+    "resposta_raw": {
+      "type": "string",
+      "description": "Resposta JSON detalhada do terminal (stringify)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora da opera\u00e7\u00e3o"
+    }
+  },
+  "required": [
+    "terminal_id",
+    "acao",
+    "executado_por",
+    "sucesso",
+    "timestamp"
+  ]
+}
