@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
             created_by: ownerEmail,
         });
 
-        const supported = ['heartbeat', 'adms_push', 'sdk_tcp'];
+        const supported = ['heartbeat', 'adms_push', 'sdk_tcp', 'websocket_cloud'];
         const terminals = allTerminals.filter(t => supported.includes(t.tipo_conexao));
 
         const result = terminals.map(t => ({

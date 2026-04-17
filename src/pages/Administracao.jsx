@@ -5,6 +5,7 @@ import { Shield, UserPlus, Pencil, X, Check, Clock, UserCheck, Settings, Activit
 import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
 import NocServerCode from '../components/configuracoes/NocServerCode';
 import P2sServerCode from '../components/configuracoes/P2sServerCode';
+import TimmyWsServerCode from '../components/configuracoes/TimmyWsServerCode';
 import PendingUserRow from '../components/admin/PendingUserRow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -550,6 +551,20 @@ export default function Administracao() {
         </CardHeader>
         <CardContent>
           <P2sServerCode />
+        </CardContent>
+      </Card>
+
+      {/* Timmy WebSocket Cloud Server */}
+      <Card className="bg-white/80 backdrop-blur-sm border-violet-200/60">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Radio className="h-5 w-5 text-violet-600" />
+            Timmy WebSocket Cloud Server
+          </CardTitle>
+          <p className="text-sm text-slate-500">Servidor WebSocket para terminais Timmy/THbio: TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros modelos com protocolo WebSocket+JSON.</p>
+        </CardHeader>
+        <CardContent>
+          <TimmyWsServerCode />
         </CardContent>
       </Card>
 

@@ -32,6 +32,7 @@
         "heartbeat",
         "adms_push",
         "sdk_tcp",
+        "websocket_cloud",
         "api"
       ],
       "default": "ip_local",
@@ -56,16 +57,17 @@
     },
     "numero_serie": {
       "type": "string",
-      "description": "N\u00famero de s\u00e9rie do terminal (SN) \u2014 usado em ADMS/Push e SDK"
+      "description": "N\u00famero de s\u00e9rie do terminal (SN) \u2014 usado em ADMS/Push, SDK e WebSocket Cloud"
     },
     "modelo": {
       "type": "string",
-      "description": "Modelo do terminal (ex: ZKTeco MB20, ZKTeco F22, Suprema BioStation)"
+      "description": "Modelo do terminal (ex: ZKTeco MB20, Timmy TM-AI07F)"
     },
     "fabricante": {
       "type": "string",
       "enum": [
         "zkteco",
+        "timmy",
         "suprema",
         "anviz",
         "hikvision",
