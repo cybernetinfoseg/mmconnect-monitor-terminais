@@ -190,10 +190,10 @@ export default function Dashboard() {
 
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 w-full overflow-x-hidden">
       {/* Header */}
-      <div className="bg-slate-900 text-white px-3 sm:px-6 py-3 sm:py-4">
-        <div className="max-w-[1920px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+      <div className="bg-slate-900 text-white px-3 sm:px-6 py-3 sm:py-4 w-full">
+        <div className="max-w-full mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg shrink-0">
               <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
@@ -279,7 +279,7 @@ export default function Dashboard() {
       )}
 
       {/* Main Content */}
-      <div className="max-w-[1920px] mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-[1920px]">
         {/* Filters */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}

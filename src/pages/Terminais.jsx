@@ -287,8 +287,8 @@ export default function Terminais() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 p-3 sm:p-6">
-      <div className="max-w-[1920px] mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full overflow-x-hidden">
+      <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-[1920px]">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
@@ -344,21 +344,21 @@ export default function Terminais() {
 
         {/* Filters */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap gap-4">
-              <div className="flex-1 min-w-[200px] relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input
-                  placeholder="Pesquisar por nome ou local..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select value={tipoFilter} onValueChange={setTipoFilter}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Tipo de conexão" />
-                </SelectTrigger>
+           <CardContent className="p-3 sm:p-4">
+             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
+               <div className="w-full sm:flex-1 sm:min-w-[180px] relative">
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                 <Input
+                   placeholder="Pesquisar por nome ou local..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="pl-10"
+                 />
+               </div>
+               <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                 <SelectTrigger className="w-full sm:w-[160px]">
+                   <SelectValue placeholder="Tipo de conexão" />
+                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os tipos</SelectItem>
                   <SelectItem value="ip_local">IP Local</SelectItem>
@@ -373,7 +373,7 @@ export default function Terminais() {
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-full sm:w-[140px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -383,11 +383,11 @@ export default function Terminais() {
                 </SelectContent>
               </Select>
               {isAdmin && (
-                <select
-                  value={userFilter}
-                  onChange={(e) => setUserFilter(e.target.value)}
-                  className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                >
+                 <select
+                   value={userFilter}
+                   onChange={(e) => setUserFilter(e.target.value)}
+                   className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                 >
                   <option value="all">Todos os utilizadores</option>
                   {usuarios.map(u => (
                     <option key={u} value={u}>{u}</option>
@@ -525,7 +525,7 @@ export default function Terminais() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+         <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingTerminal ? 'Editar Terminal' : 'Novo Terminal'}</DialogTitle>
           </DialogHeader>

@@ -155,7 +155,7 @@ export default function Manutencao() {
     };
 
     return (
-        <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-6">
+        <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-4xl overflow-x-hidden">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">

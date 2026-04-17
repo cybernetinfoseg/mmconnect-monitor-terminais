@@ -295,7 +295,7 @@ export default function Relatorios() {
     const loading = historyLoading && !history.length;
 
     return (
-        <div className="p-4 lg:p-6 max-w-6xl mx-auto space-y-6" ref={printRef}>
+        <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-6xl overflow-x-hidden" ref={printRef}>
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <div className="flex items-center gap-3">
