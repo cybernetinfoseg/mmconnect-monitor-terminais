@@ -80,7 +80,7 @@ export default function Dashboard() {
   };
 
   const perms = resolvePermissions(currentUser);
-  const canSeeAll = currentUser?.role === 'admin' || currentUser?.role === 'editor';
+  const canSeeAll = currentUser?.role === 'admin';
 
   // Fetch terminals with server-side filtering for security
   const { data: terminals = [], isLoading, refetch } = useQuery({

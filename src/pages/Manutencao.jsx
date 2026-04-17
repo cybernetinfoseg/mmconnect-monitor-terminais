@@ -41,7 +41,7 @@ export default function Manutencao() {
     }, []);
 
     const perms = resolvePermissions(currentUser);
-    const canSeeAll = perms.isAdmin || perms.isEditor;
+    const canSeeAll = perms.isAdmin;
 
     const { data: allJanelas = [], isLoading } = useQuery({
         queryKey: ['maintenance-windows'],

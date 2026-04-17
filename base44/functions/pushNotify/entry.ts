@@ -69,34 +69,29 @@ Deno.serve(async (req) => {
                 return Response.json({ error: 'terminal_id e terminal_nome obrigatórios' }, { status: 400 });
             }
 
-            // Verificar se já existe escalation para este terminal (não duplicar)
+            // Verificar escalation existente (criado pelo reporter antes de chamar pushNotify)
             const existing = await base44.asServiceRole.entities.EscalationAlert.filter({
                 terminal_id,
                 resolvido: false,
             });
 
-            let escalationAlert;
-            if (existing.length === 0) {
-                // Criar novo escalation (ainda não criado pelo reporter)
-                escalationAlert = await base44.asServiceRole.entities.EscalationAlert.create({
-                    terminal_id,
-                    terminal_nome,
-                    local: local || '',
-                    cliente: cliente || '',
-                    owner_email: owner_email || '',
-                    offline_desde: new Date().toISOString(),
-                    escalado: false,
-                    resolvido: false,
-                    notificacao_inicial_enviada: false,
-                });
-            } else {
-                escalationAlert = existing[0];
-            }
-
-            // Não re-enviar se já enviado
-            if (escalationAlert.notificacao_inicial_enviada) {
+            // Já notificado anteriormente — não duplicar
+            if (existing.length > 0 && existing[0].notificacao_inicial_enviada) {
                 return Response.json({ success: true, skipped: true, reason: 'já notificado' });
             }
+
+            // Usar escalation existente ou criar um de emergência se o reporter falhou
+            const escalationAlert = existing[0] || await base44.asServiceRole.entities.EscalationAlert.create({
+                terminal_id,
+                terminal_nome,
+                local: local || '',
+                cliente: cliente || '',
+                owner_email: owner_email || '',
+                offline_desde: new Date().toISOString(),
+                escalado: false,
+                resolvido: false,
+                notificacao_inicial_enviada: false,
+            });
 
             // Obter subscrições activas
             const [allSubs, admins] = await Promise.all([

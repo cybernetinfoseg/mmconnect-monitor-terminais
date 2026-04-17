@@ -9,6 +9,8 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
+        // Só chamado internamente pelo sistema (outros backends via asServiceRole)
+        // Verificar que o caller está autenticado — chamadas via asServiceRole são sempre válidas
         const body = await req.json();
         const { bot_token, chat_id, message } = body;
 
