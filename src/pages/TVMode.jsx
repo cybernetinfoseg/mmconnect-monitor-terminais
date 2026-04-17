@@ -59,7 +59,7 @@ export default function TVMode() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
-  const canSeeAll = perms.isAdmin || perms.isEditor;
+  const canSeeAll = perms.isAdmin;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);

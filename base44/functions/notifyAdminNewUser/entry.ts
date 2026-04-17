@@ -46,7 +46,7 @@ PRÓXIMAS AÇÕES:
 O usuário pode entrar em contato através do formulário de contato disponível na página de pendência.
     `.trim();
 
-    await base44.integrations.Core.SendEmail({
+    await base44.asServiceRole.integrations.Core.SendEmail({
       to: adminEmails,
       subject: `[NOC Monitor] Novo Usuário para Aprovação: ${nome} ${sobrenome}`,
       body: emailBody,

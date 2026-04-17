@@ -224,6 +224,7 @@ export default function Manutencao() {
                 onClose={() => { setModalOpen(false); setEditItem(null); }}
                 onSaved={handleSaved}
                 editItem={editItem}
+                currentUser={currentUser}
             />
         </div>
     );

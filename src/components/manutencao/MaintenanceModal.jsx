@@ -17,7 +17,7 @@ const EMPTY_FORM = {
     fim: '',
 };
 
-export default function MaintenanceModal({ open, onClose, onSaved, editItem }) {
+export default function MaintenanceModal({ open, onClose, onSaved, editItem, currentUser }) {
     const [form, setForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
 
@@ -59,7 +59,7 @@ export default function MaintenanceModal({ open, onClose, onSaved, editItem }) {
             inicio: new Date(form.inicio).toISOString(),
             fim: new Date(form.fim).toISOString(),
             ativo: true,
-            criado_por: (await base44.auth.me()).email,
+            criado_por: currentUser?.email || '',
         };
         let result;
         if (editItem) {
