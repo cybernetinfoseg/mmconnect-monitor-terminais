@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       console.log('ContactMessage entity não existe ou erro ao salvar');
     }
 
-    // Send email to admin(s)
+    // Send email to admin(s) — usar asServiceRole pois pode ser chamado sem sessão
     const emailBody = `
 MENSAGEM DE CONTATO DO USUÁRIO
 
@@ -52,7 +52,7 @@ ${message}
 Responda diretamente para o email do usuário.
     `.trim();
 
-    await base44.integrations.Core.SendEmail({
+    await base44.asServiceRole.integrations.Core.SendEmail({
       to: adminEmails,
       subject: `[NOC Monitor] Nova Mensagem: ${from_name || from_email}`,
       body: emailBody,
@@ -75,7 +75,7 @@ Atenciosamente,
 Equipe NOC Monitor
     `.trim();
 
-    await base44.integrations.Core.SendEmail({
+    await base44.asServiceRole.integrations.Core.SendEmail({
       to: from_email,
       subject: '[NOC Monitor] Mensagem Recebida - Aguarde Contato',
       body: confirmationEmail,

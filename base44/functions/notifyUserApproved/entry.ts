@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
     }
 
     // Envia email de aprovação
-    await base44.integrations.Core.SendEmail({
+    await base44.asServiceRole.integrations.Core.SendEmail({
       to: email,
       subject: 'Sua conta no NOC Monitor foi aprovada! ✅',
       body: `
@@ -43,8 +43,7 @@ NOC Monitor - Monitoramento de Terminais Biométricos
 function getRoleLabel(role) {
   const labels = {
     admin: 'Administrador',
-    editor: 'Editor',
-    viewer: 'Visualizador'
+    user: 'Utilizador',
   };
   return labels[role] || role;
 }
