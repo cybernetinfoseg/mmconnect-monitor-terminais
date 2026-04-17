@@ -167,6 +167,25 @@ async function actionGetLogs(terminal) {
     return { success: true, message: 'Terminais ADMS enviam marcações automaticamente ao servidor.', note: 'Verifique o Histórico de Marcações no NOC Monitor.' };
   }
 
+  if (terminal.tipo_conexao === 'sdk_tcp') {
+    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
+    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
+    const port = terminal.porta || 80;
+    // ZKTeco SDK-TCP: tenta buscar logs via HTTP iClock
+    const resp = await fetch(`http://${ip}:${port}/iclock/cdata?SN=${terminal.numero_serie || ''}&table=ATTLOG&Stamp=0000-00-00+00:00:00`, {
+      method: 'GET',
+    }).catch(() => null);
+    if (!resp) return { success: false, error: 'Terminal não respondeu' };
+    const body = await resp.text().catch(() => '');
+    const lines = body.split('\n').filter(l => l.trim() && !l.startsWith('GET'));
+    return { 
+      success: resp.status < 400, 
+      message: `${lines.length} marcações obtidas (ZKTeco SDK)`,
+      count: lines.length,
+      data: { raw: body.substring(0, 2000) }
+    };
+  }
+
   return { success: false, error: `getlogs não suportado para ${terminal.tipo_conexao}` };
 }
 
@@ -174,6 +193,25 @@ async function actionOpenDoor(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
     const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' });
     return { success: resp.result === true, message: 'Porta aberta remotamente', data: resp };
+  }
+
+  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
+    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
+    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
+    const port = terminal.porta || 80;
+    const sn = terminal.numero_serie || '';
+    // ZKTeco iClock: comando OpenDoor via ADMS/HTTP
+    const resp = await fetch(`http://${ip}:${port}/iclock/getrequest`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    // Também tenta via cdata para push imediato
+    await fetch(`http://${ip}:${port}/iclock/cdata`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `SN=${sn}&CMD=OPEN_DOOR&Lock=1`,
+    }).catch(() => {});
+    return { success: resp.status < 400, message: 'Comando de abertura enviado ao ZKTeco', note: 'Será processado na próxima sincronização ADMS' };
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
@@ -187,16 +225,11 @@ async function actionOpenDoor(terminal) {
     }
   }
 
-  if (terminal.tipo_conexao === 'sdk_tcp') {
-    return { success: false, error: 'Abertura de porta via SDK-TCP requer agente local. Use o botão no painel ZKTeco.' };
-  }
-
   return { success: false, error: `opendoor não suportado para ${terminal.tipo_conexao}` };
 }
 
 async function actionReboot(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    // Timmy reboot: envia e não espera resposta (terminal reinicia imediatamente)
     const wsUrl = buildTimmyWsUrl(terminal);
     await new Promise((resolve) => {
       const ws = new WebSocket(wsUrl);
@@ -208,6 +241,24 @@ async function actionReboot(terminal) {
       setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 5000);
     });
     return { success: true, message: 'Comando de reinício enviado. Terminal reiniciará imediatamente.' };
+  }
+
+  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
+    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
+    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
+    const port = terminal.porta || 80;
+    const sn = terminal.numero_serie || '';
+    // ZKTeco ADMS reboot command
+    const resp = await fetch(`http://${ip}:${port}/iclock/cdata`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `SN=${sn}&CMD=REBOOT`,
+    }).catch(() => ({ status: 0 }));
+    return { 
+      success: resp.status < 400, 
+      message: 'Comando de reinício enviado ao ZKTeco',
+      note: 'Terminal irá reiniciar assim que processar o comando'
+    };
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
@@ -228,6 +279,26 @@ async function actionGetDevInfo(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
     const resp = await sendTimmyCommand(terminal, { cmd: 'getdevcap' });
     return { success: resp.result === true, message: 'Informação do dispositivo obtida', data: resp };
+  }
+
+  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
+    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
+    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
+    const port = terminal.porta || 80;
+    // ZKTeco: buscar info via iClock HTTP
+    const resp = await fetch(`http://${ip}:${port}/iclock/getrequest?action=getinfo`, {
+      method: 'GET',
+    }).catch(() => null);
+    if (!resp) return { success: false, error: 'Terminal não respondeu' };
+    const body = await resp.text().catch(() => '');
+    // Também tenta endpoint alternativo para modelos mais novos
+    const resp2 = await fetch(`http://${ip}:${port}/deviceinfo`, { method: 'GET' }).catch(() => null);
+    const body2 = resp2 ? await resp2.text().catch(() => '') : '';
+    return {
+      success: resp.status < 400,
+      message: 'Informação do dispositivo ZKTeco obtida',
+      data: { iclock_response: body, device_info: body2, sn: terminal.numero_serie, modelo: terminal.modelo }
+    };
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {

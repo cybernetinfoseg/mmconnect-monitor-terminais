@@ -49,17 +49,20 @@ function getSupportedActions(terminal) {
     return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'lockctrl', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
   }
   if (tipo === 'adms_push') {
-    return ['settime', 'getlogs', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
+    // ZKTeco ADMS: todas as ações exceto lockctrl. getlogs é automático mas mostramos como info.
+    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
   }
   if (tipo === 'sdk_tcp') {
-    return ['settime', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
+    // ZKTeco SDK-TCP: todas exceto lockctrl
+    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
   }
   if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
     if (fab === 'hikvision') {
-      return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
+      return ['settime', 'getlogs', 'opendoor', 'reboot', 'adduser', 'blockuser', 'getdevinfo'].map(k => ({ key: k, ...all[k] }));
     }
     if (fab === 'dahua') {
-      return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser'].map(k => ({ key: k, ...all[k] }));
+      // Dahua: blockuser não suportado (⚠️ no-op no backend)
+      return ['settime', 'getlogs', 'opendoor', 'reboot', 'adduser', 'getdevinfo'].map(k => ({ key: k, ...all[k] }));
     }
   }
 
