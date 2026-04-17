@@ -10,27 +10,21 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Email é obrigatório' }, { status: 400 });
     }
 
+    // Email de recusa
+    if (role === 'rejected') {
+      await base44.asServiceRole.integrations.Core.SendEmail({
+        to: email,
+        subject: '[NOC Monitor] Solicitação de Acesso Recusada',
+        body: `Olá ${nome || ''},\n\nInfelizmente, a sua solicitação de acesso ao NOC Monitor foi recusada.\n\nSe tiver dúvidas, entre em contacto com o administrador do sistema.\n\n---\nNOC Monitor - Monitoramento de Terminais Biométricos`,
+      });
+      return Response.json({ success: true, message: 'Email de recusa enviado' });
+    }
+
     // Envia email de aprovação
     await base44.asServiceRole.integrations.Core.SendEmail({
       to: email,
       subject: 'Sua conta no NOC Monitor foi aprovada! ✅',
-      body: `
-Olá ${nome || 'usuário'},
-
-Sua solicitação de acesso ao NOC Monitor foi **APROVADA**! 🎉
-
-**Informações da sua conta:**
-- Email: ${email}
-- Papel: ${getRoleLabel(role)}
-- Status: ✅ Ativo
-
-Você agora tem acesso total ao sistema. Pode fazer login no NOC Monitor usando suas credenciais.
-
-Se tiver qualquer dúvida, entre em contato com o administrador do sistema.
-
----
-NOC Monitor - Monitoramento de Terminais Biométricos
-      `
+      body: `Olá ${nome || 'utilizador'},\n\nA sua solicitação de acesso ao NOC Monitor foi APROVADA!\n\nInformações da sua conta:\n- Email: ${email}\n- Papel: ${getRoleLabel(role)}\n- Status: Ativo\n\nPode fazer login no NOC Monitor usando as suas credenciais.\n\nSe tiver qualquer dúvida, entre em contacto com o administrador do sistema.\n\n---\nNOC Monitor - Monitoramento de Terminais Biométricos`,
     });
 
     return Response.json({ success: true, message: 'Email de aprovação enviado' });

@@ -60,7 +60,7 @@ export default function History() {
   // Fetch status history
   const { data: allHistory = [], isLoading: historyLoading } = useQuery({
     queryKey: ['status-history'],
-    queryFn: () => base44.entities.StatusHistory.list('-created_date', 1000),
+    queryFn: () => base44.entities.StatusHistory.list('-timestamp', 1000),
     enabled: !!currentUser,
   });
 

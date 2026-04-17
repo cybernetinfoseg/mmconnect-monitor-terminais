@@ -89,16 +89,16 @@ export default function Administracao() {
     mutationFn: async (id) => {
       const u = users.find(u => u.id === id);
       
-      // Envia email de recusa diretamente
+      // Envia email de recusa via backend
       if (u?.email) {
-        await base44.integrations.Core.SendEmail({
-          to: u.email,
-          subject: '[NOC Monitor] Solicitação de Acesso Recusada',
-          body: `Olá ${u.nome || u.full_name || ''},\n\nInfelizmente, sua solicitação de acesso ao NOC Monitor foi recusada.\n\nSe tiver dúvidas, entre em contato com o administrador do sistema.\n\n---\nNOC Monitor`,
+        await base44.functions.invoke('notifyUserApproved', {
+          email: u.email,
+          nome: u.nome || u.full_name || '',
+          role: 'rejected',
         }).catch(() => {});
       }
       
-      // Deleta usuário
+      // Deleta utilizador
       await base44.entities.User.delete(id);
       return id;
     },

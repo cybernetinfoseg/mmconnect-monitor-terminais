@@ -102,19 +102,30 @@ export default function Agendamentos() {
   const handleRunNow = async (sched) => {
     setRunningId(sched.id);
     try {
-      await base44.functions.invoke('terminalControl', {
+      const resp = await base44.functions.invoke('terminalControl', {
         terminal_id: sched.terminal_id,
         action: sched.acao,
       });
+      const resultado = resp.data?.success !== false ? 'sucesso' : 'falha';
       // Atualizar última execução
       await base44.entities.ScheduledAction.update(sched.id, {
         ultima_execucao: new Date().toISOString(),
-        ultimo_resultado: 'sucesso',
+        ultimo_resultado: resultado,
         total_execucoes: (sched.total_execucoes || 0) + 1,
       });
       queryClient.invalidateQueries({ queryKey: ['scheduled-actions'] });
-      toast.success(`Ação executada: ${ACAO_LABELS[sched.acao]}`);
+      if (resultado === 'sucesso') {
+        toast.success(`${ACAO_LABELS[sched.acao]}: ${resp.data?.message || 'Executado com sucesso'}`);
+      } else {
+        toast.error(`${ACAO_LABELS[sched.acao]}: ${resp.data?.error || 'Falha na execução'}`);
+      }
     } catch (err) {
+      await base44.entities.ScheduledAction.update(sched.id, {
+        ultima_execucao: new Date().toISOString(),
+        ultimo_resultado: 'falha',
+        total_execucoes: (sched.total_execucoes || 0) + 1,
+      }).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ['scheduled-actions'] });
       toast.error(`Erro: ${err.message}`);
     } finally {
       setRunningId(null);

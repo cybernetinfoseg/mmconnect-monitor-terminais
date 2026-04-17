@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
                         });
                     }
 
-                    // Criar incidente se transitou → offline
+                    // Criar incidente e EscalationAlert se transitou → offline
                     if (statusMudou && novoStatus === 'offline') {
                         await base44.asServiceRole.entities.AlertIncident.create({
                             terminal_id: terminal.id,
@@ -132,6 +132,19 @@ Deno.serve(async (req) => {
                             resolvido: false,
                             notificado: false,
                         });
+
+                        // Criar EscalationAlert para escalonamento automático após 24h
+                        await base44.asServiceRole.entities.EscalationAlert.create({
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || '',
+                            owner_email: terminal.created_by || '',
+                            offline_desde: timestampOffline.toISOString(),
+                            escalado: false,
+                            resolvido: false,
+                            notificacao_inicial_enviada: false,
+                        }).catch(() => {});
 
                         await base44.asServiceRole.functions.invoke('pushNotify', {
                             action: 'notify_offline',

@@ -20,33 +20,48 @@ Deno.serve(async (req) => {
 
         const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        // Buscar registos antigos (em batches de 200)
-        const oldRecords = await base44.asServiceRole.entities.StatusHistory.list('-timestamp', 200);
-        const toDelete = oldRecords.filter(r => r.timestamp < cutoff);
-
+        // Buscar registos antigos em batches maiores (500 por batch)
         let deleted = 0;
-        for (const record of toDelete) {
-            await base44.asServiceRole.entities.StatusHistory.delete(record.id).catch(() => {});
-            deleted++;
+        let batchHistory = await base44.asServiceRole.entities.StatusHistory.list('-timestamp', 500);
+        let toDeleteHistory = batchHistory.filter(r => r.timestamp < cutoff);
+        // Apagar em paralelo (grupos de 20)
+        for (let i = 0; i < toDeleteHistory.length; i += 20) {
+            const chunk = toDeleteHistory.slice(i, i + 20);
+            await Promise.all(chunk.map(r => base44.asServiceRole.entities.StatusHistory.delete(r.id).catch(() => {})));
+            deleted += chunk.length;
         }
 
         // Limpar também AlertIncidents resolvidos há mais de 60 dias
-        const oldIncidents = await base44.asServiceRole.entities.AlertIncident.list('-timestamp', 200);
         const cutoff60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+        const oldIncidents = await base44.asServiceRole.entities.AlertIncident.list('-timestamp', 500);
         const incidentsToDelete = oldIncidents.filter(i => i.resolvido && i.timestamp < cutoff60);
 
         let deletedIncidents = 0;
-        for (const incident of incidentsToDelete) {
-            await base44.asServiceRole.entities.AlertIncident.delete(incident.id).catch(() => {});
-            deletedIncidents++;
+        for (let i = 0; i < incidentsToDelete.length; i += 20) {
+            const chunk = incidentsToDelete.slice(i, i + 20);
+            await Promise.all(chunk.map(inc => base44.asServiceRole.entities.AlertIncident.delete(inc.id).catch(() => {})));
+            deletedIncidents += chunk.length;
+        }
+
+        // Limpar OperationLogs com mais de 90 dias
+        const cutoff90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        const oldOpLogs = await base44.asServiceRole.entities.OperationLog.list('-timestamp', 500).catch(() => []);
+        const opLogsToDelete = oldOpLogs.filter(l => l.timestamp < cutoff90);
+        let deletedOpLogs = 0;
+        for (let i = 0; i < opLogsToDelete.length; i += 20) {
+            const chunk = opLogsToDelete.slice(i, i + 20);
+            await Promise.all(chunk.map(l => base44.asServiceRole.entities.OperationLog.delete(l.id).catch(() => {})));
+            deletedOpLogs += chunk.length;
         }
 
         return Response.json({
             success: true,
             deleted_history: deleted,
             deleted_incidents: deletedIncidents,
+            deleted_operation_logs: deletedOpLogs,
             cutoff_history: cutoff,
             cutoff_incidents: cutoff60,
+            cutoff_operation_logs: cutoff90,
         });
 
     } catch (error) {
