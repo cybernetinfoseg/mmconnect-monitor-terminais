@@ -48,10 +48,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import StatusBadge from '../components/dashboard/StatusBadge';
+import TerminalControlPanel from '../components/terminais/TerminalControlPanel';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { User as UserIcon } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export default function Terminais() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -191,6 +193,7 @@ export default function Terminais() {
   });
 
   const [selectedTerminal, setSelectedTerminal] = useState(null);
+  const [controlTerminal, setControlTerminal] = useState(null);
 
   const { data: locaisDB = [], refetch: refetchLocais } = useQuery({
     queryKey: ['locais', currentUser?.email],
@@ -449,6 +452,15 @@ export default function Terminais() {
                           <Eye className="h-3 w-3 mr-1" />
                           Detalhes
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setControlTerminal(terminal)}
+                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          title="Controlo Remoto"
+                        >
+                          <Zap className="h-3 w-3" />
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => monitorMutation.mutate(terminal)} disabled={refreshingTerminalId === terminal.id}>
                            <RefreshCw className={cn("h-3 w-3", refreshingTerminalId === terminal.id && "animate-spin")} />
                         </Button>
@@ -481,6 +493,14 @@ export default function Terminais() {
         <TerminalDetailModal
           terminal={selectedTerminal}
           onClose={() => setSelectedTerminal(null)}
+        />
+      )}
+
+      {controlTerminal && (
+        <TerminalControlPanel
+          terminal={controlTerminal}
+          open={!!controlTerminal}
+          onClose={() => setControlTerminal(null)}
         />
       )}
 
