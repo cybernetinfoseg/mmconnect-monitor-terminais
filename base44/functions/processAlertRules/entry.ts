@@ -1,153 +1,158 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+/**
+ * processAlertRules — avalia regras de alerta e envia notificações.
+ * Chamado pelo scheduler a cada 5 minutos.
+ */
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
+    try {
+        const base44 = createClientFromRequest(req);
 
-    // Permite scheduler (sem auth) ou admin autenticado
-    const isAuthenticated = await base44.auth.isAuthenticated();
-    if (isAuthenticated) {
-      const user = await base44.auth.me();
-      if (user?.role !== 'admin') {
-        return Response.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    }
+        // Scheduler chama sem auth; utilizador autenticado deve ser admin
+        const isAuthenticated = await base44.auth.isAuthenticated();
+        if (isAuthenticated) {
+            const user = await base44.auth.me();
+            if (user?.role !== 'admin') {
+                return Response.json({ error: 'Forbidden' }, { status: 403 });
+            }
+        }
 
-    const rules = await base44.asServiceRole.entities.AlertRule.filter({ ativo: true });
-    const allTerminals = await base44.asServiceRole.entities.Terminal.list();
+        const now = new Date();
+        const agora_ms = now.getTime();
 
-    // Filtrar terminais em manutenção
-    const agora = new Date().toISOString();
-    const janelasAtivas = await base44.asServiceRole.entities.MaintenanceWindow.filter({ ativo: true });
-    const terminaisEmManutencao = new Set(
-        janelasAtivas.filter(j => j.inicio <= agora && j.fim >= agora).map(j => j.terminal_id)
-    );
-    const terminals = allTerminals.filter(t => !terminaisEmManutencao.has(t.id));
+        const [rules, allTerminals, janelasAtivas] = await Promise.all([
+            base44.asServiceRole.entities.AlertRule.filter({ ativo: true }),
+            base44.asServiceRole.entities.Terminal.list(),
+            base44.asServiceRole.entities.MaintenanceWindow.filter({ ativo: true }),
+        ]);
 
-    const now = new Date();
-    const results = [];
-    // now is used below; agora (ISO string) was computed above for maintenance filter
-
-    for (const rule of rules) {
-      // Check cooldown
-      if (rule.ultima_disparada) {
-        const lastFired = new Date(rule.ultima_disparada);
-        const minutesSince = (now - lastFired) / 60000;
-        if (minutesSince < (rule.cooldown_minutos || 30)) continue;
-      }
-
-      // Filter terminals
-      let filteredTerminals = terminals;
-      if (rule.filtro_local) {
-        filteredTerminals = filteredTerminals.filter(t => t.local === rule.filtro_local);
-      }
-      if (rule.filtro_cliente) {
-        filteredTerminals = filteredTerminals.filter(t =>
-          t.cliente_nome === rule.filtro_cliente || t.cliente === rule.filtro_cliente
+        // Filtrar terminais em manutenção — comparação temporal correcta com timestamps
+        const terminaisEmManutencao = new Set(
+            janelasAtivas
+                .filter(j => {
+                    const ini = new Date(j.inicio).getTime();
+                    const fim = new Date(j.fim).getTime();
+                    return !isNaN(ini) && !isNaN(fim) && agora_ms >= ini && agora_ms <= fim;
+                })
+                .map(j => j.terminal_id)
         );
-      }
+        const terminals = allTerminals.filter(t => !terminaisEmManutencao.has(t.id));
 
-      let shouldFire = false;
-      let messageBody = '';
-      let slackText = '';
-      const ts = now.toLocaleString('pt-BR');
+        const ts = now.toLocaleString('pt-PT', { timeZone: 'UTC' }) + ' UTC';
+        const results = [];
 
-      if (rule.gatilho === 'terminal_offline') {
-        const offlineTerminals = filteredTerminals.filter(t => t.status === 'offline');
-        if (offlineTerminals.length > 0) {
-          shouldFire = true;
-          const list = offlineTerminals.map(t => `• ${t.nome} (${t.local || '—'})`).join('\n');
-          messageBody = `Terminais offline detectados em ${ts}:\n\n${list}`;
-          slackText = `🔴 *Terminais offline* (${offlineTerminals.length}) detectados:\n` +
-            offlineTerminals.map(t => `• \`${t.nome}\` — ${t.local || '—'}`).join('\n');
-        }
-      } else if (rule.gatilho === 'terminal_online') {
-        const onlineTerminals = filteredTerminals.filter(t => t.status === 'online');
-        if (onlineTerminals.length > 0) {
-          shouldFire = true;
-          const list = onlineTerminals.map(t => `• ${t.nome} (${t.local || '—'})`).join('\n');
-          messageBody = `Terminais online detectados em ${ts}:\n\n${list}`;
-          slackText = `🟢 *Terminais restaurados* (${onlineTerminals.length}):\n` +
-            onlineTerminals.map(t => `• \`${t.nome}\` — ${t.local || '—'}`).join('\n');
-        }
-      } else if (rule.gatilho === 'sem_ping_minutos') {
-        const threshold = (rule.condicao_valor || 5) * 60;
-        const staleTerminals = filteredTerminals.filter(t =>
-          t.ativo && (t.segundos_sem_ping || 0) >= threshold
-        );
-        if (staleTerminals.length > 0) {
-          shouldFire = true;
-          const list = staleTerminals.map(t => `• ${t.nome} — sem ping há ${Math.floor((t.segundos_sem_ping || 0) / 60)} min`).join('\n');
-          messageBody = `Terminais sem ping há mais de ${rule.condicao_valor} minutos:\n\n${list}`;
-          slackText = `⚠️ *Sem ping há mais de ${rule.condicao_valor} min* (${staleTerminals.length}):\n` +
-            staleTerminals.map(t => `• \`${t.nome}\` — ${Math.floor((t.segundos_sem_ping || 0) / 60)} min sem ping`).join('\n');
-        }
-      } else if (rule.gatilho === 'multiplos_offline') {
-        const offlineCount = filteredTerminals.filter(t => t.status === 'offline').length;
-        if (offlineCount >= (rule.condicao_valor || 2)) {
-          shouldFire = true;
-          messageBody = `${offlineCount} terminais estão offline em ${ts}.`;
-          slackText = `🚨 *Alerta crítico:* ${offlineCount} terminais offline simultaneamente em ${ts}`;
-        }
-      }
+        for (const rule of rules) {
+            // Verificar cooldown
+            if (rule.ultima_disparada) {
+                const lastFired = new Date(rule.ultima_disparada);
+                if (!isNaN(lastFired.getTime())) {
+                    const minutesSince = (agora_ms - lastFired.getTime()) / 60000;
+                    if (minutesSince < (rule.cooldown_minutos || 30)) continue;
+                }
+            }
 
-      if (shouldFire) {
-        const canal = rule.canal || 'email';
-        const sentTo = [];
+            // Filtrar terminais da regra
+            let filteredTerminals = terminals;
+            if (rule.filtro_local) {
+                filteredTerminals = filteredTerminals.filter(t => t.local === rule.filtro_local);
+            }
+            if (rule.filtro_cliente) {
+                filteredTerminals = filteredTerminals.filter(t =>
+                    t.cliente_nome === rule.filtro_cliente || t.cliente === rule.filtro_cliente
+                );
+            }
 
-        // Send email
-        if ((canal === 'email' || canal === 'ambos') && rule.destinatarios_email) {
-          const emails = rule.destinatarios_email.split(',').map(e => e.trim()).filter(Boolean);
-          for (const email of emails) {
-            await base44.asServiceRole.integrations.Core.SendEmail({
-              to: email,
-              subject: `[NOC Monitor] Alerta: ${rule.nome}`,
-              body: `Regra disparada: ${rule.nome}\n\n${messageBody}\n\n---\nNOC Monitor • Terminais Biométricos`,
+            let shouldFire = false;
+            let messageBody = '';
+            let slackText = '';
+
+            if (rule.gatilho === 'terminal_offline') {
+                const offline = filteredTerminals.filter(t => t.status === 'offline');
+                if (offline.length > 0) {
+                    shouldFire = true;
+                    const list = offline.map(t => `• ${t.nome} (${t.local || '—'})`).join('\n');
+                    messageBody = `Terminais offline detectados em ${ts}:\n\n${list}`;
+                    slackText = `🔴 *Terminais offline* (${offline.length}):\n` +
+                        offline.map(t => `• \`${t.nome}\` — ${t.local || '—'}`).join('\n');
+                }
+            } else if (rule.gatilho === 'terminal_online') {
+                const online = filteredTerminals.filter(t => t.status === 'online');
+                if (online.length > 0) {
+                    shouldFire = true;
+                    const list = online.map(t => `• ${t.nome} (${t.local || '—'})`).join('\n');
+                    messageBody = `Terminais online detectados em ${ts}:\n\n${list}`;
+                    slackText = `🟢 *Terminais online* (${online.length}):\n` +
+                        online.map(t => `• \`${t.nome}\` — ${t.local || '—'}`).join('\n');
+                }
+            } else if (rule.gatilho === 'sem_ping_minutos') {
+                const threshold = (rule.condicao_valor || 5) * 60;
+                const stale = filteredTerminals.filter(t =>
+                    t.ativo && (t.segundos_sem_ping || 0) >= threshold
+                );
+                if (stale.length > 0) {
+                    shouldFire = true;
+                    const list = stale.map(t => `• ${t.nome} — sem ping há ${Math.floor((t.segundos_sem_ping || 0) / 60)} min`).join('\n');
+                    messageBody = `Terminais sem ping há mais de ${rule.condicao_valor} minutos:\n\n${list}`;
+                    slackText = `⚠️ *Sem ping há +${rule.condicao_valor} min* (${stale.length}):\n` +
+                        stale.map(t => `• \`${t.nome}\` — ${Math.floor((t.segundos_sem_ping || 0) / 60)} min`).join('\n');
+                }
+            } else if (rule.gatilho === 'multiplos_offline') {
+                const offlineCount = filteredTerminals.filter(t => t.status === 'offline').length;
+                if (offlineCount >= (rule.condicao_valor || 2)) {
+                    shouldFire = true;
+                    messageBody = `${offlineCount} terminais estão offline em ${ts}.`;
+                    slackText = `🚨 *Alerta crítico:* ${offlineCount} terminais offline simultaneamente em ${ts}`;
+                }
+            }
+
+            if (!shouldFire) continue;
+
+            const canal = rule.canal || 'email';
+            const sentTo = [];
+
+            // Email
+            if ((canal === 'email' || canal === 'ambos') && rule.destinatarios_email) {
+                const emails = rule.destinatarios_email.split(',').map(e => e.trim()).filter(Boolean);
+                await Promise.all(emails.map(email =>
+                    base44.asServiceRole.integrations.Core.SendEmail({
+                        to: email,
+                        subject: `[NOC Monitor] Alerta: ${rule.nome}`,
+                        body: `Regra disparada: ${rule.nome}\n\n${messageBody}\n\n---\nNOC Monitor • Terminais Biométricos`,
+                    }).catch(err => console.warn(`Email falhou para ${email}:`, err.message))
+                ));
+                sentTo.push(`email(${emails.length})`);
+            }
+
+            // Slack
+            if ((canal === 'slack' || canal === 'ambos') && rule.slack_webhook_url) {
+                const slackPayload = {
+                    blocks: [
+                        { type: 'header', text: { type: 'plain_text', text: `🚨 NOC Monitor: ${rule.nome}` } },
+                        { type: 'section', text: { type: 'mrkdwn', text: slackText || messageBody } },
+                        { type: 'context', elements: [{ type: 'mrkdwn', text: `*Regra:* ${rule.nome} • *Gatilho:* ${rule.gatilho} • ${ts}` }] },
+                    ],
+                };
+                const slackRes = await fetch(rule.slack_webhook_url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(slackPayload),
+                }).catch(() => null);
+                if (slackRes?.ok) sentTo.push('slack');
+            }
+
+            await base44.asServiceRole.entities.AlertRule.update(rule.id, {
+                ultima_disparada: now.toISOString(),
+                total_disparos: (rule.total_disparos || 0) + 1,
             });
-            sentTo.push(`email:${email}`);
-          }
+
+            results.push({ rule: rule.nome, fired: true, sentTo });
         }
 
-        // Send Slack
-        if ((canal === 'slack' || canal === 'ambos') && rule.slack_webhook_url) {
-          const slackPayload = {
-            blocks: [
-              {
-                type: 'header',
-                text: { type: 'plain_text', text: `🚨 NOC Monitor: ${rule.nome}` }
-              },
-              {
-                type: 'section',
-                text: { type: 'mrkdwn', text: slackText || messageBody }
-              },
-              {
-                type: 'context',
-                elements: [
-                  { type: 'mrkdwn', text: `*Regra:* ${rule.nome} • *Gatilho:* ${rule.gatilho} • ${ts}` }
-                ]
-              }
-            ]
-          };
-          await fetch(rule.slack_webhook_url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(slackPayload),
-          });
-          sentTo.push('slack');
-        }
+        console.log(`[processAlertRules] processed=${rules.length} fired=${results.length}`);
+        return Response.json({ success: true, processed: rules.length, fired: results });
 
-        await base44.asServiceRole.entities.AlertRule.update(rule.id, {
-          ultima_disparada: now.toISOString(),
-          total_disparos: (rule.total_disparos || 0) + 1,
-        });
-
-        results.push({ rule: rule.nome, fired: true, sentTo });
-      }
+    } catch (error) {
+        console.error('[processAlertRules] erro:', error.message);
+        return Response.json({ error: error.message }, { status: 500 });
     }
-
-    return Response.json({ success: true, processed: rules.length, fired: results });
-  } catch (error) {
-    console.error(error);
-    return Response.json({ error: error.message }, { status: 500 });
-  }
 });

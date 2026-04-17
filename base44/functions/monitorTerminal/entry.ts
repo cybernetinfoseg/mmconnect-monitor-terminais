@@ -83,8 +83,8 @@ Deno.serve(async (req) => {
             await base44.asServiceRole.entities.AlertIncident.create({
                 terminal_id: terminal.id,
                 terminal_nome: terminal.nome,
-                local: terminal.local,
-                cliente: terminal.cliente_nome,
+                local: terminal.local || '',
+                cliente: terminal.cliente_nome || '',
                 tipo: 'offline',
                 timestamp: agora.toISOString(),
                 resolvido: false,
@@ -100,26 +100,51 @@ Deno.serve(async (req) => {
             }).catch(() => {});
         }
 
-        // Resolver escalações se voltou online
-        if (novoStatus === 'online') {
-            const openAlerts = await base44.asServiceRole.entities.EscalationAlert.filter({
-                terminal_id: terminal.id,
-                resolvido: false,
+        // Resolver incidentes e escalações se voltou online
+        if (statusMudou && novoStatus === 'online') {
+            // Resolver AlertIncidents abertos
+            const incidentes = await base44.asServiceRole.entities.AlertIncident.filter({
+                terminal_id: terminal.id, resolvido: false,
             }).catch(() => []);
-            for (const alert of openAlerts) {
-                await base44.asServiceRole.entities.EscalationAlert.update(alert.id, { resolvido: true }).catch(() => {});
+            for (const inc of incidentes) {
+                const duracao = Math.round((agora.getTime() - new Date(inc.timestamp).getTime()) / 60000);
+                await base44.asServiceRole.entities.AlertIncident.update(inc.id, {
+                    resolvido: true,
+                    resolvido_em: agora.toISOString(),
+                    duracao_minutos: duracao,
+                }).catch(() => {});
             }
+            // Resolver EscalationAlerts
+            const openEscalations = await base44.asServiceRole.entities.EscalationAlert.filter({
+                terminal_id: terminal.id, resolvido: false,
+            }).catch(() => []);
+            for (const esc of openEscalations) {
+                await base44.asServiceRole.entities.EscalationAlert.update(esc.id, { resolvido: true }).catch(() => {});
+            }
+            // Incidente "restored"
+            await base44.asServiceRole.entities.AlertIncident.create({
+                terminal_id: terminal.id,
+                terminal_nome: terminal.nome,
+                local: terminal.local || '',
+                cliente: terminal.cliente_nome || '',
+                tipo: 'restored',
+                timestamp: agora.toISOString(),
+                resolvido: true,
+                notificado: false,
+            }).catch(() => {});
         }
 
-        // Gravar histórico
-        await base44.asServiceRole.entities.StatusHistory.create({
-            terminal_id: terminal.id,
-            terminal_nome: terminal.nome,
-            status: novoStatus,
-            timestamp: agora.toISOString(),
-            local: terminal.local || '',
-            cliente: terminal.cliente_nome || '',
-        }).catch(() => {});
+        // Gravar histórico apenas em mudanças de estado (throttle)
+        if (statusMudou) {
+            await base44.asServiceRole.entities.StatusHistory.create({
+                terminal_id: terminal.id,
+                terminal_nome: terminal.nome,
+                status: novoStatus,
+                timestamp: agora.toISOString(),
+                local: terminal.local || '',
+                cliente: terminal.cliente_nome || '',
+            }).catch(() => {});
+        }
 
         return Response.json({ success: true, terminal_id, status: novoStatus, latencia: result.latencia_ms, latencia_ms: result.latencia_ms, statusMudou });
     } catch (error) {

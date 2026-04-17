@@ -22,14 +22,15 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // Timeout para terminais passivos (segundos sem ping → offline)
 const PASSIVE_TIMEOUT = {
-    ip_local:  150,  // agente reporta a cada 30s → 5× margem
-    heartbeat: 150,  // noc_server heartbeat TCP
-    sdk_tcp:   150,  // noc_server SDK polling
-    p2s:       150,  // p2s_server conexão inversa
-    adms_push: 300,  // ADMS ciclo mais lento (pode ser até 2min)
+    ip_local:         150,  // agente reporta a cada 30s → 5× margem
+    heartbeat:        150,  // noc_server heartbeat TCP
+    sdk_tcp:          150,  // noc_server SDK polling
+    p2s:              150,  // p2s_server conexão inversa
+    adms_push:        300,  // ADMS ciclo mais lento (pode ser até 2min)
+    websocket_cloud:  150,  // timmy_ws_server reporta via WS heartbeat
 };
 
-const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s']);
+const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s', 'websocket_cloud']);
 const ACTIVE_TYPES  = new Set(['ip_publico', 'dns', 'api']);
 
 const HISTORY_THROTTLE_SECONDS = 3600;
@@ -160,15 +161,32 @@ Deno.serve(async (req) => {
                         }
                     }
 
-                    // Resolver escalações se voltou online
+                    // Resolver incidentes e escalações se voltou online
                     if (statusMudou && novoStatus === 'online') {
-                        const openAlerts = await base44.asServiceRole.entities.EscalationAlert.filter({
-                            terminal_id: terminal.id,
-                            resolvido: false,
-                        }).catch(() => []);
-                        for (const alert of openAlerts) {
-                            await base44.asServiceRole.entities.EscalationAlert.update(alert.id, { resolvido: true }).catch(() => {});
+                        const [openIncidents, openEscalations] = await Promise.all([
+                            base44.asServiceRole.entities.AlertIncident.filter({ terminal_id: terminal.id, resolvido: false }).catch(() => []),
+                            base44.asServiceRole.entities.EscalationAlert.filter({ terminal_id: terminal.id, resolvido: false }).catch(() => []),
+                        ]);
+                        for (const inc of openIncidents) {
+                            const duracao = Math.round((agora - new Date(inc.timestamp)) / 60000);
+                            await base44.asServiceRole.entities.AlertIncident.update(inc.id, {
+                                resolvido: true, resolvido_em: agora.toISOString(), duracao_minutos: duracao,
+                            }).catch(() => {});
                         }
+                        for (const esc of openEscalations) {
+                            await base44.asServiceRole.entities.EscalationAlert.update(esc.id, { resolvido: true }).catch(() => {});
+                        }
+                        // Incidente "restored"
+                        await base44.asServiceRole.entities.AlertIncident.create({
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || '',
+                            tipo: 'restored',
+                            timestamp: agora.toISOString(),
+                            resolvido: true,
+                            notificado: false,
+                        }).catch(() => {});
                     }
 
                     // THROTTLE histórico

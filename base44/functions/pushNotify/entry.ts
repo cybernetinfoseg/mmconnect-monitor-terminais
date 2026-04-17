@@ -1,213 +1,193 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
-
 /**
- * Sends a Web Push notification (via browser push) and/or email 
- * to subscribers. Also handles the escalation check logic.
- * 
- * Called with: { action: 'subscribe' | 'send' | 'check_escalations' | 'unsubscribe' }
+ * pushNotify — Notificações Web Push + gestão de subscrições.
+ *
+ * Acções:
+ *   subscribe        — registar subscrição Web Push do utilizador
+ *   unsubscribe      — desactivar subscrição
+ *   notify_offline   — notificar dono + admins que terminal ficou offline
+ *
+ * NOTA: Web Push real requer VAPID keys configuradas no servidor.
+ * Esta implementação faz best-effort push para os endpoints registados.
+ * Se o push falhar (endpoint expirado), a subscrição é desactivada automaticamente.
  */
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    const body = await req.json();
-    const { action } = body;
+    try {
+        const base44 = createClientFromRequest(req);
+        const body = await req.json();
+        const { action } = body;
 
-    // ─── SUBSCRIBE ────────────────────────────────────────────────
-    if (action === 'subscribe') {
-      const user = await base44.auth.me();
-      if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+        // ─── SUBSCRIBE ────────────────────────────────────────────────
+        if (action === 'subscribe') {
+            const user = await base44.auth.me();
+            if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-      const { endpoint, p256dh, auth: authKey } = body;
+            const { endpoint, p256dh, auth: authKey } = body;
+            if (!endpoint) return Response.json({ error: 'endpoint obrigatório' }, { status: 400 });
 
-      // Deactivate previous subscriptions for this endpoint
-      const existing = await base44.asServiceRole.entities.PushSubscription.filter({ endpoint });
-      for (const sub of existing) {
-        await base44.asServiceRole.entities.PushSubscription.update(sub.id, { ativo: false });
-      }
+            // Desactivar subscrições anteriores para este endpoint
+            const existing = await base44.asServiceRole.entities.PushSubscription.filter({ endpoint });
+            await Promise.all(existing.map(sub =>
+                base44.asServiceRole.entities.PushSubscription.update(sub.id, { ativo: false })
+            ));
 
-      await base44.asServiceRole.entities.PushSubscription.create({
-        user_email: user.email,
-        endpoint,
-        p256dh,
-        auth: authKey,
-        ativo: true,
-        user_agent: req.headers.get('user-agent') || '',
-      });
+            await base44.asServiceRole.entities.PushSubscription.create({
+                user_email: user.email,
+                endpoint,
+                p256dh: p256dh || '',
+                auth: authKey || '',
+                ativo: true,
+                user_agent: req.headers.get('user-agent') || '',
+            });
 
-      return Response.json({ success: true });
-    }
-
-    // ─── UNSUBSCRIBE ──────────────────────────────────────────────
-    if (action === 'unsubscribe') {
-      const user = await base44.auth.me();
-      if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
-
-      const { endpoint } = body;
-      const subs = await base44.asServiceRole.entities.PushSubscription.filter({
-        user_email: user.email,
-        endpoint,
-      });
-      for (const sub of subs) {
-        await base44.asServiceRole.entities.PushSubscription.update(sub.id, { ativo: false });
-      }
-      return Response.json({ success: true });
-    }
-
-    // ─── CHECK ESCALATIONS (called by automation/scheduler – no auth required) ─
-    if (action === 'check_escalations') {
-      // Se houver utilizador autenticado, verificar que é admin; scheduler chama sem auth
-      const isAuthenticated = await base44.auth.isAuthenticated();
-      if (isAuthenticated) {
-        const user = await base44.auth.me();
-        if (user?.role !== 'admin') return Response.json({ error: 'Forbidden' }, { status: 403 });
-      }
-
-      const now = new Date();
-      const threshold24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-      // Get all open escalation alerts not yet escalated
-      const openAlerts = await base44.asServiceRole.entities.EscalationAlert.filter({
-        resolvido: false,
-        escalado: false,
-      });
-
-      const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
-      const adminEmails = admins.map(a => a.email).filter(Boolean);
-
-      const escalated = [];
-
-      for (const alert of openAlerts) {
-        const offlineSince = new Date(alert.offline_desde);
-        if (offlineSince <= threshold24h) {
-          // Escalate: notify admins by push + email
-          const alertSubs = await base44.asServiceRole.entities.PushSubscription.filter({ ativo: true });
-          const adminSubs = alertSubs.filter(s => adminEmails.includes(s.user_email));
-
-          // Send push to admins
-          for (const sub of adminSubs) {
-            await sendWebPush(sub, {
-              title: '🚨 Escalação: Terminal Crítico Offline há +24h',
-              body: `${alert.terminal_nome} (${alert.local || '—'}) está offline há mais de 24 horas sem resolução.`,
-              tag: `escalation-${alert.terminal_id}`,
-            }).catch(() => {});
-          }
-
-          // Send email to admins
-          for (const email of adminEmails) {
-            await base44.asServiceRole.integrations.Core.SendEmail({
-              to: email,
-              subject: `[ESCALAÇÃO] Terminal ${alert.terminal_nome} offline há +24h`,
-              body: `ALERTA ESCALADO\n\nO terminal "${alert.terminal_nome}" localizado em "${alert.local || '—'}" (cliente: ${alert.cliente || '—'}) está OFFLINE há mais de 24 horas sem resolução.\n\nOffline desde: ${new Date(alert.offline_desde).toLocaleString('pt-BR')}\nDono: ${alert.owner_email || '—'}\n\n---\nNOC Monitor • Sistema de Escalação Automática`,
-            }).catch(() => {});
-          }
-
-          await base44.asServiceRole.entities.EscalationAlert.update(alert.id, {
-            escalado: true,
-            escalado_em: now.toISOString(),
-          });
-
-          escalated.push(alert.terminal_nome);
+            return Response.json({ success: true });
         }
-      }
 
-      // Check terminals now online → mark escalation alerts as resolved
-      const terminals = await base44.asServiceRole.entities.Terminal.list();
-      const onlineIds = new Set(terminals.filter(t => t.status === 'online').map(t => t.id));
-      const allOpen = await base44.asServiceRole.entities.EscalationAlert.filter({ resolvido: false });
-      for (const alert of allOpen) {
-        if (onlineIds.has(alert.terminal_id)) {
-          await base44.asServiceRole.entities.EscalationAlert.update(alert.id, { resolvido: true });
+        // ─── UNSUBSCRIBE ──────────────────────────────────────────────
+        if (action === 'unsubscribe') {
+            const user = await base44.auth.me();
+            if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
+            const { endpoint } = body;
+            const subs = await base44.asServiceRole.entities.PushSubscription.filter({
+                user_email: user.email,
+                endpoint,
+            });
+            await Promise.all(subs.map(sub =>
+                base44.asServiceRole.entities.PushSubscription.update(sub.id, { ativo: false })
+            ));
+            return Response.json({ success: true });
         }
-      }
 
-      return Response.json({ success: true, escalated });
+        // ─── NOTIFY OFFLINE ───────────────────────────────────────────
+        // Chamado internamente pelos reporters (agentReport, nocServerReport, etc.)
+        if (action === 'notify_offline') {
+            const { terminal_id, terminal_nome, local, cliente, owner_email } = body;
+
+            if (!terminal_id || !terminal_nome) {
+                return Response.json({ error: 'terminal_id e terminal_nome obrigatórios' }, { status: 400 });
+            }
+
+            // Verificar se já existe escalation para este terminal (não duplicar)
+            const existing = await base44.asServiceRole.entities.EscalationAlert.filter({
+                terminal_id,
+                resolvido: false,
+            });
+
+            let escalationAlert;
+            if (existing.length === 0) {
+                // Criar novo escalation (ainda não criado pelo reporter)
+                escalationAlert = await base44.asServiceRole.entities.EscalationAlert.create({
+                    terminal_id,
+                    terminal_nome,
+                    local: local || '',
+                    cliente: cliente || '',
+                    owner_email: owner_email || '',
+                    offline_desde: new Date().toISOString(),
+                    escalado: false,
+                    resolvido: false,
+                    notificacao_inicial_enviada: false,
+                });
+            } else {
+                escalationAlert = existing[0];
+            }
+
+            // Não re-enviar se já enviado
+            if (escalationAlert.notificacao_inicial_enviada) {
+                return Response.json({ success: true, skipped: true, reason: 'já notificado' });
+            }
+
+            // Obter subscrições activas
+            const [allSubs, admins] = await Promise.all([
+                base44.asServiceRole.entities.PushSubscription.filter({ ativo: true }),
+                base44.asServiceRole.entities.User.filter({ role: 'admin' }),
+            ]);
+
+            const adminEmails = new Set(admins.map(a => a.email));
+            const targetSubs = allSubs.filter(s =>
+                s.user_email === owner_email || adminEmails.has(s.user_email)
+            );
+
+            const payload = JSON.stringify({
+                title: '🔴 Terminal Offline',
+                body: `${terminal_nome}${local ? ' — ' + local : ''} ficou offline.`,
+                tag: `offline-${terminal_id}`,
+                data: { terminal_id, url: '/Terminais' },
+            });
+
+            let notified = 0;
+            const failedEndpoints = [];
+
+            for (const sub of targetSubs) {
+                const success = await sendWebPush(sub, payload);
+                if (success) {
+                    notified++;
+                } else {
+                    failedEndpoints.push(sub.id);
+                }
+            }
+
+            // Desactivar subscrições expiradas/inválidas
+            if (failedEndpoints.length > 0) {
+                await Promise.all(failedEndpoints.map(id =>
+                    base44.asServiceRole.entities.PushSubscription.update(id, { ativo: false }).catch(() => {})
+                ));
+            }
+
+            // Notificações Telegram para dono + admins
+            const allUsers = await base44.asServiceRole.entities.User.list().catch(() => []);
+            const telegramTargets = allUsers.filter(u =>
+                u.telegram_bot_token && u.telegram_chat_id &&
+                (adminEmails.has(u.email) || u.email === owner_email)
+            );
+            const telegramMsg = `🔴 <b>Terminal Offline</b>\n\n📟 <b>${terminal_nome}</b>\n📍 Local: ${local || '—'}\n🏢 Cliente: ${cliente || '—'}\n🕐 ${new Date().toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
+            await Promise.all(telegramTargets.map(u =>
+                base44.asServiceRole.functions.invoke('telegramNotify', {
+                    bot_token: u.telegram_bot_token,
+                    chat_id: u.telegram_chat_id,
+                    message: telegramMsg,
+                }).catch(() => {})
+            ));
+
+            // Marcar notificação inicial como enviada
+            await base44.asServiceRole.entities.EscalationAlert.update(escalationAlert.id, {
+                notificacao_inicial_enviada: true,
+            });
+
+            console.log(`[pushNotify] notify_offline: ${terminal_nome} → ${notified} push(es) + ${telegramTargets.length} telegram(s)`);
+            return Response.json({ success: true, notified, telegram: telegramTargets.length });
+        }
+
+        return Response.json({ error: `Acção desconhecida: ${action}` }, { status: 400 });
+
+    } catch (error) {
+        console.error('[pushNotify] erro:', error.message);
+        return Response.json({ error: error.message }, { status: 500 });
     }
-
-    // ─── SEND PUSH ON TERMINAL OFFLINE (called by monitorTerminal) ─
-    if (action === 'notify_offline') {
-      // No auth needed here – called internally by monitorAllTerminals as service role
-      const { terminal_id, terminal_nome, local, cliente, owner_email, incident_id } = body;
-
-      // Create or find EscalationAlert
-      const existing = await base44.asServiceRole.entities.EscalationAlert.filter({
-        terminal_id,
-        resolvido: false,
-      });
-
-      let escalationAlert;
-      if (existing.length === 0) {
-        escalationAlert = await base44.asServiceRole.entities.EscalationAlert.create({
-          incident_id: incident_id || '',
-          terminal_id,
-          terminal_nome,
-          local: local || '',
-          cliente: cliente || '',
-          owner_email: owner_email || '',
-          offline_desde: new Date().toISOString(),
-          escalado: false,
-          resolvido: false,
-          notificacao_inicial_enviada: false,
-        });
-      } else {
-        escalationAlert = existing[0];
-      }
-
-      if (escalationAlert.notificacao_inicial_enviada) {
-        return Response.json({ success: true, skipped: true });
-      }
-
-      // Get push subscriptions for the owner + all admins
-      const allSubs = await base44.asServiceRole.entities.PushSubscription.filter({ ativo: true });
-      const admins = await base44.asServiceRole.entities.User.filter({ role: 'admin' });
-      const adminEmails = new Set(admins.map(a => a.email));
-
-      const targetSubs = allSubs.filter(s =>
-        s.user_email === owner_email || adminEmails.has(s.user_email)
-      );
-
-      const payload = {
-        title: '🔴 Terminal Offline',
-        body: `${terminal_nome}${local ? ' — ' + local : ''} ficou offline.`,
-        tag: `offline-${terminal_id}`,
-        data: { terminal_id, url: '/terminais' },
-      };
-
-      for (const sub of targetSubs) {
-        await sendWebPush(sub, payload).catch(() => {});
-      }
-
-      await base44.asServiceRole.entities.EscalationAlert.update(escalationAlert.id, {
-        notificacao_inicial_enviada: true,
-      });
-
-      return Response.json({ success: true, notified: targetSubs.length });
-    }
-
-    return Response.json({ error: 'Unknown action' }, { status: 400 });
-  } catch (error) {
-    console.error(error);
-    return Response.json({ error: error.message }, { status: 500 });
-  }
 });
 
-// ─── Web Push helper using VAPID-less simple push (fetch POST to endpoint) ────
-// For a full VAPID implementation we use base64url signing manually.
-async function sendWebPush(sub, payload) {
-  // Build a minimal push payload
-  const body = JSON.stringify(payload);
-
-  const response = await fetch(sub.endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'TTL': '86400',
-    },
-    body,
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    console.warn(`Push failed for ${sub.user_email}: ${response.status} ${text}`);
-  }
+/**
+ * Envia Web Push para uma subscrição.
+ * Retorna true se sucesso, false se endpoint inválido/expirado.
+ */
+async function sendWebPush(sub, payloadStr) {
+    try {
+        const res = await fetch(sub.endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'TTL': '86400',
+            },
+            body: payloadStr,
+        });
+        if (res.status === 404 || res.status === 410) {
+            // Endpoint expirado ou removido pelo browser
+            console.warn(`[pushNotify] Subscrição expirada para ${sub.user_email}: ${res.status}`);
+            return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
 }

@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
  * cleanupOldHistory — apaga registos de StatusHistory com mais de 30 dias.
