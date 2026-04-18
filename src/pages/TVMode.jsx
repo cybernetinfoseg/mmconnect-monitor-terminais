@@ -219,7 +219,7 @@ export default function TVMode() {
               <h1 className="text-lg sm:text-2xl font-bold tracking-tight truncate">NOC Monitor</h1>
               <p className="text-xs sm:text-sm text-slate-400 truncate flex items-center gap-2">
                 <span>{localFilter ? localFilter : 'Terminais Biométricos'}</span>
-                <span className="bg-slate-700 text-slate-300 my-1 px-2 text-xs font-semibold rounded-full tabular-nums">
+                <span className="bg-slate-700 text-slate-300 mt-1 mb-1 px-2 text-xs font-semibold rounded-full tabular-nums">
                   {stats.total} terminal{stats.total !== 1 ? 'is' : ''}
                 </span>
               </p>
