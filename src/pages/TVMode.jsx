@@ -205,7 +205,7 @@ export default function TVMode() {
 
         
         <div className="flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <div className="ml-1 flex items-center gap-2 sm:gap-4 min-w-0">
             <div className={cn(
               "p-2 sm:p-3 rounded-lg sm:rounded-xl flex-shrink-0",
               hasActiveAlerts ? "bg-red-500/20" : "bg-emerald-500/20"
@@ -218,8 +218,8 @@ export default function TVMode() {
             <div className="min-w-0">
               <h1 className="text-lg sm:text-2xl font-bold tracking-tight truncate">NOC Monitor</h1>
               <p className="text-xs sm:text-sm text-slate-400 truncate flex items-center gap-2">
-                <span>{localFilter ? localFilter : 'Terminais Biométricos'}</span>
-                <span className="bg-slate-700 text-slate-300 px-2 text-xs font-semibold rounded-full tabular-nums">
+                <span className=" hidden">{localFilter ? localFilter : 'Terminais Biométricos'}</span>
+                <span className="bg-slate-700 text-slate-300 px-2 text-xs font-semibold rounded-full tabular-nums hidden">
                   {stats.total} terminal{stats.total !== 1 ? 'is' : ''}
                 </span>
               </p>
