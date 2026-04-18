@@ -214,8 +214,8 @@ export default function Dashboard() {
               </div>
               }
             <div className="text-right hidden sm:block whitespace-nowrap">
-              <p className="text-xs text-slate-400">Última atualização</p>
-              <p className="text-xs sm:text-sm font-mono text-slate-200">
+              <p className="text-xs text-slate-400 hidden">Última atualização</p>
+              <p className="text-xs sm:text-sm font-mono text-slate-200 hidden">
                 {lastRefresh.toLocaleTimeString('pt-PT')}
               </p>
             </div>
