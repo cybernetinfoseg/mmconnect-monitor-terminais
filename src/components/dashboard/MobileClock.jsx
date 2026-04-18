@@ -14,12 +14,12 @@ export default function MobileClock({ className = '' }) {
 
   return (
     <div className={`flex flex-col items-end leading-none select-none ${className}`}>
-      <span className="text-sm font-bold tabular-nums">
+      <span className="text-sm font-bold tabular-nums hidden">
         {time.format('HH:mm')}
       </span>
-      <span className="text-[10px] opacity-60">
+      <span className="text-[10px] opacity-60 hidden">
         {time.format('ddd DD/MM')}
       </span>
-    </div>
-  );
+    </div>);
+
 }
