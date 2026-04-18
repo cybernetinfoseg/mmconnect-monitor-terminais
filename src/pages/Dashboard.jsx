@@ -193,65 +193,81 @@ export default function Dashboard() {
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 w-full overflow-x-hidden">
       {/* Header */}
-      <div className="bg-slate-900 text-white px-3 sm:px-6 py-3 sm:py-4 w-full">
-        <div className="max-w-full mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg shrink-0">
-              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+      <div className={cn(
+        "px-3 sm:px-8 py-2 sm:py-4 transition-colors duration-500",
+        hasActiveAlerts ? "bg-red-900/50" : "bg-slate-800/50"
+      )}>
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <div className={cn(
+              "p-2 sm:p-3 rounded-lg sm:rounded-xl flex-shrink-0",
+              hasActiveAlerts ? "bg-red-500/20" : "bg-emerald-500/20"
+            )}>
+              <Activity className={cn(
+                "h-5 w-5 sm:h-8 sm:w-8",
+                hasActiveAlerts ? "text-red-400" : "text-emerald-400"
+              )} />
             </div>
             <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold tracking-tight truncate">NOC Monitor</h1>
-              <p className="text-xs text-slate-400 truncate">Terminais Biométricos</p>
-              <p className="text-xs text-slate-400/70 mt-0.5 hidden sm:block">Sistema de Monitoramento</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
-            {currentUser && (
-              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap">
-                <User className="h-4 w-4 text-slate-400 shrink-0" />
-                <span className="truncate">{currentUser.full_name || currentUser.email}</span>
-              </div>
-            )}
-            <div className="text-right hidden sm:block whitespace-nowrap">
-              <p className="text-xs text-slate-400">Última atualização</p>
-              <p className="text-xs sm:text-sm font-mono text-slate-200">
-                {lastRefresh.toLocaleTimeString('pt-PT')}
+              <h1 className="text-lg sm:text-2xl font-bold tracking-tight truncate">NOC Monitor</h1>
+              <p className="text-xs sm:text-sm text-slate-400 truncate flex items-center gap-2">
+                <span>{localFilter ? localFilter : 'Terminais Biométricos'}</span>
+                <span className="bg-slate-700 text-slate-300 text-xs font-semibold rounded-full tabular-nums">
+                  {stats.total} terminal{stats.total !== 1 ? 'is' : ''}
+                </span>
               </p>
             </div>
-            {/* Mobile clock */}
-            <MobileClock className="sm:hidden text-white" />
-            {/* Refresh button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleMonitorAll}
-              disabled={isMonitoring}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
-            >
-              <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowWidgetConfig(v => !v)}
-              className={cn("hidden sm:flex bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5", showWidgetConfig && "bg-white/20")}
-            >
-              <Settings2 className="h-4 w-4" />
-              Widgets
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => base44.auth.logout()}
-              className="hidden sm:flex text-slate-300 hover:text-white hover:bg-white/10 gap-1"
-              title="Sair"
-            >
-              <LogOut className="h-4 w-4" />
-              Sair
-            </Button>
+            
+            {/* Live indicator */}
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 flex-shrink-0">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs text-emerald-400 font-medium hidden sm:inline">LIVE</span>
+            </div>
           </div>
+          
+          <div className="pt-2 flex items-center gap-1 sm:gap-3 flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFilters((v) => !v)} className="bg-white/10 text-white mt-1 pr-2 pl-2 px-3 text-xs font-medium rounded-md inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground border-white/20 h-8 sm:h-9 sm:px-3 sm:text-sm hover:bg-white/20">
+              
+              <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline ml-1">Filtros</span>
+              {(tvLocalFilter || tvStatusFilter || tvUserFilter) &&
+              <span className="ml-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center font-bold">
+                  {[tvLocalFilter, tvStatusFilter, tvUserFilter].filter(Boolean).length}
+                </span>
+              }
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualRefresh}
+              disabled={isRefreshing}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-8 px-2 sm:h-9 sm:px-3 text-xs sm:text-sm">
+
+              <RefreshCw className={cn("h-3 w-3 sm:h-4 sm:w-4", isRefreshing && "animate-spin")} />
+              <span className="hidden sm:inline ml-1">Atualizar</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSettings(true)}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-8 w-8 sm:h-9 sm:w-9 p-0">
+
+              <Settings className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+            <div className="hidden sm:block">
+              <LiveClock />
+            </div>
+          </div>
+        </div>
+        {/* Mobile clock */}
+        <div className="sm:hidden mt-2 text-right">
+          <LiveClock />
         </div>
       </div>
 
