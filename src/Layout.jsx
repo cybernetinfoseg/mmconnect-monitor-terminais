@@ -50,6 +50,8 @@ const bottomNavItems = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
+  { name: 'Alertas', page: 'Alertas', icon: Bell },
+  { name: 'Menu', page: null, icon: Menu },
 ];
 
 // Root pages (no back button)
@@ -253,38 +255,59 @@ export default function Layout({ children, currentPageName }) {
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 select-none"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
-      >
-        <div className="flex items-stretch">
-          {bottomNavItems.map((item) => {
-                const isActive = currentPageName === item.page;
-                const Icon = item.icon;
+      <Sheet>
+        <nav
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 select-none"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
+        >
+          <div className="flex items-stretch">
+            {bottomNavItems.map((item) => {
+              const isActive = item.page && currentPageName === item.page;
+              const Icon = item.icon;
+              // "Menu" tab opens the sidebar sheet
+              if (!item.page) {
                 return (
-                  <button
-                    key={item.page}
-                    onClick={() => {
-                      if (isActive) {
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      } else {
-                        navigate(createPageUrl(item.page), { replace: false });
-                      }
-                    }}
-                    className={cn(
-                      "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
-                      isActive
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-[10px] font-medium">{item.name}</span>
-                  </button>
+                  <SheetTrigger key="menu" asChild>
+                    <button
+                      className={cn(
+                        "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
+                        "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="text-[10px] font-medium">{item.name}</span>
+                    </button>
+                  </SheetTrigger>
                 );
-              })}
-        </div>
-      </nav>
+              }
+              return (
+                <button
+                  key={item.page}
+                  onClick={() => {
+                    if (isActive) {
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } else {
+                      navigate(createPageUrl(item.page), { replace: false });
+                    }
+                  }}
+                  className={cn(
+                    "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
+                    isActive
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[10px] font-medium">{item.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+        <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
+          <Sidebar />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
