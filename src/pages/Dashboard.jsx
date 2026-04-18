@@ -206,7 +206,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="ml-1 flex items-center gap-1 sm:gap-2 overflow-x-auto">
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
             {currentUser &&
               <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap">
                 <User className="lucide lucide-user h-4 w-4 text-slate-400 shrink-0 hidden" />
