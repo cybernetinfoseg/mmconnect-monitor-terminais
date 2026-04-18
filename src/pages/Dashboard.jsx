@@ -33,6 +33,7 @@ import TerminalStatusWidget from '../components/dashboard/TerminalStatusWidget';
 import AlertRulesWidget from '../components/dashboard/AlertRulesWidget';
 import RecentAuditWidget from '../components/dashboard/RecentAuditWidget';
 import MobileClock from '../components/dashboard/MobileClock';
+import LiveClock from '../components/dashboard/LiveClock';
 
 const DEFAULT_WIDGETS = {
   terminalStatus: true,
@@ -193,44 +194,37 @@ export default function Dashboard() {
 
         {/* Header */}
         <div className="bg-slate-900 text-white px-3 sm:px-6 py-3 sm:py-4 w-full">
-          <div className="max-w-full mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg shrink-0">
-                <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+          <div className="max-w-full mx-auto flex items-center justify-between gap-2">
+            {/* Left: logo + title + clock */}
+            <div className="flex flex-col gap-1 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg shrink-0">
+                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-base sm:text-lg font-bold tracking-tight truncate">NOC Monitor</h1>
+                  <p className="text-xs text-slate-400 truncate">Terminais Biométricos</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-bold tracking-tight truncate">NOC Monitor</h1>
-                <p className="text-xs text-slate-400 truncate">Terminais Biométricos</p>
-                <p className="text-xs text-slate-400/70 mt-0.5 hidden sm:block">Sistema de Monitoramento</p>
+              {/* Clock — bottom left, desktop only */}
+              <div className="hidden sm:block pl-1">
+                <LiveClock />
               </div>
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
-              {currentUser && (
-                <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap">
-                  <User className="h-4 w-4 text-slate-400 shrink-0" />
-                  <span className="truncate">{currentUser.full_name || currentUser.email}</span>
-                </div>
-              )}
-              <div className="text-right hidden sm:block whitespace-nowrap">
-                <p className="text-xs text-slate-400">Última atualização</p>
-                <p className="text-xs sm:text-sm font-mono text-slate-200">
-                  {lastRefresh.toLocaleTimeString('pt-PT')}
-                </p>
-              </div>
+            {/* Right: actions */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
               {/* Mobile clock */}
-              <MobileClock className="sm:hidden text-white" />
-              {/* Refresh button */}
-              <Button
-                variant="outline"
-                size="sm"
+              <MobileClock className="sm:hidden" />
+              {/* Refresh button — icon only, rounded */}
+              <button
                 onClick={handleMonitorAll}
                 disabled={isMonitoring}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white transition-colors disabled:opacity-50"
+                title="Atualizar"
               >
                 <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
-                <span className="hidden sm:inline">Atualizar</span>
-              </Button>
+              </button>
               <Button
                 variant="outline"
                 size="sm"
