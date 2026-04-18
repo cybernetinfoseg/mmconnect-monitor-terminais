@@ -239,7 +239,7 @@ export default function TVMode() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowFilters((v) => !v)} className="bg-white/10 text-white mt-1 pr-2 pl-2 px-3 text-xs font-medium rounded-md inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground border-white/20 h-8 sm:h-9 sm:px-3 sm:text-sm hover:bg-white/20">
+              onClick={() => setShowFilters((v) => !v)} className="bg-white/10 text-white mx-auto my-1 text-xs font-medium rounded-md inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground border-white/20 h-8 sm:h-9 sm:px-3 sm:text-sm hover:bg-white/20">
               
               <Filter className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className="hidden sm:inline ml-1">Filtros</span>
