@@ -200,10 +200,10 @@ export default function TVMode() {
   return (
     <div className="min-h-screen bg-slate-900 text-white overflow-hidden">
       {/* Header */}
-      <div className={cn(
-        "px-3 sm:px-8 py-2 sm:py-4 transition-colors duration-500",
-        hasActiveAlerts ? "bg-red-900/50" : "bg-slate-800/50"
-      )}>
+      <div className="bg-red-900/50 sm:px-8 sm:py-4 transition-colors duration-500">
+
+
+        
         <div className="flex items-center justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <div className={cn(
