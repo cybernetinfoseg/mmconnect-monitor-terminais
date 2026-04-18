@@ -206,7 +206,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="pl-10 flex items-center gap-1 sm:gap-2 overflow-x-auto">
+          <div className="pr-2 pl-10 flex items-center gap-1 sm:gap-2 overflow-x-auto">
             {currentUser &&
               <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap">
                 <User className="h-4 w-4 text-slate-400 shrink-0" />
@@ -226,7 +226,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={handleMonitorAll}
-                disabled={isMonitoring} className="bg-white/10 text-white ml-1 text-xs font-medium rounded-md inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground h-8 border-white/20 hover:bg-white/20 gap-1.5">
+                disabled={isMonitoring} className="bg-white/10 text-white text-xs font-medium rounded-md inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground h-8 border-white/20 hover:bg-white/20 gap-1.5">
                 
                 
               <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
