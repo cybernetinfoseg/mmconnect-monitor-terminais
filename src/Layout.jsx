@@ -193,52 +193,14 @@ export default function Layout({ children, currentPageName }) {
         <Sidebar />
       </aside>
 
-      {/* Mobile Header */}
-      <header
-        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 select-none"
-        style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'max(1rem, env(safe-area-inset-left))', paddingRight: 'max(1rem, env(safe-area-inset-right))' }}
-      >
-        <div className="flex items-center justify-between h-14">
-           <div className="flex items-center gap-2">
-             {!isRoot && (
-               <Button
-                 variant="ghost"
-                 size="icon"
-                 onClick={() => window.history.back()}
-                 className="select-none h-12 w-12"
-               >
-                 <ChevronLeft className="h-5 w-5" />
-               </Button>
-             )}
-             <div className="flex items-center gap-2">
-               <div className="p-1.5 bg-slate-900 dark:bg-emerald-600 rounded-lg">
-                 <Monitor className="h-4 w-4 text-emerald-400 dark:text-white" />
-               </div>
-               <h1 className="font-bold text-slate-900 dark:text-white text-sm">NOC Monitor</h1>
-             </div>
-           </div>
-
-           <Sheet>
-             <SheetTrigger asChild>
-               <Button variant="ghost" size="icon" className="select-none h-12 w-12">
-                 <Menu className="h-6 w-6" />
-               </Button>
-             </SheetTrigger>
-             <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
-               <Sidebar />
-             </SheetContent>
-           </Sheet>
-         </div>
-      </header>
-
       {/* Main Content */}
       <main className="lg:pl-64 min-h-screen">
         {/* Desktop: no animation */}
         <div className="hidden lg:block pt-0 pb-0">
           {children}
         </div>
-        {/* Mobile: slide animation */}
-        <div className="lg:hidden pb-20" style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}>
+        {/* Mobile: slide animation — starts from top (safe-area only), bottom nav padding */}
+        <div className="lg:hidden pb-20" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <AnimatePresence mode="wait" initial={false} custom={direction}>
             <motion.div
               key={currentPageName}
