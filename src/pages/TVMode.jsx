@@ -200,7 +200,7 @@ export default function TVMode() {
   return (
     <div className="min-h-screen bg-slate-900 text-white overflow-hidden">
       {/* Header */}
-      <div className="bg-red-900/50 mx-auto sm:px-8 sm:py-4 transition-colors duration-500">
+      <div className="bg-red-900/50 ml-1 sm:px-8 sm:py-4 transition-colors duration-500">
 
 
         
