@@ -205,7 +205,7 @@ export default function TVMode() {
         hasActiveAlerts ? "bg-red-900/50" : "bg-slate-800/50"
       )}>
         <div className="flex items-center justify-between gap-2 sm:gap-4">
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <div className="mr-1 flex items-center gap-2 sm:gap-4 min-w-0">
             <div className={cn(
               "p-2 sm:p-3 rounded-lg sm:rounded-xl flex-shrink-0",
               hasActiveAlerts ? "bg-red-500/20" : "bg-emerald-500/20"
