@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -17,6 +17,16 @@ import {
   User } from
 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -50,6 +60,7 @@ export default function Dashboard() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [showWidgetConfig, setShowWidgetConfig] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(5000);
   const [widgets, setWidgets] = useState(() => {
     try {
@@ -233,9 +244,9 @@ export default function Dashboard() {
                 Widgets
               </Button>
               <button
-                onClick={() => base44.auth.logout()}
+                onClick={() => setShowCloseConfirm(true)}
                 className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors text-xs font-medium"
-                title="Sair"
+                title="Fechar sistema"
               >
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Sair</span>
@@ -469,6 +480,26 @@ export default function Dashboard() {
           }
         </div>
       </div>
-    </PullToRefresh>);
+    </PullToRefresh>
+
+    <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Fechar o sistema?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem a certeza que deseja fechar o NOC Monitor? A sua sessão será encerrada.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => base44.auth.logout()}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            Fechar sistema
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>);
 
 }
