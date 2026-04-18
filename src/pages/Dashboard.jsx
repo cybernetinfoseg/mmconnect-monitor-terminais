@@ -206,15 +206,16 @@ export default function Dashboard() {
                   <p className="text-xs text-slate-400 truncate">Terminais Biométricos</p>
                 </div>
               </div>
-              {/* Clock — all screen sizes */}
-              <div className="pl-1">
+              {/* Clock — bottom left, desktop only */}
+              <div className="hidden sm:block pl-1">
                 <LiveClock />
               </div>
             </div>
 
             {/* Right: actions */}
             <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-
+              {/* Mobile clock */}
+              <MobileClock className="sm:hidden" />
               {/* Refresh button — icon only, rounded */}
               <button
                 onClick={handleMonitorAll}
