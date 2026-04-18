@@ -14,7 +14,9 @@ import {
   LayoutDashboard,
   Settings2,
   LogOut,
-  User
+  User,
+  Filter,
+  Settings
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,7 @@ import TerminalStatusWidget from '../components/dashboard/TerminalStatusWidget';
 import AlertRulesWidget from '../components/dashboard/AlertRulesWidget';
 import RecentAuditWidget from '../components/dashboard/RecentAuditWidget';
 import MobileClock from '../components/dashboard/MobileClock';
+import LiveClock from '../components/dashboard/LiveClock';
 const DEFAULT_WIDGETS = {
   terminalStatus: true,
   alertRules: true,
@@ -46,6 +49,9 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState('status');
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showWidgetConfig, setShowWidgetConfig] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(5000);
@@ -183,6 +189,22 @@ export default function Dashboard() {
     const filters = { local: localFilter, status: statusFilter, sort: sortBy, user: userFilter };
     localStorage.setItem('dashboard-filters', JSON.stringify(filters));
   }, [localFilter, statusFilter, sortBy]);
+
+  // Derived state used in header
+  const hasActiveAlerts = alerts.some(a => !a.resolvido);
+  const tvLocalFilter = localFilter;
+  const tvStatusFilter = statusFilter;
+  const tvUserFilter = userFilter;
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+      setLastRefresh(new Date());
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handlePullRefresh = async () => {
     await refetch();
