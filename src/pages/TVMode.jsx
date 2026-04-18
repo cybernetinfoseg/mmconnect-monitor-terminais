@@ -365,7 +365,7 @@ export default function TVMode() {
       {/* KPI Strip */}
       {tvSettings.showKPIs &&
       <div className="px-3 sm:px-8 py-3 sm:py-4 bg-slate-800/30 border-y border-slate-700/50 overflow-x-auto">
-          <div className="flex items-center justify-center gap-3 sm:gap-8 lg:gap-16 flex-wrap whitespace-nowrap">
+          <div className="rounded-xl flex items-center justify-center gap-3 sm:gap-8 lg:gap-16 flex-wrap whitespace-nowrap">
             <motion.div className="flex items-center gap-2 sm:gap-4" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                <Monitor className="h-6 sm:h-8 w-6 sm:w-8 text-blue-400 shrink-0" />
                <div className="whitespace-nowrap">
