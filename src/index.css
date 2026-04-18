@@ -4,14 +4,19 @@
 
 html, body {
   overscroll-behavior: none;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 @layer base {
-  button, [role="button"], nav, a, [role="tab"], svg {
+  button, [role="button"], nav, a, [role="tab"], svg,
+  .select-none {
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  /* Ensure data content stays selectable */
+  input, textarea, [data-selectable], p, span, td, th, li, code, pre {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   :root {

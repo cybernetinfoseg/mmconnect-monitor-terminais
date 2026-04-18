@@ -193,8 +193,8 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Mobile Header */}
       <header
-        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4"
-        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4 select-none"
+        style={{ paddingTop: 'env(safe-area-inset-top)', paddingLeft: 'max(1rem, env(safe-area-inset-left))', paddingRight: 'max(1rem, env(safe-area-inset-right))' }}
       >
         <div className="flex items-center justify-between h-14">
            <div className="flex items-center gap-2">
@@ -236,7 +236,7 @@ export default function Layout({ children, currentPageName }) {
           {children}
         </div>
         {/* Mobile: slide animation */}
-        <div className="lg:hidden pt-14 pb-20">
+        <div className="lg:hidden pb-20" style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}>
           <AnimatePresence mode="wait" initial={false} custom={direction}>
             <motion.div
               key={currentPageName}
@@ -254,8 +254,8 @@ export default function Layout({ children, currentPageName }) {
 
       {/* Mobile Bottom Navigation */}
       <nav
-        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 select-none"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
       >
         <div className="flex items-stretch">
           {bottomNavItems.map((item) => {

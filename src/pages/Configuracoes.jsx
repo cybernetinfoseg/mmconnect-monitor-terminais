@@ -323,8 +323,16 @@ export default function Configuracoes() {
                         <AlertDialogCancel className="select-none">Cancelar</AlertDialogCancel>
                         <AlertDialogAction
                           className="bg-red-600 hover:bg-red-700 select-none"
-                          onClick={() => {
-                            toast.error('Funcionalidade disponível apenas via suporte. Contacte o administrador.');
+                          onClick={async () => {
+                            try {
+                              await base44.entities.Terminal.list().then(async (terminals) => {
+                                await Promise.all(terminals.map(t => base44.entities.Terminal.delete(t.id)));
+                              });
+                              await base44.auth.logout('/');
+                              toast.success('Conta e dados eliminados com sucesso.');
+                            } catch (e) {
+                              toast.error('Erro ao eliminar dados. Tente novamente ou contacte o suporte.');
+                            }
                             setDeleteConfirmOpen(false);
                           }}
                         >
