@@ -18,9 +18,9 @@ export default function LiveClock({ className }) {
       animate={{ opacity: 1 }}
       className={className}>
       
-      <div className="pl-1 flex items-center gap-4">
+      <div className="flex items-center gap-4">
         <div className="text-right">
-          <p className="text-white mx-3 text-3xl font-bold tracking-tight tabular-nums">
+          <p className="text-white mr-3 ml-3 text-3xl font-bold tracking-tight tabular-nums">
             {time.format('HH:mm:ss')}
           </p>
           <p className="text-white/60 mr-3 text-sm uppercase tracking-wider">
