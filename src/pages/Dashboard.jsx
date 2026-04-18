@@ -226,7 +226,7 @@ export default function Dashboard() {
                 variant="outline"
                 size="sm"
                 onClick={handleMonitorAll}
-                disabled={isMonitoring} className="bg-white/10 text-white text-xs font-medium rounded-md inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground h-8 border-white/20 hover:bg-white/20 gap-1.5">
+                disabled={isMonitoring} className="bg-white/10 text-white mr-10 text-xs font-medium rounded-md inline-flex items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground h-8 border-white/20 hover:bg-white/20 gap-1.5">
                 
                 
               <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
