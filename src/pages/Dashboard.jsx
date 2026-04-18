@@ -235,7 +235,7 @@ export default function Dashboard() {
             <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowWidgetConfig((v) => !v)} className="bg-white/10 text-white ml-4 px-3 text-xs font-medium rounded-md items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground h-8 hidden sm:flex border-white/20 hover:bg-white/20 gap-1.5">
+                onClick={() => setShowWidgetConfig((v) => !v)} className="bg-white/10 text-white px-3 text-xs font-medium rounded-md items-center justify-center whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:text-accent-foreground h-8 hidden sm:flex border-white/20 hover:bg-white/20 gap-1.5">
                 
                 
               <Settings2 className="h-4 w-4" />
