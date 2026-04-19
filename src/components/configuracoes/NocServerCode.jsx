@@ -48,10 +48,11 @@ CONFIG_FILE  = os.path.join(APP_DIR, "config.json")
 LOG_FILE     = os.path.join(APP_DIR, "noc_server.log")
 LOCK_FILE    = os.path.join(APP_DIR, "noc_server.lock")
 
-DEFAULT_INTERVAL  = 30    # segundos entre ciclos de reporte
-ACCEPT_TIMEOUT    = 25    # timeout TCP para terminais Heartbeat
-SDK_TCP_TIMEOUT   = 5     # timeout para testar porta SDK (4370)
-DEFAULT_ADMS_PORT = 8080  # porta HTTP para recepcao ADMS/Push
+DEFAULT_INTERVAL       = 30    # segundos entre ciclos de reporte
+ACCEPT_TIMEOUT         = 25    # timeout TCP para terminais Heartbeat
+SDK_TCP_TIMEOUT        = 5     # timeout para testar porta SDK (4370)
+DEFAULT_ADMS_PORT      = 8080  # porta HTTP para recepcao ADMS/Push
+RELOAD_INTERVAL        = 300   # segundos entre recargas automáticas de terminais (5 min)
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
 logger = logging.getLogger("noc_server")
@@ -60,6 +61,10 @@ logger = logging.getLogger("noc_server")
 # { terminal_id: { "connected": bool, "last_seen": float, "latencia_ms": int|None, "tipo": str } }
 state      = {}
 state_lock = threading.Lock()
+
+# Controlo de threads activas por terminal_id (para evitar duplicados na recarga)
+active_threads = {}
+active_threads_lock = threading.Lock()
 
 
 # ──────────────────────────────────────────────────────────────
@@ -364,36 +369,102 @@ def sdk_tcp_poller(terminal, stop_event, intervalo=30):
 # ──────────────────────────────────────────────────────────────
 # Ciclo de Reporte → NOC Monitor
 # ──────────────────────────────────────────────────────────────
-def ciclo_reporte(terminais, app_id, api_key, stop_event, intervalo):
-    logger.info(f"[REPORT] Ciclo de reporte activo — intervalo={intervalo}s")
+def _report_once(terminais, app_id, api_key):
+    """Envia um ciclo de reporte para todos os terminais dados."""
+    sess = requests.Session()
+    try:
+        for t in terminais:
+            tid  = t["id"]
+            nome = t.get("nome", tid)
+            with state_lock:
+                estado = state.get(tid, {})
+            connected   = estado.get("connected", False)
+            last_seen   = estado.get("last_seen", 0)
+            latencia    = estado.get("latencia_ms")
+            seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
+            status = "online" if connected else "offline"
+            try:
+                reportar_status(sess, app_id, api_key,
+                                terminal_id=tid, status=status,
+                                latencia_ms=latencia, segundos_sem_ping=seg_offline)
+                logger.info(f"[REPORT] '{nome}' ({t.get('tipo_conexao','?')}) → {status.upper()}"
+                            + (f" lat={latencia}ms" if latencia else "")
+                            + (f" offline={seg_offline}s" if seg_offline else ""))
+            except requests.HTTPError as e:
+                code = e.response.status_code if e.response is not None else "?"
+                logger.error(f"[REPORT] HTTP {code} ao reportar '{nome}'")
+            except Exception as e:
+                logger.error(f"[REPORT] Erro '{nome}': {e}")
+    finally:
+        sess.close()
+
+
+def _iniciar_thread_terminal(t, stop_event, intervalo, adms_port):
+    """Inicia a thread de monitorização para um terminal, se ainda não existir."""
+    tid  = t["id"]
+    tipo = t.get("tipo_conexao")
+    with active_threads_lock:
+        if tid in active_threads and active_threads[tid].is_alive():
+            return  # já está a correr
+        if tipo == "heartbeat":
+            th = threading.Thread(target=heartbeat_listener, args=(t, stop_event),
+                                  name=f"hb-{t['nome']}", daemon=True)
+        elif tipo == "sdk_tcp":
+            th = threading.Thread(target=sdk_tcp_poller, args=(t, stop_event, intervalo),
+                                  name=f"sdk-{t['nome']}", daemon=True)
+        else:
+            return  # ADMS e outros não têm thread por terminal
+        th.start()
+        active_threads[tid] = th
+        logger.info(f"[RELOAD] Nova thread iniciada para '{t['nome']}' ({tipo})")
+
+
+def ciclo_reporte_com_reload(terminais_inicial, app_id, api_key, stop_event, intervalo, adms_port):
+    """
+    Ciclo de reporte com recarga automática de terminais a cada RELOAD_INTERVAL segundos.
+    Novos terminais adicionados no painel são detectados e monitorizados sem reiniciar o serviço.
+    """
+    global sn_to_terminal
+    terminais_geridos = list(terminais_inicial)
+    ultimo_reload     = time.time()
+    logger.info(f"[REPORT] Ciclo activo — intervalo={intervalo}s | auto-reload cada {RELOAD_INTERVAL}s")
+
     while not stop_event.is_set():
-        sess = requests.Session()
-        try:
-            for t in terminais:
-                if stop_event.is_set(): break
-                tid  = t["id"]
-                nome = t.get("nome", tid)
-                with state_lock:
-                    estado = state.get(tid, {})
-                connected   = estado.get("connected", False)
-                last_seen   = estado.get("last_seen", 0)
-                latencia    = estado.get("latencia_ms")
-                seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
-                status = "online" if connected else "offline"
-                try:
-                    reportar_status(sess, app_id, api_key,
-                                    terminal_id=tid, status=status,
-                                    latencia_ms=latencia, segundos_sem_ping=seg_offline)
-                    logger.info(f"[REPORT] '{nome}' ({t.get('tipo_conexao','?')}) → {status.upper()}"
-                                + (f" lat={latencia}ms" if latencia else "")
-                                + (f" offline={seg_offline}s" if seg_offline else ""))
-                except requests.HTTPError as e:
-                    code = e.response.status_code if e.response is not None else "?"
-                    logger.error(f"[REPORT] HTTP {code} ao reportar '{nome}'")
-                except Exception as e:
-                    logger.error(f"[REPORT] Erro '{nome}': {e}")
-        finally:
-            sess.close()
+        # ── Recarga automática de terminais ─────────────────────
+        if time.time() - ultimo_reload >= RELOAD_INTERVAL:
+            try:
+                sess = requests.Session()
+                novos = listar_terminais(sess, app_id, api_key)
+                sess.close()
+                ids_actuais = {t["id"] for t in terminais_geridos}
+                ids_novos   = {t["id"] for t in novos if t.get("tipo_conexao") in ("heartbeat","adms_push","sdk_tcp")}
+
+                adicionados = [t for t in novos if t["id"] not in ids_actuais and t.get("tipo_conexao") in ("heartbeat","adms_push","sdk_tcp")]
+                removidos   = [t for t in terminais_geridos if t["id"] not in ids_novos]
+
+                if adicionados:
+                    logger.info(f"[RELOAD] +{len(adicionados)} novo(s) terminal(is) detectado(s)")
+                    for t in adicionados:
+                        tipo = t.get("tipo_conexao")
+                        if tipo == "adms_push":
+                            sn = t.get("numero_serie","").strip()
+                            if sn:
+                                sn_to_terminal[sn] = t["id"]
+                                logger.info(f"[RELOAD] ADMS mapeado: SN={sn} → '{t['nome']}'")
+                        _iniciar_thread_terminal(t, stop_event, intervalo, adms_port)
+                    terminais_geridos.extend(adicionados)
+
+                if removidos:
+                    logger.info(f"[RELOAD] -{len(removidos)} terminal(is) removido(s) do painel")
+                    terminais_geridos = [t for t in terminais_geridos if t["id"] in ids_novos]
+
+                ultimo_reload = time.time()
+            except Exception as e:
+                logger.warning(f"[RELOAD] Falha na recarga: {e}")
+
+        # ── Ciclo de reporte ─────────────────────────────────────
+        _report_once(terminais_geridos, app_id, api_key)
+
         for _ in range(intervalo):
             if stop_event.is_set(): return
             time.sleep(1)
@@ -477,9 +548,7 @@ def run_noc_server(stop_event=None):
 
         # Iniciar threads Heartbeat TCP (1 por terminal)
         for t in hb_terminais:
-            th = threading.Thread(target=heartbeat_listener, args=(t, stop_event),
-                                  name=f"hb-{t['nome']}", daemon=True)
-            th.start()
+            _iniciar_thread_terminal(t, stop_event, intervalo, adms_port)
             logger.info(f"  [HB-TCP] Thread iniciada para '{t['nome']}' :{t.get('porta',5005)}")
 
         # Iniciar servidor ADMS/Push HTTP (se houver terminais ADMS)
@@ -490,9 +559,7 @@ def run_noc_server(stop_event=None):
 
         # Iniciar threads SDK-TCP (1 por terminal)
         for t in sdk_terminais:
-            th = threading.Thread(target=sdk_tcp_poller, args=(t, stop_event, intervalo),
-                                   name=f"sdk-{t['nome']}", daemon=True)
-            th.start()
+            _iniciar_thread_terminal(t, stop_event, intervalo, adms_port)
             logger.info(f"  [SDK-TCP] Poller iniciado para '{t['nome']}'")
 
         # Aviso sobre terminais WebSocket Cloud (não geridos por este servidor)
@@ -506,8 +573,8 @@ def run_noc_server(stop_event=None):
             logger.warning("Nenhum terminal Heartbeat/ADMS/SDK encontrado. Nada a fazer — encerrando.")
             return 0
 
-        # Ciclo de reporte apenas para terminais geridos por este servidor
-        ciclo_reporte(terminais_geridos, app_id, api_key, stop_event, intervalo)
+        # Ciclo de reporte + recarga automática de terminais a quente
+        ciclo_reporte_com_reload(terminais_geridos, app_id, api_key, stop_event, intervalo, adms_port)
         return 0
 
     except KeyboardInterrupt:
