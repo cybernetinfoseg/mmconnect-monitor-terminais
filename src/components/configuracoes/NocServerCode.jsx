@@ -311,7 +311,7 @@ def start_adms_server(port, stop_event):
         server = HTTPServer(("0.0.0.0", port), ADMSHandler)
         server.timeout = 1
         logger.info(f"[ADMS] Servidor HTTP activo em http://0.0.0.0:{port}/iclock/cdata")
-        logger.info(f"[ADMS] Configure os terminais ZKTeco com: Servidor = http://51.91.219.145:{port}")
+        logger.info(f"[ADMS] Configure os terminais ZKTeco com: Servidor = http://127.0.0.1:{port}")
         while not stop_event.is_set():
             server.handle_request()
         server.server_close()
@@ -555,7 +555,7 @@ if __name__ == "__main__":
 
 const SECTIONS = [
   { key: 'heartbeat', label: 'Heartbeat TCP', color: 'violet', badge: 'TCP', desc: 'Terminal conecta TCP → online/offline por timeout. Cada terminal usa uma porta diferente.' },
-  { key: 'adms',      label: 'ADMS / Push',   color: 'blue',   badge: 'HTTP', desc: 'ZKTeco ADMS, Anviz CrossChex — terminal faz HTTP POST. Servidor fica em http://51.91.219.145:8080.' },
+  { key: 'adms',      label: 'ADMS / Push',   color: 'blue',   badge: 'HTTP', desc: 'ZKTeco ADMS, Anviz CrossChex — terminal faz HTTP POST. Servidor fica em http://127.0.0.1:8080.' },
   { key: 'sdk',       label: 'SDK-TCP',        color: 'emerald', badge: 'TCP', desc: 'Polling activo na porta ZKTeco SDK (4370). Terminal precisa de ter IP acessível.' },
 ];
 
@@ -609,7 +609,7 @@ export default function NocServerCode() {
 
       {/* Firewall */}
       <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
-        <p className="font-semibold">🔥 Portas a abrir no Firewall do Windows Server (51.91.219.145)</p>
+        <p className="font-semibold">🔥 Portas a abrir no Firewall do Windows Server (127.0.0.1)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1">
           <p>• <strong>8080 TCP</strong> — Servidor ADMS/Push (ZKTeco, Anviz)</p>
           <p>• <strong>5005–5xxx TCP</strong> — Portas Heartbeat (uma por terminal)</p>
@@ -623,7 +623,7 @@ export default function NocServerCode() {
         <p className="font-semibold">📱 Configuração ADMS no terminal ZKTeco</p>
         <p>Menu Principal → Comm → Cloud Server Settings (ou ADMS):</p>
         <div className="font-mono bg-blue-100 px-2 py-1.5 rounded mt-1 space-y-0.5">
-          <p>Server Address: <strong>51.91.219.145</strong></p>
+          <p>Server Address: <strong>127.0.0.1</strong></p>
           <p>Server Port: <strong>8080</strong></p>
           <p>HTTPS: <strong>Desativado</strong></p>
           <p>Device Push: <strong>Ativado</strong></p>
