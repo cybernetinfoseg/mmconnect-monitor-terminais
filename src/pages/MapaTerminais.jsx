@@ -64,7 +64,15 @@ export default function MapaTerminais() {
   const handleRefresh = async () => {
     setIsMonitoring(true);
     try {
-      await base44.functions.invoke('monitorAllTerminals', {});
+      if (isAdmin) {
+        await base44.functions.invoke('monitorAllTerminals', {});
+      } else {
+        // Utilizadores não-admin verificam cada terminal ativo individualmente
+        const ativos = allTerminals.filter(t => t.ativo !== false && ['ip_publico','dns','api'].includes(t.tipo_conexao));
+        await Promise.all(ativos.map(t =>
+          base44.functions.invoke('monitorTerminal', { terminalId: t.id }).catch(() => {})
+        ));
+      }
     } catch {}
     await Promise.all([refetch(), refetchPlans()]);
     setIsMonitoring(false);

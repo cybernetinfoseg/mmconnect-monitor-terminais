@@ -70,7 +70,10 @@ export default function Incidents() {
   const handleRefresh = async () => {
     setIsMonitoring(true);
     try {
-      await base44.functions.invoke('monitorAllTerminals', {});
+      if (canSeeAll) {
+        await base44.functions.invoke('monitorAllTerminals', {});
+      }
+      // Não-admins: apenas recarregar dados (terminais passivos são atualizados pelo agente)
     } catch {}
     await refetch();
     setIsMonitoring(false);
