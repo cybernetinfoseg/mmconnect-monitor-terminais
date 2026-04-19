@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Upload, Trash2, Move, Save, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, Trash2, Move, Save, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -240,16 +240,7 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
           </span>
         )}
 
-        {/* No image hint for editable users */}
-        {!hasImage && canEdit && (
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-300 hover:text-slate-400 transition-colors"
-          >
-            <ImageIcon className="h-10 w-10" />
-            <span className="text-xs">Clique para importar planta baixa</span>
-          </button>
-        )}
+
 
         {/* Terminal markers */}
         {terminals.map((terminal, idx) => {
