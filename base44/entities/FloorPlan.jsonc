@@ -1,0 +1,25 @@
+{
+  "name": "FloorPlan",
+  "type": "object",
+  "properties": {
+    "local": {
+      "type": "string",
+      "description": "Nome do local associado \u00e0 planta"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL da imagem da planta baixa"
+    },
+    "positions": {
+      "type": "string",
+      "description": "JSON com posi\u00e7\u00f5es dos terminais: { terminalId: {x, y} }"
+    },
+    "criado_por": {
+      "type": "string",
+      "description": "Email do admin que criou"
+    }
+  },
+  "required": [
+    "local"
+  ]
+}
