@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Upload, Trash2, Move, Save, Loader2, Fingerprint, Scan, Shield, Cpu, MonitorSmartphone, Wifi, DoorOpen, UserCheck, Camera } from 'lucide-react';
+import { Upload, Trash2, Move, Save, Loader2, Fingerprint, Scan, Shield, Cpu, MonitorSmartphone, Wifi, DoorOpen, UserCheck, Camera, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,30 +16,56 @@ function getColor(status) {
   return STATUS_COLORS[status] || STATUS_COLORS.default;
 }
 
-// Ícones disponíveis para os terminais
 const TERMINAL_ICONS = [
-  { id: 'initials', label: 'Iniciais', Icon: null },
-  { id: 'fingerprint', label: 'Biométrico', Icon: Fingerprint },
-  { id: 'scan', label: 'Scan', Icon: Scan },
-  { id: 'shield', label: 'Segurança', Icon: Shield },
-  { id: 'cpu', label: 'CPU', Icon: Cpu },
-  { id: 'monitor', label: 'Monitor', Icon: MonitorSmartphone },
-  { id: 'wifi', label: 'Wireless', Icon: Wifi },
-  { id: 'door', label: 'Porta', Icon: DoorOpen },
-  { id: 'user', label: 'Utilizador', Icon: UserCheck },
-  { id: 'camera', label: 'Câmara', Icon: Camera },
+  { id: 'initials',     label: 'Iniciais',    Icon: null },
+  { id: 'fingerprint',  label: 'Biométrico',  Icon: Fingerprint },
+  { id: 'scan',         label: 'Scan',        Icon: Scan },
+  { id: 'shield',       label: 'Segurança',   Icon: Shield },
+  { id: 'cpu',          label: 'CPU',         Icon: Cpu },
+  { id: 'monitor',      label: 'Monitor',     Icon: MonitorSmartphone },
+  { id: 'wifi',         label: 'Wireless',    Icon: Wifi },
+  { id: 'door',         label: 'Porta',       Icon: DoorOpen },
+  { id: 'user',         label: 'Utilizador',  Icon: UserCheck },
+  { id: 'camera',       label: 'Câmara',      Icon: Camera },
 ];
 
 function getIconEntry(iconId) {
   return TERMINAL_ICONS.find(i => i.id === iconId) || TERMINAL_ICONS[0];
 }
 
-// Tooltip flutuante — apenas no hover
-function MarkerTooltip({ terminal }) {
+// Tooltip com posicionamento inteligente dentro do contentor
+function MarkerTooltip({ terminal, markerRef, containerRef }) {
+  const tooltipRef = useRef(null);
+  const [style, setStyle] = useState({ bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)' });
   const c = getColor(terminal.status);
+
+  useEffect(() => {
+    if (!tooltipRef.current || !containerRef?.current || !markerRef?.current) return;
+    const tip  = tooltipRef.current.getBoundingClientRect();
+    const cont = containerRef.current.getBoundingClientRect();
+    const mark = markerRef.current.getBoundingClientRect();
+
+    // Vertical: preferir acima; se sair pelo topo → abaixo
+    const spaceAbove = mark.top - cont.top;
+    const showBelow  = spaceAbove < tip.height + 12;
+
+    // Horizontal: centrado no marcador, mas clampado dentro do contentor
+    const markerCenterX = mark.left - cont.left + mark.width / 2;
+    let left = markerCenterX - tip.width / 2;
+    left = Math.max(4, Math.min(left, cont.width - tip.width - 4));
+
+    setStyle(showBelow
+      ? { top: mark.bottom - cont.top + 8, left }
+      : { bottom: cont.bottom - mark.top + 8, left }
+    );
+  }, []);
+
   return (
-    <div className="absolute z-50 pointer-events-none"
-      style={{ bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)', minWidth: 160 }}>
+    <div
+      ref={tooltipRef}
+      className="absolute z-[500] pointer-events-none"
+      style={{ ...style, minWidth: 160, position: 'absolute' }}
+    >
       <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-3 text-xs">
         <div className="flex items-center gap-1.5 mb-1">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.dot }} />
@@ -52,15 +78,15 @@ function MarkerTooltip({ terminal }) {
           {terminal.status?.toUpperCase() || '—'}
         </div>
       </div>
-      <div className="w-2 h-2 bg-white border-b border-r border-slate-200 rotate-45 mx-auto -mt-1" />
     </div>
   );
 }
 
-// Picker de ícone para um terminal (aparece no modo edição ao clicar no marcador)
+// Picker de ícone
 function IconPicker({ terminalId, currentIcon, onSelect, onClose }) {
   return (
-    <div className="absolute z-[300] bg-white border border-slate-200 rounded-xl shadow-2xl p-2"
+    <div
+      className="absolute z-[300] bg-white border border-slate-200 rounded-xl shadow-2xl p-2"
       style={{ bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)', width: 220 }}
       onMouseDown={e => e.stopPropagation()}
     >
@@ -83,18 +109,24 @@ function IconPicker({ terminalId, currentIcon, onSelect, onClose }) {
   );
 }
 
+const ZOOM_STEP = 0.2;
+const ZOOM_MIN  = 0.5;
+const ZOOM_MAX  = 3;
+
 export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, onSave, selectedId, onSelect }) {
-  // positions format: { terminalId: {x, y, icon?} }
-  const [imageUrl, setImageUrl]   = useState(savedPlan?.imageUrl || null);
-  const [positions, setPositions] = useState(savedPlan?.positions || {});
-  const [dragging, setDragging]   = useState(null);
-  const [editMode, setEditMode]   = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving]       = useState(false);
-  const [hover, setHover]         = useState(null);
-  const [iconPicker, setIconPicker] = useState(null); // terminalId or null
-  const containerRef = useRef(null);
-  const fileRef      = useRef(null);
+  const [imageUrl, setImageUrl]     = useState(savedPlan?.imageUrl || null);
+  const [positions, setPositions]   = useState(savedPlan?.positions || {});
+  const [dragging, setDragging]     = useState(null);
+  const [editMode, setEditMode]     = useState(false);
+  const [uploading, setUploading]   = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [hover, setHover]           = useState(null);
+  const [iconPicker, setIconPicker] = useState(null);
+  const [zoom, setZoom]             = useState(1);
+
+  const containerRef  = useRef(null); // outer scroll container
+  const canvasRef     = useRef(null); // inner zoomable canvas
+  const markerRefs    = useRef({});   // per-terminal marker refs
 
   useEffect(() => {
     if (savedPlan) {
@@ -113,9 +145,7 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
 
   function defaultPos(idx, total) {
     const cols = Math.max(4, Math.ceil(Math.sqrt(total)));
-    const col  = idx % cols;
-    const row  = Math.floor(idx / cols);
-    return { x: 10 + col * 14, y: 15 + row * 20 };
+    return { x: 10 + (idx % cols) * 14, y: 15 + Math.floor(idx / cols) * 20 };
   }
 
   function getPos(terminal, idx) {
@@ -127,10 +157,7 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
   }
 
   function setTerminalIcon(terminalId, iconId) {
-    setPositions(p => ({
-      ...p,
-      [terminalId]: { ...(p[terminalId] || {}), icon: iconId },
-    }));
+    setPositions(p => ({ ...p, [terminalId]: { ...(p[terminalId] || {}), icon: iconId } }));
   }
 
   async function handleUpload(e) {
@@ -150,18 +177,13 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
     }
   }
 
-  function removePlan() {
-    setImageUrl(null);
-    setPositions({});
-  }
+  function removePlan() { setImageUrl(null); setPositions({}); }
 
+  // Mouse drag (positions in % of canvas)
   function onMouseDown(e, terminalId) {
-    if (!editMode) return;
-    // If clicking to open icon picker, don't start drag
-    if (iconPicker === terminalId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = containerRef.current.getBoundingClientRect();
+    if (!editMode || iconPicker === terminalId) return;
+    e.preventDefault(); e.stopPropagation();
+    const rect = canvasRef.current.getBoundingClientRect();
     const cx = ((e.clientX - rect.left) / rect.width)  * 100;
     const cy = ((e.clientY - rect.top)  / rect.height) * 100;
     const pos = positions[terminalId] || defaultPos(terminals.findIndex(t => t.id === terminalId), terminals.length);
@@ -170,16 +192,15 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
 
   const onMouseMove = useCallback((e) => {
     if (!dragging) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = canvasRef.current.getBoundingClientRect();
     const x = Math.min(97, Math.max(2, ((e.clientX - rect.left) / rect.width)  * 100 - dragging.offsetX));
     const y = Math.min(95, Math.max(2, ((e.clientY - rect.top)  / rect.height) * 100 - dragging.offsetY));
     setPositions(p => ({ ...p, [dragging.id]: { ...(p[dragging.id] || {}), x, y } }));
     setDragging(d => d ? { ...d, moved: true } : d);
   }, [dragging]);
 
-  const onMouseUp = useCallback((e) => {
+  const onMouseUp = useCallback(() => {
     if (dragging && !dragging.moved) {
-      // It was a click (no drag) — open icon picker
       setIconPicker(id => id === dragging.id ? null : dragging.id);
     }
     setDragging(null);
@@ -200,7 +221,7 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
     if (!editMode) return;
     e.preventDefault();
     const touch = e.touches[0];
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect  = canvasRef.current.getBoundingClientRect();
     const cx = ((touch.clientX - rect.left) / rect.width)  * 100;
     const cy = ((touch.clientY - rect.top)  / rect.height) * 100;
     const pos = positions[terminalId] || defaultPos(terminals.findIndex(t => t.id === terminalId), terminals.length);
@@ -210,7 +231,7 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
   function onTouchMove(e) {
     if (!dragging) return;
     const touch = e.touches[0];
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect  = canvasRef.current.getBoundingClientRect();
     const x = Math.min(97, Math.max(2, ((touch.clientX - rect.left) / rect.width)  * 100 - dragging.offsetX));
     const y = Math.min(95, Math.max(2, ((touch.clientY - rect.top)  / rect.height) * 100 - dragging.offsetY));
     setPositions(p => ({ ...p, [dragging.id]: { ...(p[dragging.id] || {}), x, y } }));
@@ -221,16 +242,19 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
     try {
       await onSave({ imageUrl, positions });
       toast.success('Planta guardada!');
-      setEditMode(false);
-      setIconPicker(null);
+      setEditMode(false); setIconPicker(null);
     } catch {
       toast.error('Erro ao guardar');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   }
 
-  const hasImage = !!imageUrl;
+  function changeZoom(delta) {
+    setZoom(z => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + delta) * 10) / 10)));
+  }
+
+  const hasImage   = !!imageUrl;
+  const fileRef    = useRef(null);
+  const canvasH    = hasImage ? 360 : Math.max(140, Math.ceil(terminals.length / 6) * 100 + 40);
 
   return (
     <div className="space-y-2">
@@ -238,8 +262,7 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
       {canEdit && (
         <div className="flex items-center gap-2 flex-wrap">
           <Button
-            variant={editMode ? 'default' : 'outline'}
-            size="sm"
+            variant={editMode ? 'default' : 'outline'} size="sm"
             onClick={() => { setEditMode(v => !v); setIconPicker(null); }}
             className={editMode ? 'bg-blue-600 hover:bg-blue-700' : ''}
           >
@@ -265,127 +288,198 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
         </div>
       )}
 
-      {/* Canvas */}
+      {/* Zoom controls */}
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeZoom(-ZOOM_STEP)} disabled={zoom <= ZOOM_MIN}>
+          <ZoomOut className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-xs text-slate-500 w-10 text-center">{Math.round(zoom * 100)}%</span>
+        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeZoom(ZOOM_STEP)} disabled={zoom >= ZOOM_MAX}>
+          <ZoomIn className="h-3.5 w-3.5" />
+        </Button>
+        {zoom !== 1 && (
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setZoom(1)} title="Repor zoom">
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
+      {/* Outer scroll container */}
       <div
         ref={containerRef}
-        className="relative w-full rounded-xl overflow-hidden select-none"
-        style={{
-          minHeight: hasImage ? 360 : Math.max(140, Math.ceil(terminals.length / 6) * 100 + 40),
-          background: hasImage
-            ? 'transparent'
-            : 'repeating-linear-gradient(0deg,transparent,transparent 39px,#e2e8f0 39px,#e2e8f0 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,#e2e8f0 39px,#e2e8f0 40px)',
-          backgroundColor: '#f8fafc',
-          cursor: editMode ? 'crosshair' : 'default',
-        }}
-        onTouchMove={onTouchMove}
-        onTouchEnd={() => setDragging(null)}
+        className="w-full rounded-xl overflow-auto border border-slate-200"
+        style={{ maxHeight: 560 }}
       >
-        {hasImage && (
-          <img
-            src={imageUrl}
-            alt="Planta baixa"
-            className="w-full h-full object-contain"
-            style={{ minHeight: 360, maxHeight: 600 }}
-            draggable={false}
-          />
-        )}
+        {/* Inner zoomable canvas */}
+        <div
+          ref={canvasRef}
+          className="relative select-none"
+          style={{
+            width:  `${100 * zoom}%`,
+            minHeight: canvasH * zoom,
+            background: hasImage
+              ? 'transparent'
+              : 'repeating-linear-gradient(0deg,transparent,transparent 39px,#e2e8f0 39px,#e2e8f0 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,#e2e8f0 39px,#e2e8f0 40px)',
+            backgroundColor: '#f8fafc',
+            cursor: editMode ? 'crosshair' : 'default',
+            transformOrigin: 'top left',
+          }}
+          onTouchMove={onTouchMove}
+          onTouchEnd={() => setDragging(null)}
+        >
+          {hasImage && (
+            <img
+              src={imageUrl}
+              alt="Planta baixa"
+              className="w-full object-contain"
+              style={{ minHeight: canvasH * zoom, maxHeight: 600 * zoom, display: 'block' }}
+              draggable={false}
+            />
+          )}
 
-        {!hasImage && (
-          <span className="absolute top-2 left-3 text-[10px] text-slate-400 font-medium uppercase tracking-wider">
-            Planta — {local}
-          </span>
-        )}
+          {!hasImage && (
+            <span className="absolute top-2 left-3 text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+              Planta — {local}
+            </span>
+          )}
 
-        {/* Terminal markers */}
-        {terminals.map((terminal, idx) => {
-          const pos            = getPos(terminal, idx);
-          const c              = getColor(terminal.status);
-          const isDraggingThis = dragging?.id === terminal.id;
-          const isHovered      = hover === terminal.id;
-          const iconId         = getTerminalIcon(terminal);
-          const iconEntry      = getIconEntry(iconId);
-          const IconComponent  = iconEntry.Icon;
-          const showPicker     = editMode && iconPicker === terminal.id;
+          {/* Terminal markers */}
+          {terminals.map((terminal, idx) => {
+            const pos            = getPos(terminal, idx);
+            const c              = getColor(terminal.status);
+            const isDraggingThis = dragging?.id === terminal.id;
+            const isHovered      = hover === terminal.id;
+            const iconId         = getTerminalIcon(terminal);
+            const iconEntry      = getIconEntry(iconId);
+            const IconComponent  = iconEntry.Icon;
+            const showPicker     = editMode && iconPicker === terminal.id;
 
-          return (
-            <div
-              key={terminal.id}
-              className="absolute"
-              style={{
-                left:        `${pos.x}%`,
-                top:         `${pos.y}%`,
-                transform:   'translate(-50%, -50%)',
-                zIndex:      isDraggingThis ? 200 : showPicker ? 150 : isHovered ? 50 : 10,
-                cursor:      editMode ? 'grab' : 'pointer',
-                touchAction: editMode ? 'none' : 'auto',
-              }}
-              onMouseDown={(e) => onMouseDown(e, terminal.id)}
-              onTouchStart={(e) => onTouchStart(e, terminal.id)}
-              onMouseEnter={() => !editMode && setHover(terminal.id)}
-              onMouseLeave={() => setHover(null)}
-              onClick={() => !editMode && onSelect(terminal)}
-            >
-              {/* Tooltip — hover only, non-edit mode */}
-              <AnimatePresence>
-                {isHovered && !editMode && (
-                  <motion.div key="tip" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}>
-                    <MarkerTooltip terminal={terminal} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Icon picker — edit mode click */}
-              <AnimatePresence>
-                {showPicker && (
-                  <motion.div key="picker" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}>
-                    <IconPicker
-                      terminalId={terminal.id}
-                      currentIcon={iconId}
-                      onSelect={setTerminalIcon}
-                      onClose={() => setIconPicker(null)}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Ping animation for offline */}
-              {terminal.status === 'offline' && (
-                <span className="absolute inset-0 rounded-full animate-ping opacity-60" style={{ backgroundColor: c.ring }} />
-              )}
-
-              {/* Dot marker */}
+            return (
               <div
-                className="relative flex items-center justify-center rounded-full border-2 border-white shadow-lg transition-transform duration-150"
+                key={terminal.id}
+                ref={el => markerRefs.current[terminal.id] = el}
+                className="absolute"
                 style={{
-                  width:           32,
-                  height:          32,
-                  backgroundColor: c.dot,
-                  boxShadow:       `0 0 0 3px ${c.ring}`,
-                  transform:       isDraggingThis ? 'scale(1.3)' : 'scale(1)',
+                  left:        `${pos.x}%`,
+                  top:         `${pos.y}%`,
+                  transform:   'translate(-50%, -50%)',
+                  zIndex:      isDraggingThis ? 200 : showPicker ? 150 : isHovered ? 50 : 10,
+                  cursor:      editMode ? 'grab' : 'pointer',
+                  touchAction: editMode ? 'none' : 'auto',
                 }}
+                onMouseDown={(e) => onMouseDown(e, terminal.id)}
+                onTouchStart={(e) => onTouchStart(e, terminal.id)}
+                onMouseEnter={() => !editMode && setHover(terminal.id)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => !editMode && onSelect(terminal)}
               >
-                {IconComponent
-                  ? <IconComponent className="text-white h-4 w-4" />
-                  : <span className="text-white text-[10px] font-bold leading-none select-none">{terminal.nome?.slice(0, 2).toUpperCase()}</span>
-                }
-              </div>
+                {/* Tooltip — hover only, smart positioning */}
+                <AnimatePresence>
+                  {isHovered && !editMode && (
+                    <motion.div key="tip" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}>
+                      <SmartTooltip terminal={terminal} markerEl={markerRefs.current[terminal.id]} containerEl={containerRef.current} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-              {/* Label below marker */}
-              <div className="mt-1 text-center" style={{ width: 60, marginLeft: -14 }}>
-                <span className="text-[9px] font-semibold text-slate-700 bg-white/80 px-1 rounded leading-tight block truncate">
-                  {terminal.nome}
-                </span>
+                {/* Icon picker */}
+                <AnimatePresence>
+                  {showPicker && (
+                    <motion.div key="picker" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}>
+                      <IconPicker terminalId={terminal.id} currentIcon={iconId} onSelect={setTerminalIcon} onClose={() => setIconPicker(null)} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Ping for offline */}
+                {terminal.status === 'offline' && (
+                  <span className="absolute inset-0 rounded-full animate-ping opacity-60" style={{ backgroundColor: c.ring }} />
+                )}
+
+                {/* Marker dot */}
+                <div
+                  className="relative flex items-center justify-center rounded-full border-2 border-white shadow-lg transition-transform duration-150"
+                  style={{
+                    width:           32,
+                    height:          32,
+                    backgroundColor: c.dot,
+                    boxShadow:       `0 0 0 3px ${c.ring}`,
+                    transform:       isDraggingThis ? 'scale(1.3)' : 'scale(1)',
+                  }}
+                >
+                  {IconComponent
+                    ? <IconComponent className="text-white h-4 w-4" />
+                    : <span className="text-white text-[10px] font-bold leading-none select-none">{terminal.nome?.slice(0, 2).toUpperCase()}</span>
+                  }
+                </div>
+
+                {/* Label */}
+                <div className="mt-1 text-center" style={{ width: 60, marginLeft: -14 }}>
+                  <span className="text-[9px] font-semibold text-slate-700 bg-white/80 px-1 rounded leading-tight block truncate">
+                    {terminal.nome}
+                  </span>
+                </div>
               </div>
+            );
+          })}
+
+          {editMode && (
+            <div className="absolute bottom-2 right-2 bg-blue-600/90 text-white text-[10px] px-2 py-1 rounded-lg">
+              Arraste para mover · Clique para mudar ícone
             </div>
-          );
-        })}
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* Edit mode hints */}
-        {editMode && (
-          <div className="absolute bottom-2 right-2 bg-blue-600/90 text-white text-[10px] px-2 py-1 rounded-lg">
-            Arraste para mover · Clique para mudar ícone
-          </div>
-        )}
+// Tooltip com posicionamento relativo ao contentor de scroll (outer)
+function SmartTooltip({ terminal, markerEl, containerEl }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState({ top: null, left: null, bottom: null });
+  const c = getColor(terminal.status);
+
+  useEffect(() => {
+    if (!ref.current || !containerEl || !markerEl) return;
+    const tip  = ref.current.getBoundingClientRect();
+    const cont = containerEl.getBoundingClientRect();
+    const mark = markerEl.getBoundingClientRect();
+
+    // Horizontal clamp within outer container
+    let left = mark.left - cont.left + mark.width / 2 - tip.width / 2 + containerEl.scrollLeft;
+    left = Math.max(4, Math.min(left, cont.width - tip.width - 4));
+
+    // Vertical: above marker if space, else below
+    const spaceAbove = mark.top - cont.top;
+    const top = spaceAbove >= tip.height + 12
+      ? mark.top - cont.top - tip.height - 8 + containerEl.scrollTop
+      : mark.bottom - cont.top + 8 + containerEl.scrollTop;
+
+    setPos({ top, left });
+  }, [containerEl, markerEl]);
+
+  return (
+    <div
+      ref={ref}
+      className="pointer-events-none z-[500] bg-white rounded-xl shadow-2xl border border-slate-200 p-3 text-xs"
+      style={{
+        position: 'absolute',
+        top:      pos.top ?? 0,
+        left:     pos.left ?? 0,
+        minWidth: 160,
+        visibility: pos.top === null ? 'hidden' : 'visible',
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.dot }} />
+        <span className="font-bold text-slate-800 truncate">{terminal.nome}</span>
+      </div>
+      {terminal.local && <p className="text-slate-500 truncate">{terminal.local}</p>}
+      {terminal.latencia_ms && <p className="text-slate-400">Latência: {terminal.latencia_ms}ms</p>}
+      <div className="mt-1.5 text-center font-semibold rounded px-1 py-0.5"
+        style={{ backgroundColor: c.dot + '22', color: c.dot }}>
+        {terminal.status?.toUpperCase() || '—'}
       </div>
     </div>
   );
