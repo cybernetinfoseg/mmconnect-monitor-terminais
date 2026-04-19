@@ -388,7 +388,7 @@ export default function HeartbeatServerCode() {
           Modo Heartbeat — Windows Server com IP Público
         </p>
         <div className="text-violet-700 space-y-1 text-xs">
-          <p>✅ <strong>Ideal para:</strong> terminais já apontados ao servidor Windows (<code className="bg-violet-100 px-1 rounded">51.91.219.145</code>) com portas diferentes</p>
+          <p>✅ <strong>Ideal para:</strong> terminais já apontados ao servidor Windows (<code className="bg-violet-100 px-1 rounded">127.0.0.1</code>) com portas diferentes</p>
           <p>🔌 <strong>Como funciona:</strong> o serviço abre um socket TCP em cada porta configurada → o terminal conecta → online. Se não conectar no timeout → offline.</p>
           <p>📡 <strong>Uma porta por terminal</strong> — as portas já abertas no firewall do servidor são usadas diretamente</p>
           <p>📊 <strong>Reporte automático</strong> ao painel NOC Monitor a cada ciclo (default 30s)</p>
