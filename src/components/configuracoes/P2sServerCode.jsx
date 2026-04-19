@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
 const P2S_SERVER_CODE = `# p2s_server.py — Servidor P2S (Push to Server) para Terminais Biométricos
-# Versão: 2.0  |  IP Servidor: 51.91.219.145
+# Versão: 2.0  |  IP Servidor: 127.0.0.1
 #
 # O que é modo P2S / Push to Server?
 #   No modo P2S, o terminal biométrico NÃO espera que o servidor tente conectar-se a ele.
@@ -31,10 +31,10 @@ const P2S_SERVER_CODE = `# p2s_server.py — Servidor P2S (Push to Server) para 
 #
 # Configuração no terminal ZKTeco (via ZKAccess Software ou SDK):
 #   SetServerPortAndTick(5100, 7)   ← porta 5100, keepalive 7s
-#   O terminal tentará conectar a 51.91.219.145:5100 continuamente
+#   O terminal tentará conectar a 127.0.0.1:5100 continuamente
 #
 # Configuração no terminal Anviz (via Web UI / CrossChex):
-#   Server IP: 51.91.219.145
+#   Server IP: 127.0.0.1
 #   Server Port: 5200 (configurar porta diferente para cada terminal)
 #   Connection Mode: Server (TCP Push)
 #
