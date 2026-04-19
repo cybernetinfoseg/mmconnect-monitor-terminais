@@ -470,15 +470,15 @@ export default function Incidents() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: index * 0.02 }}
-                  className={cn(
-                    "relative overflow-hidden rounded-xl border p-5 transition-all",
-                    incident.tipo === 'offline' && !incident.resolvido ?
-                    "bg-red-50/50 border-red-200" :
-                    incident.tipo === 'restored' ?
-                    "bg-emerald-50/50 border-emerald-200" :
-                    "bg-slate-50/50 border-slate-200"
-                  )}>
+                  transition={{ delay: index * 0.02 }} className="bg-emerald-50/50 pt-5 pr-8 pb-5 pl-5 rounded-xl relative overflow-hidden border transition-all border-emerald-200">
+
+
+
+
+
+
+
+                  
                   
                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                       <div className="flex items-start gap-3">
