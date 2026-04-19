@@ -31,6 +31,37 @@ Deno.serve(async (req) => {
             deleted += chunk.length;
         }
 
+        // Limpar também AuditLogs com mais de 90 dias (independentemente do tamanho)
+        const cutoff90audit = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        const oldAuditLogs = await base44.asServiceRole.entities.AuditLog.list('-timestamp', 500).catch(() => []);
+        const auditToDelete = oldAuditLogs.filter(l => l.timestamp < cutoff90audit);
+        let deletedAuditLogs = 0;
+        for (let i = 0; i < auditToDelete.length; i += 20) {
+            const chunk = auditToDelete.slice(i, i + 20);
+            await Promise.all(chunk.map(l => base44.asServiceRole.entities.AuditLog.delete(l.id).catch(() => {})));
+            deletedAuditLogs += chunk.length;
+        }
+
+        // Limpar EscalationAlerts resolvidos há mais de 30 dias
+        const escalationsOld = await base44.asServiceRole.entities.EscalationAlert.list('-offline_desde', 500).catch(() => []);
+        const escalationsToDelete = escalationsOld.filter(e => e.resolvido && e.offline_desde < cutoff);
+        let deletedEscalations = 0;
+        for (let i = 0; i < escalationsToDelete.length; i += 20) {
+            const chunk = escalationsToDelete.slice(i, i + 20);
+            await Promise.all(chunk.map(e => base44.asServiceRole.entities.EscalationAlert.delete(e.id).catch(() => {})));
+            deletedEscalations += chunk.length;
+        }
+
+        // Limpar PushSubscriptions inativas há mais de 90 dias
+        const oldSubs = await base44.asServiceRole.entities.PushSubscription.list('-updated_date', 500).catch(() => []);
+        const subsToDelete = oldSubs.filter(s => !s.ativo && s.updated_date < cutoff90audit);
+        let deletedSubs = 0;
+        for (let i = 0; i < subsToDelete.length; i += 20) {
+            const chunk = subsToDelete.slice(i, i + 20);
+            await Promise.all(chunk.map(s => base44.asServiceRole.entities.PushSubscription.delete(s.id).catch(() => {})));
+            deletedSubs += chunk.length;
+        }
+
         // Limpar também AlertIncidents resolvidos há mais de 60 dias
         const cutoff60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
         const oldIncidents = await base44.asServiceRole.entities.AlertIncident.list('-timestamp', 500);
@@ -59,6 +90,9 @@ Deno.serve(async (req) => {
             deleted_history: deleted,
             deleted_incidents: deletedIncidents,
             deleted_operation_logs: deletedOpLogs,
+            deleted_audit_logs: deletedAuditLogs,
+            deleted_escalations: deletedEscalations,
+            deleted_push_subscriptions: deletedSubs,
             cutoff_history: cutoff,
             cutoff_incidents: cutoff60,
             cutoff_operation_logs: cutoff90,

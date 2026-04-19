@@ -73,7 +73,9 @@ Deno.serve(async (req) => {
                             const segundosSemPing = Math.floor((agora - ultimoPing) / 1000);
                             novoStatus = segundosSemPing > timeoutSec ? 'offline' : 'online';
                             if (novoStatus === 'offline') {
-                                timestampOffline = new Date(ultimoPing.getTime() + timeoutSec * 1000);
+                                // Timestamp offline = quando expirou o timeout, mas nunca no futuro
+                                const calculado = new Date(ultimoPing.getTime() + timeoutSec * 1000);
+                                timestampOffline = calculado < agora ? calculado : agora;
                             }
                             await base44.asServiceRole.entities.Terminal.update(terminal.id, {
                                 status: novoStatus,
@@ -146,6 +148,7 @@ Deno.serve(async (req) => {
                             notificacao_inicial_enviada: false,
                         }).catch(() => {});
 
+                        // pushNotify trata push web + Telegram (fonte única de notificações)
                         await base44.asServiceRole.functions.invoke('pushNotify', {
                             action: 'notify_offline',
                             terminal_id: terminal.id,
@@ -154,24 +157,6 @@ Deno.serve(async (req) => {
                             cliente: terminal.cliente_nome || '',
                             owner_email: terminal.created_by || '',
                         }).catch(() => {});
-
-                        // Notificação Telegram
-                        const users = await base44.asServiceRole.entities.User.list().catch(() => []);
-                        const targets = users.filter(u => u.role === 'admin' || u.email === terminal.created_by);
-                        for (const u of targets) {
-                            if (u.telegram_bot_token && u.telegram_chat_id) {
-                                const msg = `🔴 <b>Terminal Offline</b>\n\n` +
-                                    `📟 <b>${terminal.nome}</b>\n` +
-                                    `📍 Local: ${terminal.local || '—'}\n` +
-                                    `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
-                                    `🕐 ${agora.toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
-                                await base44.asServiceRole.functions.invoke('telegramNotify', {
-                                    bot_token: u.telegram_bot_token,
-                                    chat_id: u.telegram_chat_id,
-                                    message: msg,
-                                }).catch(() => {});
-                            }
-                        }
                     }
 
                     // Resolver incidentes e escalações se voltou online

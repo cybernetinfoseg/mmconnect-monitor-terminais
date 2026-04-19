@@ -85,7 +85,11 @@ Deno.serve(async (req) => {
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
         const statusAnterior = cache?.ultimo_status ?? null;
-        const mudouDeEstado = statusAnterior !== null && statusAnterior !== statusEfetivo;
+        // Se não há cache anterior, tratar como mudança apenas se chegar offline (para criar incidente inicial)
+        // Se chegar online sem histórico — apenas registar, sem criar "restored" espúrio
+        const mudouDeEstado = statusAnterior === null
+            ? statusEfetivo === 'offline'
+            : statusAnterior !== statusEfetivo;
 
         if (mudouDeEstado) {
             console.log(`[agentReport] '${terminal.nome}' mudou: ${statusAnterior} → ${statusEfetivo}`);

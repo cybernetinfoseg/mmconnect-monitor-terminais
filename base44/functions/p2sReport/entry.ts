@@ -73,7 +73,10 @@ Deno.serve(async (req) => {
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
         const statusAnterior = cache?.ultimo_status ?? null;
-        const mudouDeEstado = statusAnterior !== null && statusAnterior !== status;
+        // Se não há cache anterior, criar incidente apenas se chegar offline (evitar "restored" espúrio)
+        const mudouDeEstado = statusAnterior === null
+            ? status === 'offline'
+            : statusAnterior !== status;
 
         if (mudouDeEstado) {
             console.log(`[p2sReport] '${terminal.nome}' mudou: ${statusAnterior} → ${status}`);
