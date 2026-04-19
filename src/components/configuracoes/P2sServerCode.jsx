@@ -602,7 +602,7 @@ export default function P2sServerCode() {
 
       {/* Firewall */}
       <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
-        <p className="font-semibold">🔥 Portas a abrir no Firewall do Windows Server (51.91.219.145)</p>
+        <p className="font-semibold">🔥 Portas a abrir no Firewall do Windows Server (127.0.0.1)</p>
         <p>• <strong>5100–5xxx TCP (entrada)</strong> — Uma porta por terminal P2S (ex: 5100, 5101, 5102...)</p>
         <p>• <strong>9100 TCP (entrada)</strong> — Interface de diagnóstico HTTP <code className="bg-amber-100 px-1 rounded">/status</code></p>
         <p className="text-amber-700 mt-1">Firewall → Regras de Entrada → Nova Regra → Tipo: Porta → TCP → Porta específica</p>
@@ -615,19 +615,19 @@ export default function P2sServerCode() {
           <div>
             <p className="font-semibold">ZKTeco (via Software ZKAccess/Atentra):</p>
             <p className="font-mono bg-blue-100 px-2 py-1 rounded mt-0.5">
-              Communication → Cloud Server → Server: 51.91.219.145 | Port: 5100 | Enable Push: ON
+              Communication → Cloud Server → Server: 127.0.0.1 | Port: 5100 | Enable Push: ON
             </p>
           </div>
           <div>
             <p className="font-semibold">Anviz (via Web UI / CrossChex Cloud):</p>
             <p className="font-mono bg-blue-100 px-2 py-1 rounded mt-0.5">
-              Network → Server Mode → Server IP: 51.91.219.145 | Server Port: 5100
+              Network → Server Mode → Server IP: 127.0.0.1 | Server Port: 5100
             </p>
           </div>
           <div>
             <p className="font-semibold">Suprema (via BioStar 2):</p>
             <p className="font-mono bg-blue-100 px-2 py-1 rounded mt-0.5">
-              Configuration → Network → Server Connection → IP: 51.91.219.145 | Port: 5100
+              Configuration → Network → Server Connection → IP: 127.0.0.1 | Port: 5100
             </p>
           </div>
         </div>
@@ -643,7 +643,7 @@ export default function P2sServerCode() {
         <code className="block bg-emerald-100 px-2 py-1 rounded mt-0.5">nssm install P2SServer "C:\Python311\python.exe" "C:\Program Files\P2SServer\p2s_server.py"</code>
         <code className="block bg-emerald-100 px-2 py-1 rounded mt-0.5">nssm set P2SServer AppDirectory "C:\Program Files\P2SServer"</code>
         <code className="block bg-emerald-100 px-2 py-1 rounded mt-0.5">nssm start P2SServer</code>
-        <p className="mt-1">5. Verificar estado: <code className="bg-emerald-100 px-1 rounded">http://51.91.219.145:9100/status</code></p>
+        <p className="mt-1">5. Verificar estado: <code className="bg-emerald-100 px-1 rounded">http://127.0.0.1:9100/status</code></p>
       </div>
 
       {/* Botões */}
