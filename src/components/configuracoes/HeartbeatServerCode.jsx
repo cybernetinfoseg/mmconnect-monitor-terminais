@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const HEARTBEAT_CODE = `# heartbeat_server.py — Serviço Heartbeat NOC Monitor
-# Corre no Windows Server (ex: 51.91.219.145)
+# Corre no Windows Server (ex: 127.0.0.1)
 # Cada terminal usa uma porta diferente — escuta cada porta com uma thread dedicada.
 #
 # Instalacao:
