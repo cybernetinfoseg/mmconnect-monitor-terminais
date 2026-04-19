@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
@@ -36,6 +35,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 import TelegramConfig from '../components/configuracoes/TelegramConfig';
+import WebhooksPanel from '../components/configuracoes/WebhooksPanel';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
 
@@ -281,6 +281,11 @@ export default function Configuracoes() {
         {/* Telegram Notifications */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
           <TelegramConfig />
+        </motion.div>
+
+        {/* Webhooks & External Integrations */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }}>
+          <WebhooksPanel />
         </motion.div>
 
         {/* Delete Account — todos os utilizadores */}
