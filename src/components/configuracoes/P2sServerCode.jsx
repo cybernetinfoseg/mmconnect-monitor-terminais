@@ -239,7 +239,7 @@ def _handle_connection(conn, addr, tid, nome, keepalive_timeout):
             # Enviar ACK se necessário (alguns terminais esperam resposta)
             # ZKTeco: enviar "OK\\n" ou "000 OK\\n"
             # Anviz/Suprema: silêncio é ok
-            conn.sendall(b"OK\\n")
+            conn.sendall(b"OK\n")
     except socket.timeout:
         logger.info(f"[P2S] '{nome}' timeout ({keepalive_timeout}s) → OFFLINE")
     except (ConnectionResetError, OSError) as e:
@@ -469,8 +469,9 @@ def run_p2s_server(stop_event=None):
 
         if not terminais:
             logger.warning("Nenhum terminal P2S encontrado. Adicione terminais com tipo=p2s no painel.")
-            # Continuar a escutar — terminais podem ser adicionados depois
-            terminais = []
+            logger.warning("⚠️  Após adicionar terminais, reinicie o serviço P2SServer para carregar as novas portas.")
+            # Encerrar — sem terminais não há portas para escutar
+            return 0
 
         logger.info(f"Terminais P2S carregados: {len(terminais)}")
         for t in terminais:

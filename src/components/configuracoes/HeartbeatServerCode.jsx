@@ -23,6 +23,10 @@ const HEARTBEAT_CODE = `# heartbeat_server.py — Serviço Heartbeat NOC Monitor
 #   "INTERVALO_REPORT": 30
 # }
 #
+# NOTA: O heartbeat_server.py é um servidor STANDALONE dedicado apenas a terminais
+# do tipo "Heartbeat TCP". Se já usa o noc_server.py (que inclui Heartbeat + ADMS + SDK),
+# NÃO precisa deste servidor separado — evite duplicação de portas TCP.
+#
 # Como funciona:
 #   1. O servico busca terminais do tipo "heartbeat" no NOC Monitor (heartbeatGetTerminals)
 #   2. Para cada terminal, abre um socket TCP na porta configurada (o terminal ja aponta para este IP/porta)
@@ -132,17 +136,19 @@ def _headers(api_key):
 
 
 def listar_terminais(session, app_id, api_key):
-    url = f"{BASE_URL.format(app_id=app_id)}/heartbeatGetTerminals"
+    url = f"{BASE_URL.format(app_id=app_id)}/nocServerGetTerminals"
     r   = session.post(url, headers=_headers(api_key), json={}, timeout=10)
     r.raise_for_status()
     data = r.json()
     if not data.get("success"):
-        raise ValueError(f"heartbeatGetTerminals erro: {data}")
-    return data.get("terminals", [])
+        raise ValueError(f"nocServerGetTerminals erro: {data}")
+    # Filtrar apenas terminais do tipo heartbeat
+    todos = data.get("terminals", [])
+    return [t for t in todos if t.get("tipo_conexao") == "heartbeat"]
 
 
 def reportar_status(session, app_id, api_key, terminal_id, status, latencia_ms=None, segundos_sem_ping=0):
-    url     = f"{BASE_URL.format(app_id=app_id)}/heartbeatReport"
+    url     = f"{BASE_URL.format(app_id=app_id)}/nocServerReport"
     payload = {
         "terminal_id":       terminal_id,
         "status":            status,

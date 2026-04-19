@@ -165,8 +165,8 @@ def testar_tcp(host, porta):
 def testar_http(session, host, porta):
     t = time.time()
     try:
-        r = session.get(f"http://{host}:{porta}", timeout=TIMEOUT)
-        return True, int((time.time() - t) * 1000)
+        r = session.get(f"http://{host}:{porta}", timeout=TIMEOUT, allow_redirects=False)
+        return r.status_code < 500, int((time.time() - t) * 1000)
     except Exception:
         return False, None
 

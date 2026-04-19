@@ -57,9 +57,9 @@ Deno.serve(async (req) => {
         const statusValido = ['online', 'offline', 'warning'].includes(status) ? status : 'offline';
         const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
 
-        // Atualizar terminal
+        // Atualizar terminal (guardar statusEfetivo para consistência — warning=online)
         await base44.asServiceRole.entities.Terminal.update(terminal_id, {
-            status: statusValido,
+            status: statusEfetivo,
             ultimo_check: agora,
             latencia_ms: latencia_ms ?? null,
             segundos_sem_ping: segundos_sem_ping ?? 0,
@@ -182,8 +182,8 @@ Deno.serve(async (req) => {
             });
         }
 
-        console.log(`[agentReport] ${ownerEmail} → "${terminal.nome}" (${terminal.tipo_conexao}) → ${statusValido}`);
-        return Response.json({ success: true, terminal: terminal.nome, status: statusValido, mudou: mudouDeEstado });
+        console.log(`[agentReport] ${ownerEmail} → "${terminal.nome}" (${terminal.tipo_conexao}) → ${statusEfetivo}`);
+        return Response.json({ success: true, terminal: terminal.nome, status: statusEfetivo, mudou: mudouDeEstado });
 
     } catch (error) {
         console.error('agentReport erro:', error.message);

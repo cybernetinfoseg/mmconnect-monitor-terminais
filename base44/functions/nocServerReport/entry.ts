@@ -56,11 +56,12 @@ Deno.serve(async (req) => {
 
         const agora = new Date().toISOString();
         const statusValido = ['online', 'offline', 'warning'].includes(status) ? status : 'offline';
+        // warning é tratado como online para incidentes/cache (apenas visual no terminal)
         const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
 
         // Atualizar terminal
         await base44.asServiceRole.entities.Terminal.update(terminal_id, {
-            status: statusValido,
+            status: statusEfetivo,  // guardar estado efetivo (não warning) para consistência
             ultimo_check: agora,
             latencia_ms: latencia_ms ?? null,
             segundos_sem_ping: segundos_sem_ping ?? 0,
@@ -183,8 +184,8 @@ Deno.serve(async (req) => {
             });
         }
 
-        console.log(`[nocServerReport] ${ownerEmail} → "${terminal.nome}" (${terminal.tipo_conexao}) → ${statusValido}`);
-        return Response.json({ success: true, terminal: terminal.nome, status: statusValido, mudou: mudouDeEstado });
+        console.log(`[nocServerReport] ${ownerEmail} → "${terminal.nome}" (${terminal.tipo_conexao}) → ${statusEfetivo}`);
+        return Response.json({ success: true, terminal: terminal.nome, status: statusEfetivo, mudou: mudouDeEstado });
 
     } catch (error) {
         console.error('nocServerReport erro:', error.message);

@@ -459,8 +459,11 @@ def run_noc_server(stop_event=None):
         adms_terminais = [t for t in terminais if t.get("tipo_conexao") == "adms_push"]
         sdk_terminais  = [t for t in terminais if t.get("tipo_conexao") == "sdk_tcp"]
         ws_terminais   = [t for t in terminais if t.get("tipo_conexao") == "websocket_cloud"]
+        # Excluir websocket_cloud — geridos exclusivamente pelo timmy_ws_server.py
+        # O ciclo de reporte só deve reportar terminais que este servidor monitoriza
+        terminais_geridos = hb_terminais + adms_terminais + sdk_terminais
 
-        logger.info(f"Terminais: {len(hb_terminais)} Heartbeat | {len(adms_terminais)} ADMS/Push | {len(sdk_terminais)} SDK-TCP | {len(ws_terminais)} WebSocket Cloud")
+        logger.info(f"Terminais: {len(hb_terminais)} Heartbeat | {len(adms_terminais)} ADMS/Push | {len(sdk_terminais)} SDK-TCP | {len(ws_terminais)} WebSocket Cloud (ignorados — use timmy_ws_server.py)")
 
         # Construir mapa SN → terminal_id para ADMS
         global sn_to_terminal
@@ -492,15 +495,19 @@ def run_noc_server(stop_event=None):
             th.start()
             logger.info(f"  [SDK-TCP] Poller iniciado para '{t['nome']}'")
 
-        # Aviso sobre terminais WebSocket Cloud
+        # Aviso sobre terminais WebSocket Cloud (não geridos por este servidor)
         if ws_terminais:
-            logger.info(f"  [WS] {len(ws_terminais)} terminal(is) WebSocket Cloud detectado(s).")
-            logger.info(f"  [WS] Estes terminais são geridos pelo timmy_ws_server.py — certifique-se que está a correr.")
+            logger.info(f"  [WS] {len(ws_terminais)} terminal(is) WebSocket Cloud — NÃO geridos aqui.")
+            logger.info(f"  [WS] Use timmy_ws_server.py para estes terminais:")
             for t in ws_terminais:
                 logger.info(f"    - '{t['nome']}' SN={t.get('numero_serie','?')}")
 
-        # Loop de reporte (bloqueia aqui até stop_event)
-        ciclo_reporte(terminais, app_id, api_key, stop_event, intervalo)
+        if not terminais_geridos:
+            logger.warning("Nenhum terminal Heartbeat/ADMS/SDK encontrado. Nada a fazer — encerrando.")
+            return 0
+
+        # Ciclo de reporte apenas para terminais geridos por este servidor
+        ciclo_reporte(terminais_geridos, app_id, api_key, stop_event, intervalo)
         return 0
 
     except KeyboardInterrupt:
