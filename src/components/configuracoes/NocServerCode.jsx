@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 const NOC_SERVER_CODE = `# noc_server.py — NOC Monitor Windows Server
 # Servidor unificado para terminais biométricos (Heartbeat TCP + ADMS/Push HTTP + SDK-TCP)
-# IP do servidor: 51.91.219.145
+# IP do servidor: 127.0.0.1
 #
 # Suporta terminais:
 #   - Heartbeat TCP: terminal conecta via TCP — online se conectar, offline no timeout
