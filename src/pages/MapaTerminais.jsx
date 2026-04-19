@@ -36,7 +36,7 @@ export default function MapaTerminais() {
   const isAdmin = perms.isAdmin;
 
   // Terminais — admin vê todos, utilizador só os seus
-  const { data: allTerminals = [], isLoading, refetch } = useQuery({
+  const { data: allTerminals = [], isLoading, isFetching, refetch } = useQuery({
     queryKey: ['mapa-terminals', currentUser?.email, isAdmin],
     queryFn: async () => {
       if (isAdmin) return base44.entities.Terminal.list('-created_date');
@@ -53,11 +53,16 @@ export default function MapaTerminais() {
   );
 
   // Plantas baixas guardadas — busca todas (admin vê tudo, utilizador vê as suas)
-  const { data: floorPlans = [] } = useQuery({
+  const { data: floorPlans = [], refetch: refetchPlans } = useQuery({
     queryKey: ['floor-plans'],
     queryFn:  () => base44.entities.FloorPlan.list('local'),
     enabled:  !!currentUser,
   });
+
+  const handleRefresh = () => {
+    refetch();
+    refetchPlans();
+  };
 
   // Determina o dono efectivo da planta a mostrar:
   // - Admin com filtro de utilizador activo → planta do utilizador filtrado
@@ -144,8 +149,8 @@ export default function MapaTerminais() {
               <p className="text-xs sm:text-sm text-slate-500">Visualização por local com planta baixa</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
-            <RefreshCw className="h-4 w-4" />
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching} className="gap-1.5">
+            <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
         </div>
