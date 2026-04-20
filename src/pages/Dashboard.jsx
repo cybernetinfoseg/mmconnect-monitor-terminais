@@ -219,7 +219,7 @@ export default function Dashboard() {
                 </div>
               </div>
               {/* Clock — all screens */}
-              <div className="ml-8 pl-1">
+              <div className="ml-6">
                 <LiveClock />
               </div>
             </div>
