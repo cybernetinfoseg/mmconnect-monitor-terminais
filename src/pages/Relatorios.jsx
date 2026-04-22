@@ -45,9 +45,13 @@ export default function Relatorios() {
         enabled: !!currentUser,
     });
 
-    const { data: allTerminals = [] } = useQuery({
-        queryKey: ['rel-terminals'],
-        queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
+    const { data: terminals = [] } = useQuery({
+        queryKey: ['rel-terminals', currentUser?.email],
+        queryFn: async () => {
+            const response = await base44.functions.invoke('getMyTerminals', {});
+            const all = response.data?.terminals || [];
+            return all.filter(t => t.ativo !== false);
+        },
         enabled: !!currentUser,
     });
 
@@ -56,12 +60,6 @@ export default function Relatorios() {
         queryFn: () => base44.entities.AlertIncident.list('-timestamp', 1000),
         enabled: !!currentUser,
     });
-
-    const terminals = useMemo(() => {
-        if (!currentUser) return [];
-        if (canSeeAll) return allTerminals;
-        return allTerminals.filter(t => t.created_by === currentUser.email);
-    }, [allTerminals, currentUser, canSeeAll]);
 
     // Computed date range
     const { cutoff, cutoffEnd } = useMemo(() => {
