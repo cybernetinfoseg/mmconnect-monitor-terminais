@@ -96,21 +96,12 @@ export default function Dashboard() {
   const perms = resolvePermissions(currentUser);
   const canSeeAll = currentUser?.role === 'admin';
 
-  // Fetch terminals with server-side filtering for security
+  // Fetch terminals via backend function (bypasses RLS session cache issues)
   const { data: terminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals', currentUser?.email, canSeeAll],
     queryFn: async () => {
-      if (canSeeAll) {
-        return await base44.entities.Terminal.list();
-      }
-      // Non-admins see terminals where they are the creator OR assigned user
-      const [byCreator, byAssigned] = await Promise.all([
-        base44.entities.Terminal.filter({ created_by: currentUser?.email }, '-created_date'),
-        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }, '-created_date'),
-      ]);
-      const map = new Map();
-      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
-      return [...map.values()];
+      const response = await base44.functions.invoke('getMyTerminals', {});
+      return response.data?.terminals || [];
     },
     refetchInterval: refreshInterval,
     enabled: !!currentUser
@@ -130,21 +121,16 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch alerts with server-side filtering for security
+  // Fetch alerts filtered by user's terminals
   const { data: alerts = [] } = useQuery({
     queryKey: ['alerts', currentUser?.email, canSeeAll],
     queryFn: async () => {
       if (canSeeAll) {
         return await base44.entities.AlertIncident.list('-created_date', 50);
       }
-      // Use already-loaded terminals list (same logic: creator OR assigned)
-      const [byCreator, byAssigned] = await Promise.all([
-        base44.entities.Terminal.filter({ created_by: currentUser?.email }),
-        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }),
-      ]);
-      const map = new Map();
-      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
-      const myTerminalIds = [...map.keys()];
+      // Use already-loaded terminals to filter alerts
+      const termRes = await base44.functions.invoke('getMyTerminals', {});
+      const myTerminalIds = (termRes.data?.terminals || []).map(t => t.id);
       if (myTerminalIds.length === 0) return [];
       const allAlerts = await base44.entities.AlertIncident.list('-created_date', 50);
       return allAlerts.filter((a) => myTerminalIds.includes(a.terminal_id));

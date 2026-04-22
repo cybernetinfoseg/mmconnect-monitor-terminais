@@ -97,12 +97,12 @@ export default function Terminais() {
       .catch(() => setRefreshInterval(5000));
   }, []);
 
-  // Fetch terminals with server-side filtering for security
+  // Fetch terminals via backend function (bypasses RLS session cache issues)
   const { data: terminals = [], isLoading } = useQuery({
     queryKey: ['terminals-manage', currentUser?.email, isAdmin],
     queryFn: async () => {
-      // RLS handles filtering automatically — admin sees all, users see their own (created_by OR usuario_email)
-      return await base44.entities.Terminal.list('-created_date');
+      const response = await base44.functions.invoke('getMyTerminals', {});
+      return response.data?.terminals || [];
     },
     enabled: !!currentUser,
     refetchInterval: refreshInterval,
