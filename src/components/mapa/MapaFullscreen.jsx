@@ -59,34 +59,26 @@ export default function MapaFullscreen({ local, termList, canEdit, savedPlan, on
           </div>
 
           {/* Right: controls + clock */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <Button
-              variant="outline"
               size="sm"
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 h-8 px-2 sm:h-9 sm:px-3 text-xs"
+              className="bg-slate-700 hover:bg-slate-600 text-white border border-slate-500 gap-1.5 h-9 px-3 text-sm font-medium"
             >
-              <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-              <span className="hidden sm:inline ml-1">Atualizar</span>
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+              <span>Atualizar</span>
             </Button>
-            <div className="hidden sm:block">
-              <LiveClock />
-            </div>
+            <LiveClock />
             <Button
-              variant="ghost"
               size="icon"
               onClick={onClose}
               title="Fechar (ESC)"
-              className="text-slate-400 hover:text-white hover:bg-slate-700 h-9 w-9"
+              className="bg-slate-700 hover:bg-slate-600 text-white border border-slate-500 h-9 w-9"
             >
               <Minimize2 className="h-5 w-5" />
             </Button>
           </div>
-        </div>
-        {/* Mobile clock */}
-        <div className="sm:hidden mt-1 text-right">
-          <LiveClock />
         </div>
       </div>
 
