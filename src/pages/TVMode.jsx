@@ -190,12 +190,13 @@ export default function TVMode() {
     return `${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h`;
   };
 
-  const hasActiveAlerts = alerts.filter((a) => !a.resolvido).length > 0;
+  // Só mostra alertas se o utilizador tem terminais E há incidentes dos seus terminais
+  const hasActiveAlerts = allTerminals.length > 0 && alerts.filter((a) => !a.resolvido).length > 0;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white overflow-hidden">
       {/* Header */}
-      <div className="bg-red-900/50 sm:px-8 sm:py-4 transition-colors duration-500">
+      <div className={cn("sm:px-8 sm:py-4 transition-colors duration-500", hasActiveAlerts ? "bg-red-900/50" : "bg-slate-800/80")}>
 
 
         

@@ -181,7 +181,7 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
   /* ─── Posições ─── */
   function defaultPos(idx, total) {
     const cols = Math.max(4, Math.ceil(Math.sqrt(total)));
-    return { x: 10 + (idx % cols) * 14, y: 15 + Math.floor(idx / cols) * 20 };
+    return { x: 10 + (idx % cols) * 12, y: 12 + Math.floor(idx / cols) * 18 };
   }
   const getPos          = (t, i) => positions[t.id] || defaultPos(i, terminals.length);
   const getTerminalIcon = (t)    => positions[t.id]?.icon || 'initials';
@@ -218,8 +218,8 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
   const onMouseMove = useCallback((e) => {
     if (!dragging || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.min(97, Math.max(2, ((e.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100 - dragging.offsetX));
-    const y = Math.min(95, Math.max(2, ((e.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100 - dragging.offsetY));
+    const x = Math.min(95, Math.max(3, ((e.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100 - dragging.offsetX));
+    const y = Math.min(92, Math.max(3, ((e.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100 - dragging.offsetY));
     setPositions(p => ({ ...p, [dragging.id]: { ...(p[dragging.id] || {}), x, y } }));
     setDragging(d => d ? { ...d, moved: true } : d);
   }, [dragging, zoom]);
@@ -256,8 +256,8 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
     if (!dragging || !canvasRef.current) return;
     const touch = e.touches[0];
     const rect  = canvasRef.current.getBoundingClientRect();
-    const x = Math.min(97, Math.max(2, ((touch.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100 - dragging.offsetX));
-    const y = Math.min(95, Math.max(2, ((touch.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100 - dragging.offsetY));
+    const x = Math.min(95, Math.max(3, ((touch.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100 - dragging.offsetX));
+    const y = Math.min(92, Math.max(3, ((touch.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100 - dragging.offsetY));
     setPositions(p => ({ ...p, [dragging.id]: { ...(p[dragging.id] || {}), x, y } }));
   }
 

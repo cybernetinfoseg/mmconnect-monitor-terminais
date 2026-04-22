@@ -75,6 +75,14 @@ export default function Layout({ children, currentPageName }) {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
+  // Scroll to top on page change for non-tab pages (must be before any early return)
+  useEffect(() => {
+    const isTab = bottomTabPages.includes(currentPageName);
+    if (!isTab) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [currentPageName]);
+
   const perms = resolvePermissions(currentUser);
 
   if (currentPageName === 'TVMode') {
@@ -252,8 +260,9 @@ export default function Layout({ children, currentPageName }) {
               {children}
             </div>
           ) : (
-            /* Stacked page (non-tab): shown below the top bar */
+            /* Stacked page (non-tab): shown below the top bar — key forces remount on page change */
             <div
+              key={currentPageName}
               className="pb-20"
               style={{
                 paddingTop: showMobileTopBar

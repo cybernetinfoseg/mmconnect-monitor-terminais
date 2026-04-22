@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import ContactMessagesPanel from '../components/admin/ContactMessagesPanel';
+import WebhooksPanel from '../components/configuracoes/WebhooksPanel';
 
 const EMPTY_FORM = {
   email: '',
@@ -139,8 +140,10 @@ export default function Administracao() {
     queryFn: () => base44.entities.Terminal.list(),
   });
 
+  // Conta terminais por utilizador responsável (usuario_email tem prioridade sobre created_by)
   const terminalCountByUser = terminals.reduce((acc, t) => {
-    if (t.created_by) acc[t.created_by] = (acc[t.created_by] || 0) + 1;
+    const owner = t.usuario_email || t.created_by;
+    if (owner) acc[owner] = (acc[owner] || 0) + 1;
     return acc;
   }, {});
 
@@ -567,6 +570,9 @@ export default function Administracao() {
           <TimmyWsServerCode />
         </CardContent>
       </Card>
+
+      {/* Webhooks & Integrações Externas */}
+      <WebhooksPanel />
 
       {/* Agent Installation Guide — admin only */}
       <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">

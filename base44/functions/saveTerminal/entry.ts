@@ -25,10 +25,25 @@ Deno.serve(async (req) => {
       const updated = await base44.asServiceRole.entities.Terminal.update(terminalId, data);
       return Response.json({ terminal: updated });
     } else {
-      // CREATE — set usuario_email to current user if not admin
+      // CREATE — check terminal limit for non-admins
       const createData = { ...data };
       if (user.role !== 'admin') {
         createData.usuario_email = user.email;
+
+        // Validate terminal limit
+        const userEntity = await base44.asServiceRole.entities.User.filter({ email: user.email });
+        const limite = userEntity[0]?.limite_terminais ?? 0;
+        if (limite > 0) {
+          // Count terminals owned by this user
+          const [byCreator, byAssigned] = await Promise.all([
+            base44.asServiceRole.entities.Terminal.filter({ created_by: user.email }),
+            base44.asServiceRole.entities.Terminal.filter({ usuario_email: user.email }),
+          ]);
+          const ids = new Set([...byCreator, ...byAssigned].map(t => t.id));
+          if (ids.size >= limite) {
+            return Response.json({ error: `Limite de ${limite} terminais atingido` }, { status: 403 });
+          }
+        }
       }
       const created = await base44.asServiceRole.entities.Terminal.create(createData);
       return Response.json({ terminal: created });
