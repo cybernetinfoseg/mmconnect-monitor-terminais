@@ -162,11 +162,24 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
   const canvasRef     = useRef(null);  // div escalada com transform:scale
   const markerRefs    = useRef({});    // { [terminalId]: DOM el }
 
+  /* Sanitizar posições — trazer terminais fora dos limites para dentro */
+  function sanitizePositions(pos) {
+    const out = {};
+    for (const [id, p] of Object.entries(pos || {})) {
+      out[id] = {
+        ...p,
+        x: Math.min(97, Math.max(3, p.x ?? 10)),
+        y: Math.min(95, Math.max(3, p.y ?? 10)),
+      };
+    }
+    return out;
+  }
+
   /* Sincronizar savedPlan */
   useEffect(() => {
     if (savedPlan) {
       setImageUrl(savedPlan.imageUrl || null);
-      setPositions(savedPlan.positions || {});
+      setPositions(sanitizePositions(savedPlan.positions || {}));
     }
   }, [savedPlan?.imageUrl]);
 
@@ -203,23 +216,33 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
   }
   const removePlan = () => { setImageUrl(null); setPositions({}); };
 
+  /* ─── Helpers de coordenadas ─── */
+  // Converte clientX/Y para % do canvas (sem zoom), usando o canvasRef já escalado
+  function clientToCanvasPercent(clientX, clientY) {
+    const rect = canvasRef.current.getBoundingClientRect();
+    // rect.width e rect.height já incluem o zoom (scale)
+    // Dividir por zoom para obter as dimensões originais do canvas
+    const canvasW = rect.width  / zoom;
+    const canvasH = rect.height / zoom;
+    const x = ((clientX - rect.left) / zoom / canvasW) * 100;
+    const y = ((clientY - rect.top)  / zoom / canvasH) * 100;
+    return { x, y };
+  }
+
   /* ─── Drag (coordenadas em % do canvas ANTES do scale) ─── */
   function onMouseDown(e, terminalId) {
     if (!editMode || iconPicker === terminalId) return;
     e.preventDefault(); e.stopPropagation();
-    const rect = canvasRef.current.getBoundingClientRect();
-    // Converter para coordenadas do canvas sem zoom
-    const cx = ((e.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100;
-    const cy = ((e.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100;
+    const { x: cx, y: cy } = clientToCanvasPercent(e.clientX, e.clientY);
     const pos = positions[terminalId] || defaultPos(terminals.findIndex(t => t.id === terminalId), terminals.length);
     setDragging({ id: terminalId, offsetX: cx - pos.x, offsetY: cy - pos.y, moved: false });
   }
 
   const onMouseMove = useCallback((e) => {
     if (!dragging || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.min(95, Math.max(3, ((e.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100 - dragging.offsetX));
-    const y = Math.min(92, Math.max(3, ((e.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100 - dragging.offsetY));
+    const { x: rawX, y: rawY } = clientToCanvasPercent(e.clientX, e.clientY);
+    const x = Math.min(97, Math.max(3, rawX - dragging.offsetX));
+    const y = Math.min(95, Math.max(3, rawY - dragging.offsetY));
     setPositions(p => ({ ...p, [dragging.id]: { ...(p[dragging.id] || {}), x, y } }));
     setDragging(d => d ? { ...d, moved: true } : d);
   }, [dragging, zoom]);
@@ -246,18 +269,16 @@ export default function FloorPlanCanvas({ local, terminals, canEdit, savedPlan, 
     if (!editMode) return;
     e.preventDefault();
     const touch = e.touches[0];
-    const rect  = canvasRef.current.getBoundingClientRect();
-    const cx = ((touch.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100;
-    const cy = ((touch.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100;
+    const { x: cx, y: cy } = clientToCanvasPercent(touch.clientX, touch.clientY);
     const pos = positions[terminalId] || defaultPos(terminals.findIndex(t => t.id === terminalId), terminals.length);
     setDragging({ id: terminalId, offsetX: cx - pos.x, offsetY: cy - pos.y, moved: false });
   }
   function onTouchMove(e) {
     if (!dragging || !canvasRef.current) return;
     const touch = e.touches[0];
-    const rect  = canvasRef.current.getBoundingClientRect();
-    const x = Math.min(95, Math.max(3, ((touch.clientX - rect.left) / zoom / (rect.width  / zoom)) * 100 - dragging.offsetX));
-    const y = Math.min(92, Math.max(3, ((touch.clientY - rect.top)  / zoom / (rect.height / zoom)) * 100 - dragging.offsetY));
+    const { x: rawX, y: rawY } = clientToCanvasPercent(touch.clientX, touch.clientY);
+    const x = Math.min(97, Math.max(3, rawX - dragging.offsetX));
+    const y = Math.min(95, Math.max(3, rawY - dragging.offsetY));
     setPositions(p => ({ ...p, [dragging.id]: { ...(p[dragging.id] || {}), x, y } }));
   }
 
