@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -41,25 +41,18 @@ export default function Manutencao() {
     }, []);
 
     const perms = resolvePermissions(currentUser);
-    const canSeeAll = perms.isAdmin;
 
-    const { data: allJanelas = [], isLoading } = useQuery({
-        queryKey: ['maintenance-windows'],
+    const { data: janelas = [], isLoading } = useQuery({
+        queryKey: ['maintenance-windows', currentUser?.email],
         queryFn: () => base44.entities.MaintenanceWindow.list('-inicio', 100),
         refetchInterval: 30000,
         enabled: !!currentUser,
     });
 
-    const janelas = useMemo(() => {
-        if (!currentUser) return [];
-        if (canSeeAll) return allJanelas;
-        return allJanelas.filter(j => j.criado_por === currentUser.email);
-    }, [allJanelas, currentUser, canSeeAll]);
-
     const deleteMutation = useMutation({
         mutationFn: (id) => base44.entities.MaintenanceWindow.delete(id),
         onSuccess: (_, id) => {
-            const item = allJanelas.find(j => j.id === id);
+            const item = janelas.find(j => j.id === id);
             logAudit('manutencao_cancelada', id, `Manutenção "${item?.titulo || id}" do terminal "${item?.terminal_nome || ''}" removida`);
             queryClient.invalidateQueries({ queryKey: ['maintenance-windows'] });
         },
@@ -68,7 +61,7 @@ export default function Manutencao() {
     const cancelMutation = useMutation({
         mutationFn: (id) => base44.entities.MaintenanceWindow.update(id, { ativo: false }),
         onSuccess: (_, id) => {
-            const item = allJanelas.find(j => j.id === id);
+            const item = janelas.find(j => j.id === id);
             logAudit('manutencao_cancelada', id, `Manutenção "${item?.titulo || id}" do terminal "${item?.terminal_nome || ''}" cancelada`);
             queryClient.invalidateQueries({ queryKey: ['maintenance-windows'] });
         },

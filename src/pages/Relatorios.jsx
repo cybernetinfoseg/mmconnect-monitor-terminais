@@ -39,12 +39,6 @@ export default function Relatorios() {
     const perms = resolvePermissions(currentUser);
     const canSeeAll = perms.isAdmin;
 
-    const { data: allHistory = [], isLoading: historyLoading } = useQuery({
-        queryKey: ['rel-history'],
-        queryFn: () => base44.entities.StatusHistory.list('-timestamp', 2000),
-        enabled: !!currentUser,
-    });
-
     const { data: terminals = [] } = useQuery({
         queryKey: ['rel-terminals', currentUser?.email],
         queryFn: async () => {
@@ -55,12 +49,6 @@ export default function Relatorios() {
         enabled: !!currentUser,
     });
 
-    const { data: allIncidents = [] } = useQuery({
-        queryKey: ['rel-incidents'],
-        queryFn: () => base44.entities.AlertIncident.list('-timestamp', 1000),
-        enabled: !!currentUser,
-    });
-
     // Computed date range
     const { cutoff, cutoffEnd } = useMemo(() => {
         const c = dataInicio ? startOfDay(parseISO(dataInicio)) : startOfDay(subDays(new Date(), 7));
@@ -68,25 +56,38 @@ export default function Relatorios() {
         return { cutoff: c, cutoffEnd: e };
     }, [dataInicio, dataFim]);
 
+    // myTerminalIds derived from terminals (already filtered by getMyTerminals)
+    const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
+
+    const { data: allHistory = [], isLoading: historyLoading } = useQuery({
+        queryKey: ['rel-history', currentUser?.email],
+        queryFn: () => base44.entities.StatusHistory.list('-timestamp', 2000),
+        enabled: !!currentUser && terminals.length >= 0,
+    });
+
+    const { data: allIncidents = [] } = useQuery({
+        queryKey: ['rel-incidents', currentUser?.email],
+        queryFn: () => base44.entities.AlertIncident.list('-timestamp', 1000),
+        enabled: !!currentUser && terminals.length >= 0,
+    });
+
     const history = useMemo(() => {
         if (!currentUser) return [];
-        const myIds = canSeeAll ? null : new Set(terminals.map(t => t.id));
         return allHistory.filter(h => {
-            if (myIds && !myIds.has(h.terminal_id)) return false;
+            if (!canSeeAll && !myTerminalIds.has(h.terminal_id)) return false;
             const t = new Date(h.timestamp);
             return t >= cutoff && t <= cutoffEnd;
         });
-    }, [allHistory, currentUser, canSeeAll, terminals, cutoff, cutoffEnd]);
+    }, [allHistory, currentUser, canSeeAll, myTerminalIds, cutoff, cutoffEnd]);
 
     const incidents = useMemo(() => {
         if (!currentUser) return [];
-        const myIds = canSeeAll ? null : new Set(terminals.map(t => t.id));
         return allIncidents.filter(i => {
-            if (myIds && !myIds.has(i.terminal_id)) return false;
+            if (!canSeeAll && !myTerminalIds.has(i.terminal_id)) return false;
             const t = new Date(i.timestamp);
             return t >= cutoff && t <= cutoffEnd;
         });
-    }, [allIncidents, currentUser, canSeeAll, terminals, cutoff, cutoffEnd]);
+    }, [allIncidents, currentUser, canSeeAll, myTerminalIds, cutoff, cutoffEnd]);
 
     // Auto-select bucket size based on date range
     const { buckets, bucketSize } = useMemo(() => {

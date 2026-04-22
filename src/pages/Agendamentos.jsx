@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
@@ -71,20 +71,13 @@ export default function Agendamentos() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
-  const canSeeAll = perms.isAdmin;
 
-  const { data: allSchedules = [], isLoading } = useQuery({
-    queryKey: ['scheduled-actions'],
+  const { data: schedules = [], isLoading } = useQuery({
+    queryKey: ['scheduled-actions', currentUser?.email],
     queryFn: () => base44.entities.ScheduledAction.list('-created_date', 100),
     refetchInterval: 30000,
     enabled: !!currentUser,
   });
-
-  const schedules = useMemo(() => {
-    if (!currentUser) return [];
-    if (canSeeAll) return allSchedules;
-    return allSchedules.filter(s => s.criado_por === currentUser.email);
-  }, [allSchedules, currentUser, canSeeAll]);
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, ativo }) => base44.entities.ScheduledAction.update(id, { ativo }),

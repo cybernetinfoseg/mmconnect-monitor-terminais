@@ -41,19 +41,11 @@ export default function Alertas() {
 
   const perms = resolvePermissions(currentUser);
 
-  const canSeeAll = perms.isAdmin;
-
-  const { data: allRules = [], isLoading } = useQuery({
-    queryKey: ['alert-rules'],
+  const { data: rules = [], isLoading } = useQuery({
+    queryKey: ['alert-rules', currentUser?.email],
     queryFn: () => base44.entities.AlertRule.list('-created_date', 100),
     enabled: !!currentUser,
   });
-
-  const rules = useMemo(() => {
-    if (!currentUser) return [];
-    if (canSeeAll) return allRules;
-    return allRules.filter(r => r.created_by === currentUser.email);
-  }, [allRules, currentUser, canSeeAll]);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.AlertRule.delete(id),

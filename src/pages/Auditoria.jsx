@@ -55,18 +55,12 @@ export default function Auditoria() {
 
   const perms = resolvePermissions(currentUser);
 
-  const { data: allLogs = [], isLoading, refetch } = useQuery({
-    queryKey: ['audit-logs'],
+  const { data: logs = [], isLoading, refetch } = useQuery({
+    queryKey: ['audit-logs', currentUser?.email],
     queryFn: () => base44.entities.AuditLog.list('-timestamp', 500),
     refetchInterval: 15000,
     enabled: !!currentUser,
   });
-
-  const logs = useMemo(() => {
-    if (!currentUser) return [];
-    if (perms.isAdmin) return allLogs;
-    return allLogs.filter(l => l.usuario_email === currentUser.email);
-  }, [allLogs, currentUser, perms.isAdmin]);
 
   const usuarios = useMemo(() =>
     [...new Set(logs.map(l => l.usuario_email).filter(Boolean))].sort(),
