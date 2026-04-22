@@ -120,7 +120,8 @@ export default function Terminais() {
 
   // Limite: contar apenas terminais "próprios" do utilizador (onde é o assignee)
   const terminalCount = terminals.length;
-  const atLimit = !isAdmin && (limiteTerminais === 0 || (limiteTerminais > 0 && terminalCount >= limiteTerminais));
+  // limiteTerminais === 0 significa "sem limite definido" (utilizador ainda a carregar ou sem limite)
+  const atLimit = !isAdmin && limiteTerminais > 0 && terminalCount >= limiteTerminais;
 
 
   const logAudit = (acao, entidade_id, descricao) =>
