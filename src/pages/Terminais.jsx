@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTerminals, TERMINALS_QUERY_KEY } from '@/hooks/useTerminals';
 import LocalSelectField from '../components/terminais/LocalSelectField';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -83,30 +84,8 @@ export default function Terminais() {
   const isAdmin = perms.isAdmin;
   const limiteTerminais = perms.limite_terminais;
 
-  const [refreshInterval, setRefreshInterval] = useState(5000);
-
-  // Fetch monitor config to get actual refresh interval
-  useEffect(() => {
-    base44.entities.MonitorConfig.list()
-      .then((configs) => {
-        const config = configs[0];
-        if (config?.intervalo_sync_minutos) {
-          setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
-        }
-      })
-      .catch(() => setRefreshInterval(5000));
-  }, []);
-
-  // Fetch terminals via backend function (bypasses RLS session cache issues)
-  const { data: terminals = [], isLoading } = useQuery({
-    queryKey: ['terminals-manage', currentUser?.email, isAdmin],
-    queryFn: async () => {
-      const response = await base44.functions.invoke('getMyTerminals', {});
-      return response.data?.terminals || [];
-    },
-    enabled: !!currentUser,
-    refetchInterval: refreshInterval,
-  });
+  // Terminais — hook centralizado, query key partilhada com todas as páginas
+  const { data: terminals = [], isLoading } = useTerminals({ enabled: !!currentUser });
 
   const terminalCount = terminals.length;
   // limiteTerminais === 0 significa "sem permissão para adicionar" (igual à lógica do backend)
@@ -125,43 +104,43 @@ export default function Terminais() {
        return response.data?.terminal;
      },
      onMutate: async (data) => {
-       await queryClient.cancelQueries(['terminals-manage']);
-       const prev = queryClient.getQueryData(['terminals-manage']);
-       if (editingTerminal) {
-         queryClient.setQueryData(['terminals-manage'], (old = []) =>
-           old.map(t => t.id === editingTerminal.id ? { ...t, ...data } : t)
-         );
-       } else {
-         queryClient.setQueryData(['terminals-manage'], (old = []) => [
-           ...old,
-           { ...data, id: 'temp_' + Date.now(), usuario_email: data.usuario_email || currentUser?.email, status: 'offline' }
-         ]);
-       }
-       return { prev };
-     },
-     onSuccess: async (result, data) => {
-       const isEdit = !!editingTerminal;
-       const nome = data.nome || editingTerminal?.nome || '';
-       const terminalId = editingTerminal?.id || result?.id || '';
-       logAudit(
-         isEdit ? 'terminal_editado' : 'terminal_criado',
-         terminalId,
-         isEdit ? `Terminal "${nome}" editado` : `Terminal "${nome}" criado`
-       );
-       setDialogOpen(false);
-       setEditingTerminal(null);
-       setFormData({});
-       toast.success(isEdit ? 'Terminal atualizado' : 'Terminal criado');
-       const tipo = data.tipo_conexao || 'ip_local';
-       if (tipo !== 'ip_local' && terminalId) {
-         await base44.functions.invoke('monitorTerminal', { terminalId }).catch(() => {});
-       }
-       queryClient.invalidateQueries(['terminals-manage']);
-     },
-     onError: (error, _, context) => {
-       if (context?.prev) {
-         queryClient.setQueryData(['terminals-manage'], context.prev);
-       }
+       await queryClient.cancelQueries({ queryKey: TERMINALS_QUERY_KEY });
+        const prev = queryClient.getQueryData(TERMINALS_QUERY_KEY);
+        if (editingTerminal) {
+          queryClient.setQueryData(TERMINALS_QUERY_KEY, (old = []) =>
+            old.map(t => t.id === editingTerminal.id ? { ...t, ...data } : t)
+          );
+        } else {
+          queryClient.setQueryData(TERMINALS_QUERY_KEY, (old = []) => [
+            ...old,
+            { ...data, id: 'temp_' + Date.now(), usuario_email: data.usuario_email || currentUser?.email, status: 'offline' }
+          ]);
+        }
+        return { prev };
+       },
+       onSuccess: async (result, data) => {
+        const isEdit = !!editingTerminal;
+        const nome = data.nome || editingTerminal?.nome || '';
+        const terminalId = editingTerminal?.id || result?.id || '';
+        logAudit(
+          isEdit ? 'terminal_editado' : 'terminal_criado',
+          terminalId,
+          isEdit ? `Terminal "${nome}" editado` : `Terminal "${nome}" criado`
+        );
+        setDialogOpen(false);
+        setEditingTerminal(null);
+        setFormData({});
+        toast.success(isEdit ? 'Terminal atualizado' : 'Terminal criado');
+        const tipo = data.tipo_conexao || 'ip_local';
+        if (tipo !== 'ip_local' && terminalId) {
+          await base44.functions.invoke('monitorTerminal', { terminalId }).catch(() => {});
+        }
+        queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY });
+       },
+       onError: (error, _, context) => {
+        if (context?.prev) {
+          queryClient.setQueryData(TERMINALS_QUERY_KEY, context.prev);
+        }
        toast.error(`Erro: ${error.message}`);
      },
    });
@@ -169,9 +148,9 @@ export default function Terminais() {
   const deleteMutation = useMutation({
      mutationFn: (id) => base44.functions.invoke('deleteTerminal', { terminalId: id }),
      onMutate: async (id) => {
-       await queryClient.cancelQueries(['terminals-manage']);
-       const prev = queryClient.getQueryData(['terminals-manage']);
-       queryClient.setQueryData(['terminals-manage'], (old = []) =>
+       await queryClient.cancelQueries({ queryKey: TERMINALS_QUERY_KEY });
+       const prev = queryClient.getQueryData(TERMINALS_QUERY_KEY);
+       queryClient.setQueryData(TERMINALS_QUERY_KEY, (old = []) =>
          old.filter(t => t.id !== id)
        );
        return { prev };
@@ -183,7 +162,7 @@ export default function Terminais() {
      },
      onError: (error, _, context) => {
        if (context?.prev) {
-         queryClient.setQueryData(['terminals-manage'], context.prev);
+         queryClient.setQueryData(TERMINALS_QUERY_KEY, context.prev);
        }
        toast.error('Erro ao eliminar terminal');
      },
@@ -201,9 +180,9 @@ export default function Terminais() {
        return response.data;
      },
      onMutate: async (terminal) => {
-       await queryClient.cancelQueries(['terminals-manage']);
-       const prev = queryClient.getQueryData(['terminals-manage']);
-       queryClient.setQueryData(['terminals-manage'], (old = []) =>
+       await queryClient.cancelQueries({ queryKey: TERMINALS_QUERY_KEY });
+       const prev = queryClient.getQueryData(TERMINALS_QUERY_KEY);
+       queryClient.setQueryData(TERMINALS_QUERY_KEY, (old = []) =>
          old.map(t => t.id === terminal.id ? { ...t, status: 'loading' } : t)
        );
        return { prev };
@@ -211,7 +190,7 @@ export default function Terminais() {
      onSuccess: (data, terminal) => {
        setRefreshingTerminalId(null);
        if (data?.status) {
-         queryClient.setQueryData(['terminals-manage'], (old = []) =>
+         queryClient.setQueryData(TERMINALS_QUERY_KEY, (old = []) =>
            old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia } : t)
          );
        }
@@ -228,7 +207,7 @@ export default function Terminais() {
      onError: (error, _, context) => {
        setRefreshingTerminalId(null);
        if (context?.prev) {
-         queryClient.setQueryData(['terminals-manage'], context.prev);
+         queryClient.setQueryData(TERMINALS_QUERY_KEY, context.prev);
        }
        toast.error(`Erro: ${error.message}`);
      },
@@ -258,7 +237,7 @@ export default function Terminais() {
     for (const terminal of terminaisAtivos) {
       await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id }).catch(() => {});
     }
-    queryClient.invalidateQueries(['terminals-manage']);
+    queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY });
     setVerificandoTodos(false);
     toast.success('Verificação concluída!');
   };
@@ -342,7 +321,7 @@ export default function Terminais() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
               <p className="text-xs sm:text-sm text-emerald-600 flex items-center gap-1">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shrink-0 inline-block"></span>
-                Auto-refresh {refreshInterval >= 60000 ? (refreshInterval / 60000).toFixed(0) + 'm' : (refreshInterval / 1000).toFixed(0) + 's'}
+                Auto-refresh
                 <span className="ml-2 font-semibold text-slate-600">
                   • {filteredTerminals.length !== terminalCount ? `${filteredTerminals.length} de ` : ''}{terminalCount} terminal{terminalCount !== 1 ? 'is' : ''}
                 </span>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTerminals, TERMINALS_QUERY_KEY } from '@/hooks/useTerminals';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { MapPin, Monitor, AlertTriangle, Search, RefreshCw, Maximize2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,16 +38,8 @@ export default function MapaTerminais() {
   const perms   = resolvePermissions(currentUser);
   const isAdmin = perms.isAdmin;
 
-  // Terminais — admin vê todos, utilizador só os seus
-  const { data: allTerminals = [], isLoading, isFetching, refetch } = useQuery({
-    queryKey: ['mapa-terminals', currentUser?.email, isAdmin],
-    queryFn: async () => {
-      const response = await base44.functions.invoke('getMyTerminals', {});
-      return response.data?.terminals || [];
-    },
-    enabled: !!currentUser,
-    refetchInterval: 15000,
-  });
+  // Terminais — hook centralizado, query key partilhada com todas as páginas
+  const { data: allTerminals = [], isLoading, isFetching, refetch } = useTerminals({ enabled: !!currentUser });
 
   // Utilizadores únicos (só para admin)
   const usuarios = useMemo(() =>
@@ -76,7 +69,10 @@ export default function MapaTerminais() {
         ));
       }
     } catch {}
-    await Promise.all([refetch(), refetchPlans()]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY }),
+      refetchPlans()
+    ]);
     setIsMonitoring(false);
   };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTerminals, TERMINALS_QUERY_KEY } from '@/hooks/useTerminals';
 import { motion } from 'framer-motion';
 import {
   Monitor,
@@ -61,7 +62,8 @@ export default function Dashboard() {
   const [showWidgetConfig, setShowWidgetConfig] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [refreshInterval, setRefreshInterval] = useState(5000);
+  const [refreshInterval, setRefreshInterval] = useState(30000);
+  const queryClient = useQueryClient();
   const [widgets, setWidgets] = useState(() => {
     try {
       const saved = localStorage.getItem('dashboard-widgets');
@@ -73,16 +75,16 @@ export default function Dashboard() {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
-  // Fetch monitor config to get actual refresh interval
+  // Fetch monitor config — ajusta o refreshInterval
   useEffect(() => {
-    base44.entities.MonitorConfig.list().
-    then((configs) => {
-      const config = configs[0];
-      if (config?.intervalo_sync_minutos) {
-        setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
-      }
-    }).
-    catch(() => setRefreshInterval(30000));
+    base44.entities.MonitorConfig.list()
+      .then((configs) => {
+        const config = configs[0];
+        if (config?.intervalo_sync_minutos) {
+          setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const toggleWidget = (key) => {
@@ -96,15 +98,10 @@ export default function Dashboard() {
   const perms = resolvePermissions(currentUser);
   const canSeeAll = currentUser?.role === 'admin';
 
-  // Fetch terminals via backend function (bypasses RLS session cache issues)
-  const { data: terminals = [], isLoading, refetch } = useQuery({
-    queryKey: ['terminals', currentUser?.email, canSeeAll],
-    queryFn: async () => {
-      const response = await base44.functions.invoke('getMyTerminals', {});
-      return response.data?.terminals || [];
-    },
-    refetchInterval: refreshInterval,
-    enabled: !!currentUser
+  // Terminais — hook centralizado, query key partilhada com todas as páginas
+  const { data: terminals = [], isLoading } = useTerminals({
+    enabled: !!currentUser,
+    refetchInterval,
   });
 
   // Ciclo de monitoramento — chamado no mount e a cada refreshInterval
@@ -115,7 +112,7 @@ export default function Dashboard() {
       base44.functions.invoke('expireMaintenanceWindows', {}).catch(() => {});
       base44.functions.invoke('processAlertRules', {}).catch(() => {});
       setLastRefresh(new Date());
-      setTimeout(() => refetch(), 1500);
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY }), 1500);
     } catch (error) {
       console.error('Erro no ciclo de monitoramento:', error);
     }

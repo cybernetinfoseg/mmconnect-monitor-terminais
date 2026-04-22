@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTerminals, TERMINALS_QUERY_KEY } from '@/hooks/useTerminals';
 import { resolvePermissions } from '../components/auth/usePermissions';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -40,22 +41,10 @@ const DEFAULT_SETTINGS = {
 
 export default function TVMode() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [refreshInterval, setRefreshInterval] = useState(5000);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
-  }, []);
-
-  // Fetch monitor config to get actual refresh interval
-  useEffect(() => {
-    base44.entities.MonitorConfig.list().
-    then((configs) => {
-      const config = configs[0];
-      if (config?.intervalo_sync_minutos) {
-        setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
-      }
-    }).
-    catch(() => setRefreshInterval(5000));
   }, []);
 
   const perms = resolvePermissions(currentUser);
@@ -103,52 +92,28 @@ export default function TVMode() {
   const localFilter = tvLocalFilter || urlParams.get('local') || null;
   const statusFilterMirror = tvStatusFilter || null;
 
-  // Fetch terminals via backend function (bypasses RLS session cache issues)
-  const { data: allTerminalsRaw = [], refetch } = useQuery({
-    queryKey: ['terminals-tv', currentUser?.email, canSeeAll],
-    queryFn: async () => {
-      const response = await base44.functions.invoke('getMyTerminals', {});
-      const all = response.data?.terminals || [];
-      return all.filter(t => t.ativo !== false);
-    },
-    refetchInterval: refreshInterval,
-    enabled: !!currentUser
-  });
+  // Terminais — hook centralizado, query key partilhada com todas as páginas
+  const { data: allTerminalsRaw = [] } = useTerminals({ enabled: !!currentUser });
 
   const allTerminals = useMemo(() => {
     if (!currentUser) return [];
-    return allTerminalsRaw;
+    return allTerminalsRaw.filter(t => t.ativo !== false);
   }, [allTerminalsRaw, currentUser]);
 
-  // Ciclo de monitoramento automático
-  const runMonitorCycle = useCallback(async () => {
-    try {
-      await base44.functions.invoke('monitorAllTerminals', {});
-      base44.functions.invoke('expireMaintenanceWindows', {}).catch(() => {});
-      base44.functions.invoke('processAlertRules', {}).catch(() => {});
-      setTimeout(() => refetch(), 1500);
-    } catch {}
-  }, [refetch]);
-
-  // Disparar ao abrir TVMode
-  useEffect(() => {
-    if (!currentUser) return;
-    runMonitorCycle();
-  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Ciclo automático
-  useEffect(() => {
-    if (!currentUser || !refreshInterval) return;
-    const interval = setInterval(runMonitorCycle, refreshInterval);
-    return () => clearInterval(interval);
-  }, [currentUser, refreshInterval, runMonitorCycle]);
-
-  // Manual refresh
+  // Manual refresh — invalida a query centralizada
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
-    await runMonitorCycle();
-    await refetch();
-    setTimeout(() => setIsRefreshing(false), 1000);
+    try {
+      await base44.functions.invoke('monitorAllTerminals', {}).catch(() => {});
+      base44.functions.invoke('expireMaintenanceWindows', {}).catch(() => {});
+      base44.functions.invoke('processAlertRules', {}).catch(() => {});
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY });
+        setIsRefreshing(false);
+      }, 1500);
+    } catch {
+      setIsRefreshing(false);
+    }
   };
 
   // Fetch alerts — filtrar apenas incidentes dos terminais visíveis ao utilizador
