@@ -505,9 +505,9 @@ export default function Dashboard() {
     <AlertDialog open={showCloseConfirm} onOpenChange={setShowCloseConfirm}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Fechar o sistema?</AlertDialogTitle>
+          <AlertDialogTitle>Terminar sessão?</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem a certeza que deseja fechar o NOC Monitor? A sua sessão será encerrada.
+            Tem a certeza que deseja sair do NOC Monitor? O monitoramento automático será interrompido neste dispositivo.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -515,8 +515,7 @@ export default function Dashboard() {
           <AlertDialogAction
               onClick={() => base44.auth.logout()}
               className="bg-red-600 hover:bg-red-700 text-white">
-              
-            Fechar sistema
+            Terminar Sessão
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

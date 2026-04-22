@@ -432,9 +432,9 @@ export default function Administracao() {
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>
-                            {count}{limit > 0 ? `/${limit}` : ''} terminais
-                          </span>
+                          <span className={cn("font-mono text-xs font-semibold", count >= limit && user.role !== 'admin' ? "text-red-600" : user.role === 'admin' ? "text-violet-600" : "text-emerald-600")}>
+                                                             {user.role === 'admin' ? `${count}/∞` : `${count}/${limit}`} terminais
+                                                           </span>
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" onClick={() => handleEdit(user)} className="h-7 w-7 text-slate-400 hover:text-blue-600">
                               <Pencil className="h-3.5 w-3.5" />
@@ -475,9 +475,9 @@ export default function Administracao() {
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>
-                                {count}{limit > 0 ? `/${limit}` : ''}
-                              </span>
+                              <span className={cn("font-mono text-xs font-semibold", count >= limit && user.role !== 'admin' ? "text-red-600" : user.role === 'admin' ? "text-violet-600" : "text-emerald-600")}>
+                                                                {user.role === 'admin' ? `${count} / ∞` : `${count}/${limit}`}
+                                                              </span>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="flex items-center justify-center gap-1">

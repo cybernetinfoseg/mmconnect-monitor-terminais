@@ -108,10 +108,9 @@ export default function Terminais() {
     refetchInterval: refreshInterval,
   });
 
-  // Limite: contar apenas terminais "próprios" do utilizador (onde é o assignee)
   const terminalCount = terminals.length;
-  // limiteTerminais === 0 significa "sem limite definido" (utilizador ainda a carregar ou sem limite)
-  const atLimit = !isAdmin && limiteTerminais > 0 && terminalCount >= limiteTerminais;
+  // limiteTerminais === 0 significa "sem permissão para adicionar" (igual à lógica do backend)
+  const atLimit = !isAdmin && terminalCount >= limiteTerminais;
 
 
   const logAudit = (acao, entidade_id, descricao) =>
@@ -349,7 +348,7 @@ export default function Terminais() {
                 </span>
                 {!isAdmin && (
                   <span className={cn("ml-2 font-semibold", atLimit ? "text-red-600" : "text-slate-500")}>
-                    • {terminalCount}/{limiteTerminais} terminais
+                    • {terminalCount}/{limiteTerminais === 0 ? '0' : limiteTerminais} terminais
                   </span>
                 )}
               </p>
