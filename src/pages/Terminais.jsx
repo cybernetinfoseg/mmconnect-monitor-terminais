@@ -119,10 +119,11 @@ export default function Terminais() {
 
   const saveMutation = useMutation({
      mutationFn: async (data) => {
-       if (editingTerminal) {
-         return base44.entities.Terminal.update(editingTerminal.id, data);
-       }
-       return base44.entities.Terminal.create({ ...data, usuario_email: data.usuario_email || currentUser?.email });
+       const response = await base44.functions.invoke('saveTerminal', {
+         terminalId: editingTerminal?.id || null,
+         data: editingTerminal ? data : { ...data, usuario_email: data.usuario_email || currentUser?.email },
+       });
+       return response.data?.terminal;
      },
      onMutate: async (data) => {
        await queryClient.cancelQueries(['terminals-manage']);
@@ -167,7 +168,7 @@ export default function Terminais() {
    });
 
   const deleteMutation = useMutation({
-     mutationFn: (id) => base44.entities.Terminal.delete(id),
+     mutationFn: (id) => base44.functions.invoke('deleteTerminal', { terminalId: id }),
      onMutate: async (id) => {
        await queryClient.cancelQueries(['terminals-manage']);
        const prev = queryClient.getQueryData(['terminals-manage']);
