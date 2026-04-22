@@ -49,14 +49,9 @@ export default function Incidents() {
       if (canSeeAll) {
         return await base44.entities.AlertIncident.list('-created_date', 200);
       }
-      // Non-admins: terminais onde são criador OU utilizador atribuído
-      const [byCreator, byAssigned] = await Promise.all([
-        base44.entities.Terminal.filter({ created_by: currentUser?.email }),
-        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }),
-      ]);
-      const map = new Map();
-      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
-      const myTerminalIds = [...map.keys()];
+      // Non-admins: usar getMyTerminals (service role) para obter terminais criados OU atribuídos
+      const termRes = await base44.functions.invoke('getMyTerminals', {});
+      const myTerminalIds = (termRes.data?.terminals || []).map(t => t.id);
       if (myTerminalIds.length === 0) return [];
       const allIncidents = await base44.entities.AlertIncident.list('-created_date', 200);
       return allIncidents.filter((i) => myTerminalIds.includes(i.terminal_id));

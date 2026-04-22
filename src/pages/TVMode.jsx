@@ -103,18 +103,13 @@ export default function TVMode() {
   const localFilter = tvLocalFilter || urlParams.get('local') || null;
   const statusFilterMirror = tvStatusFilter || null;
 
-  // Fetch terminals with auto-refresh based on config
+  // Fetch terminals via backend function (bypasses RLS session cache issues)
   const { data: allTerminalsRaw = [], refetch } = useQuery({
     queryKey: ['terminals-tv', currentUser?.email, canSeeAll],
     queryFn: async () => {
-      const baseFilter = { ativo: true };
-      if (canSeeAll) {
-        return await base44.entities.Terminal.filter(baseFilter);
-      }
-      return await base44.entities.Terminal.filter({
-        ...baseFilter,
-        created_by: currentUser?.email
-      });
+      const response = await base44.functions.invoke('getMyTerminals', {});
+      const all = response.data?.terminals || [];
+      return all.filter(t => t.ativo !== false);
     },
     refetchInterval: refreshInterval,
     enabled: !!currentUser
