@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
-import { MapPin, Monitor, Wifi, WifiOff, AlertTriangle, Search, RefreshCw, X, Info, User, Maximize2, Minimize2 } from 'lucide-react';
+import { MapPin, Monitor, AlertTriangle, Search, RefreshCw, Maximize2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import FloorPlanCanvas from '@/components/mapa/FloorPlanCanvas';
+import MapaFullscreen from '@/components/mapa/MapaFullscreen';
 
 const STATUS_COLORS = {
   online:  { bg: 'bg-emerald-500', text: 'text-emerald-700', light: 'bg-emerald-50 border-emerald-200' },
@@ -149,90 +150,21 @@ export default function MapaTerminais() {
 
   const hasActiveFilters = search || statusFilter !== 'all' || localFilter !== 'all' || userFilter !== 'all';
 
-  // Fechar fullscreen com ESC
-  React.useEffect(() => {
-    if (!fullscreenLocal) return;
-    const handler = (e) => { if (e.key === 'Escape') setFullscreenLocal(null); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [fullscreenLocal]);
-
   return (
     <>
     {/* ── Overlay Fullscreen ── */}
     <AnimatePresence>
       {fullscreenLocal && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col"
-          style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
-        >
-          {/* Top bar */}
-          <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-700 shrink-0">
-            <div className="flex items-center gap-3">
-              <MapPin className="h-5 w-5 text-teal-400 shrink-0" />
-              <div>
-                <h2 className="text-base font-bold text-white">{fullscreenLocal.local}</h2>
-                <div className="flex items-center gap-3 text-xs text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
-                    {fullscreenLocal.termList.filter(t => t.status === 'online').length} online
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-500 inline-block" />
-                    {fullscreenLocal.termList.filter(t => t.status === 'offline').length} offline
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" />
-                    {fullscreenLocal.termList.filter(t => t.status === 'warning').length} atenção
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 hidden sm:inline">Pressione ESC para sair</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setFullscreenLocal(null)}
-                className="text-slate-400 hover:text-white hover:bg-slate-700 h-9 w-9"
-              >
-                <Minimize2 className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Canvas */}
-          <div className="flex-1 overflow-auto p-4 sm:p-6">
-            <FloorPlanCanvas
-              local={fullscreenLocal.local}
-              terminals={fullscreenLocal.termList}
-              canEdit={canEditPlan}
-              savedPlan={getPlan(fullscreenLocal.local)}
-              onSave={(plan) => savePlan(fullscreenLocal.local, plan)}
-              selectedId={selectedTerminal?.id}
-              onSelect={setSelectedTerminal}
-              fullscreen
-            />
-          </div>
-
-          {/* Lista de terminais offline no rodapé */}
-          {fullscreenLocal.termList.some(t => t.status === 'offline') && (
-            <div className="shrink-0 px-4 pb-3 pt-2 bg-slate-900/80 border-t border-red-900/40">
-              <p className="text-xs text-red-400 font-semibold mb-2 uppercase tracking-wider">Offline</p>
-              <div className="flex flex-wrap gap-2">
-                {fullscreenLocal.termList.filter(t => t.status === 'offline').map(t => (
-                  <span key={t.id} className="flex items-center gap-1.5 bg-red-950/60 border border-red-800/50 text-red-300 text-xs rounded-lg px-3 py-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                    {t.nome}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </motion.div>
+        <MapaFullscreen
+          local={fullscreenLocal.local}
+          termList={fullscreenLocal.termList}
+          canEdit={canEditPlan}
+          savedPlan={getPlan(fullscreenLocal.local)}
+          onSave={(plan) => savePlan(fullscreenLocal.local, plan)}
+          onClose={() => setFullscreenLocal(null)}
+          onRefresh={handleRefresh}
+          isRefreshing={isMonitoring || isFetching}
+        />
       )}
     </AnimatePresence>
 
