@@ -49,13 +49,15 @@ export default function Incidents() {
       if (canSeeAll) {
         return await base44.entities.AlertIncident.list('-created_date', 200);
       }
-      // Non-admins: fetch incidents from their own terminals only
-      const myTerminals = await base44.entities.Terminal.filter(
-        { created_by: currentUser?.email }
-      );
-      const myTerminalIds = myTerminals.map((t) => t.id);
+      // Non-admins: terminais onde são criador OU utilizador atribuído
+      const [byCreator, byAssigned] = await Promise.all([
+        base44.entities.Terminal.filter({ created_by: currentUser?.email }),
+        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }),
+      ]);
+      const map = new Map();
+      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
+      const myTerminalIds = [...map.keys()];
       if (myTerminalIds.length === 0) return [];
-      // Fetch all incidents and filter by owned terminals
       const allIncidents = await base44.entities.AlertIncident.list('-created_date', 200);
       return allIncidents.filter((i) => myTerminalIds.includes(i.terminal_id));
     },

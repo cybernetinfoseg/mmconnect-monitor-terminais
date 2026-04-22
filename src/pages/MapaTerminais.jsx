@@ -40,7 +40,14 @@ export default function MapaTerminais() {
     queryKey: ['mapa-terminals', currentUser?.email, isAdmin],
     queryFn: async () => {
       if (isAdmin) return base44.entities.Terminal.list('-created_date');
-      return base44.entities.Terminal.filter({ created_by: currentUser?.email }, '-created_date');
+      // Non-admins see terminals where they are creator OR assigned user
+      const [byCreator, byAssigned] = await Promise.all([
+        base44.entities.Terminal.filter({ created_by: currentUser?.email }, '-created_date'),
+        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }, '-created_date'),
+      ]);
+      const map = new Map();
+      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
+      return [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
     },
     enabled: !!currentUser,
     refetchInterval: 15000,

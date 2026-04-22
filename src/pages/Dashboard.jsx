@@ -103,10 +103,14 @@ export default function Dashboard() {
       if (canSeeAll) {
         return await base44.entities.Terminal.list();
       }
-      return await base44.entities.Terminal.filter(
-        { created_by: currentUser?.email },
-        '-created_date'
-      );
+      // Non-admins see terminals where they are the creator OR assigned user
+      const [byCreator, byAssigned] = await Promise.all([
+        base44.entities.Terminal.filter({ created_by: currentUser?.email }, '-created_date'),
+        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }, '-created_date'),
+      ]);
+      const map = new Map();
+      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
+      return [...map.values()];
     },
     refetchInterval: refreshInterval,
     enabled: !!currentUser
@@ -133,10 +137,14 @@ export default function Dashboard() {
       if (canSeeAll) {
         return await base44.entities.AlertIncident.list('-created_date', 50);
       }
-      const myTerminals = await base44.entities.Terminal.filter(
-        { created_by: currentUser?.email }
-      );
-      const myTerminalIds = myTerminals.map((t) => t.id);
+      // Use already-loaded terminals list (same logic: creator OR assigned)
+      const [byCreator, byAssigned] = await Promise.all([
+        base44.entities.Terminal.filter({ created_by: currentUser?.email }),
+        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }),
+      ]);
+      const map = new Map();
+      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
+      const myTerminalIds = [...map.keys()];
       if (myTerminalIds.length === 0) return [];
       const allAlerts = await base44.entities.AlertIncident.list('-created_date', 50);
       return allAlerts.filter((a) => myTerminalIds.includes(a.terminal_id));

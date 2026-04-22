@@ -104,16 +104,21 @@ export default function Terminais() {
       if (isAdmin) {
         return await base44.entities.Terminal.list('-created_date');
       }
-      // Non-admins only see their own terminals
-      return await base44.entities.Terminal.filter(
-        { created_by: currentUser?.email },
-        '-created_date'
-      );
+      // Non-admins see terminals where they are the creator OR assigned user
+      const [byCreator, byAssigned] = await Promise.all([
+        base44.entities.Terminal.filter({ created_by: currentUser?.email }, '-created_date'),
+        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }, '-created_date'),
+      ]);
+      // Merge and deduplicate by id
+      const map = new Map();
+      [...byCreator, ...byAssigned].forEach(t => map.set(t.id, t));
+      return [...map.values()].sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
     },
-    enabled: !!currentUser, // Only run when user is loaded
+    enabled: !!currentUser,
     refetchInterval: refreshInterval,
   });
 
+  // Limite: contar apenas terminais "próprios" do utilizador (onde é o assignee)
   const terminalCount = terminals.length;
   const atLimit = !isAdmin && (limiteTerminais === 0 || (limiteTerminais > 0 && terminalCount >= limiteTerminais));
 
