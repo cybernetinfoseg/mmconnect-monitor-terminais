@@ -32,6 +32,7 @@ export default function Manutencao() {
     const queryClient = useQueryClient();
     const [modalOpen, setModalOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
+    const [userFilter, setUserFilter] = useState('all');
     const [currentUser, setCurrentUser] = useState(null);
 
     const logAudit = (acao, entidade_id, descricao) =>
@@ -42,6 +43,7 @@ export default function Manutencao() {
     }, []);
 
     const perms = resolvePermissions(currentUser);
+    const isAdmin = perms.isAdmin;
 
     const { data: janelas = [], isLoading } = useQuery({
         queryKey: ['maintenance-windows', currentUser?.email],
@@ -92,9 +94,17 @@ export default function Manutencao() {
         setModalOpen(true);
     };
 
-    const ativas = janelas.filter(j => getStatus(j) === 'ativa');
-    const agendadas = janelas.filter(j => getStatus(j) === 'agendada');
-    const historico = janelas.filter(j => ['concluida', 'cancelada'].includes(getStatus(j)));
+    // Lista de utilizadores únicos para filtro admin
+    const usuarios = [...new Set(janelas.map(j => j.criado_por).filter(Boolean))].sort();
+
+    // Janelas filtradas por utilizador (admin only)
+    const janelasFiltradas = isAdmin && userFilter !== 'all'
+        ? janelas.filter(j => j.criado_por === userFilter)
+        : janelas;
+
+    const ativas = janelasFiltradas.filter(j => getStatus(j) === 'ativa');
+    const agendadas = janelasFiltradas.filter(j => getStatus(j) === 'agendada');
+    const historico = janelasFiltradas.filter(j => ['concluida', 'cancelada'].includes(getStatus(j)));
 
     const JanelaCard = ({ item }) => {
         const status = getStatus(item);
@@ -156,7 +166,7 @@ export default function Manutencao() {
     return (
         <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-4xl overflow-x-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-orange-100 rounded-xl">
                         <Wrench className="h-5 w-5 text-orange-600" />
@@ -166,12 +176,24 @@ export default function Manutencao() {
                         <p className="text-sm text-slate-500">Suspende alertas durante períodos de manutenção</p>
                     </div>
                 </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                    {isAdmin && usuarios.length > 0 && (
+                        <select
+                            value={userFilter}
+                            onChange={e => setUserFilter(e.target.value)}
+                            className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                            <option value="all">Todos os utilizadores</option>
+                            {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                    )}
                 <Button onClick={() => { setEditItem(null); setModalOpen(true); }} className="gap-2">
                     <Plus className="h-4 w-4" />
                     <span className="hidden sm:inline">Nova Janela</span>
                     <span className="sm:hidden">Nova</span>
-                </Button>
-            </div>
+                    </Button>
+                    </div>
+                    </div>
 
             {/* Aviso informativo */}
             <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">

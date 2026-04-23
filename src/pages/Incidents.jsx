@@ -12,7 +12,8 @@ import {
   RefreshCw,
   Bell,
   BellOff,
-  FileDown } from
+  FileDown,
+  User } from
 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,7 @@ import { formatDateTimePT } from '@/lib/localization';
 export default function Incidents() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [tipoFilter, setTipoFilter] = useState('all');
+  const [userFilter, setUserFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
@@ -43,8 +45,23 @@ export default function Incidents() {
   const logAudit = (acao, entidade_id, descricao) =>
   base44.functions.invoke('auditLog', { acao, entidade: 'AlertIncident', entidade_id, descricao }).catch(() => {});
 
+  // Fetch all terminals (for admin user filter)
+  const { data: allTerminalsList = [] } = useQuery({
+    queryKey: ['terminals-for-incidents', currentUser?.email],
+    queryFn: async () => {
+      const res = await base44.functions.invoke('getMyTerminals', {});
+      return res.data?.terminals || [];
+    },
+    enabled: !!currentUser && canSeeAll,
+  });
+
+  const usuarios = useMemo(() =>
+    [...new Set(allTerminalsList.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort(),
+    [allTerminalsList]
+  );
+
   // Fetch incidents with server-side filtering for security
-  const { data: incidents = [], isLoading, refetch } = useQuery({
+  const { data: allIncidentsList = [], isLoading, refetch } = useQuery({
     queryKey: ['incidents', currentUser?.email, canSeeAll],
     queryFn: async () => {
       if (canSeeAll) {
@@ -54,12 +71,21 @@ export default function Incidents() {
       const termRes = await base44.functions.invoke('getMyTerminals', {});
       const myTerminalIds = (termRes.data?.terminals || []).map(t => t.id);
       if (myTerminalIds.length === 0) return [];
-      const allIncidents = await base44.entities.AlertIncident.list('-created_date', 200);
-      return allIncidents.filter((i) => myTerminalIds.includes(i.terminal_id));
+      const all = await base44.entities.AlertIncident.list('-created_date', 200);
+      return all.filter((i) => myTerminalIds.includes(i.terminal_id));
     },
     refetchInterval: 30000,
     enabled: !!currentUser
   });
+
+  // Filtrar por utilizador (admin only)
+  const incidents = useMemo(() => {
+    if (!canSeeAll || userFilter === 'all') return allIncidentsList;
+    const filteredTerminalIds = new Set(
+      allTerminalsList.filter(t => (t.usuario_email || t.created_by) === userFilter).map(t => t.id)
+    );
+    return allIncidentsList.filter(i => filteredTerminalIds.has(i.terminal_id));
+  }, [allIncidentsList, canSeeAll, userFilter, allTerminalsList]);
 
   const [checkingId, setCheckingId] = useState(null);
   const [checkError, setCheckError] = useState(null);
@@ -439,6 +465,16 @@ export default function Incidents() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3">
+          {canSeeAll && usuarios.length > 0 && (
+            <select
+              value={userFilter}
+              onChange={e => setUserFilter(e.target.value)}
+              className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <option value="all">Todos os utilizadores</option>
+              {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          )}
           <Tabs value={statusFilter} onValueChange={setStatusFilter}>
             <TabsList className="bg-white shadow-sm">
               <TabsTrigger value="all">Todos</TabsTrigger>
@@ -462,8 +498,8 @@ export default function Incidents() {
           </Tabs>
 
           <button
-            onClick={() => {setStatusFilter('all');setTipoFilter('all');}}
-            disabled={statusFilter === 'all' && tipoFilter === 'all'}
+            onClick={() => {setStatusFilter('all');setTipoFilter('all');setUserFilter('all');}}
+            disabled={statusFilter === 'all' && tipoFilter === 'all' && userFilter === 'all'}
             className="text-xs text-slate-400 hover:text-slate-700 disabled:opacity-30 select-none transition-colors">
             
             Limpar filtros

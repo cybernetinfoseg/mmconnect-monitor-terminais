@@ -30,6 +30,7 @@ const GATILHO_ICONS = {
 export default function Alertas() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
+  const [userFilter, setUserFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
 
@@ -41,6 +42,7 @@ export default function Alertas() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
+  const isAdmin = perms.isAdmin;
 
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['alert-rules', currentUser?.email],
@@ -80,7 +82,19 @@ export default function Alertas() {
     setModalOpen(true);
   };
 
-  const activeRules = rules.filter(r => r.ativo).length;
+  // Utilizadores únicos para filtro admin
+  const usuarios = useMemo(() =>
+    [...new Set(rules.map(r => r.created_by).filter(Boolean))].sort(),
+    [rules]
+  );
+
+  // Filtrar regras por utilizador (admin only)
+  const filteredRules = useMemo(() => {
+    if (!isAdmin || userFilter === 'all') return rules;
+    return rules.filter(r => r.created_by === userFilter);
+  }, [rules, isAdmin, userFilter]);
+
+  const activeRules = filteredRules.filter(r => r.ativo).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full overflow-x-hidden">
@@ -96,7 +110,17 @@ export default function Alertas() {
               <p className="text-sm text-slate-500">{activeRules} regra(s) ativa(s)</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {isAdmin && usuarios.length > 0 && (
+              <select
+                value={userFilter}
+                onChange={e => setUserFilter(e.target.value)}
+                className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="all">Todos os utilizadores</option>
+                {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+              </select>
+            )}
             <BrowserNotificationToggle />
             {perms.pode_configurar_alertas && (
               <Button onClick={handleNew} className="bg-slate-900 hover:bg-slate-800 text-white gap-2">
@@ -108,7 +132,7 @@ export default function Alertas() {
         </div>
 
         {/* Empty state */}
-        {!isLoading && rules.length === 0 && (
+        {!isLoading && filteredRules.length === 0 && (
           <Card className="bg-white/80 border-slate-200/50">
             <CardContent className="py-16 text-center">
               <Bell className="h-12 w-12 mx-auto mb-4 text-slate-300" />
@@ -126,7 +150,7 @@ export default function Alertas() {
         {/* Rules list */}
         <div className="space-y-3">
           <AnimatePresence>
-            {rules.map((rule, index) => {
+            {filteredRules.map((rule, index) => {
               const Icon = GATILHO_ICONS[rule.gatilho] || Bell;
               return (
                 <motion.div

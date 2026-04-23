@@ -28,6 +28,7 @@ export default function Relatorios() {
 
     const [dataInicio, setDataInicio] = useState(sevenDaysAgo);
     const [dataFim, setDataFim] = useState(today);
+    const [userFilter, setUserFilter] = useState('all');
     const [currentUser, setCurrentUser] = useState(null);
     const [printing, setPrinting] = useState(false);
     const printRef = useRef();
@@ -39,7 +40,7 @@ export default function Relatorios() {
     const perms = resolvePermissions(currentUser);
     const canSeeAll = perms.isAdmin;
 
-    const { data: terminals = [] } = useQuery({
+    const { data: allTerminalsList = [] } = useQuery({
         queryKey: ['rel-terminals', currentUser?.email],
         queryFn: async () => {
             const response = await base44.functions.invoke('getMyTerminals', {});
@@ -48,6 +49,18 @@ export default function Relatorios() {
         },
         enabled: !!currentUser,
     });
+
+    // Utilizadores únicos para filtro admin
+    const usuarios = useMemo(() =>
+        [...new Set(allTerminalsList.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort(),
+        [allTerminalsList]
+    );
+
+    // Terminais filtrados por utilizador (admin only)
+    const terminals = useMemo(() => {
+        if (!canSeeAll || userFilter === 'all') return allTerminalsList;
+        return allTerminalsList.filter(t => (t.usuario_email || t.created_by) === userFilter);
+    }, [allTerminalsList, canSeeAll, userFilter]);
 
     // Computed date range
     const { cutoff, cutoffEnd } = useMemo(() => {
@@ -332,6 +345,17 @@ export default function Relatorios() {
                             </Button>
                         )}
                     </div>
+                    {/* User filter — admin only */}
+                    {canSeeAll && usuarios.length > 0 && (
+                        <select
+                            value={userFilter}
+                            onChange={e => setUserFilter(e.target.value)}
+                            className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                        >
+                            <option value="all">Todos os utilizadores</option>
+                            {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                    )}
                     {/* Action buttons */}
                     <div className="flex gap-2 shrink-0">
                         <Button onClick={handlePrint} variant="outline" size="sm" className="gap-2 h-9" disabled={printing}>
