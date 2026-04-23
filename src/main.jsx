@@ -7,13 +7,9 @@ import '@/index.css'
 if (typeof window !== 'undefined') {
   document.documentElement.lang = 'pt-PT';
 
-  // Auto dark mode based on system preference
-  const applyColorScheme = (dark) => {
-    document.documentElement.classList.toggle('dark', dark);
-  };
-  const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  applyColorScheme(mq.matches);
-  mq.addEventListener('change', (e) => applyColorScheme(e.matches));
+  // Force light mode regardless of system preference
+  document.documentElement.classList.remove('dark');
+  document.documentElement.style.colorScheme = 'light';
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
