@@ -584,6 +584,7 @@ export default function Terminais() {
                   value={formData.local || ''}
                   onChange={val => setFormData(f => ({...f, local: val}))}
                   onRefresh={refetchLocais}
+                  isAdmin={isAdmin}
                 />
               </div>
             </div>
