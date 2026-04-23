@@ -28,10 +28,17 @@ export function useTerminals({ enabled = true, refetchInterval } = {}) {
     queryKey: TERMINALS_QUERY_KEY,
     queryFn: async () => {
       const response = await base44.functions.invoke('getMyTerminals', {});
-      return response.data?.terminals || [];
+      const terminals = response.data?.terminals;
+      // Se a resposta não trouxe array (erro silencioso), lançar erro para retry
+      if (!Array.isArray(terminals)) {
+        throw new Error(response.data?.error || 'Resposta inválida do servidor');
+      }
+      return terminals;
     },
     refetchInterval: refetchInterval ?? 30000,
     staleTime: 10000,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
     enabled,
   });
 }
