@@ -44,9 +44,16 @@ Deno.serve(async (req) => {
                 return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
             }
         } else {
-            const terminaisDoUtilizador = await base44.asServiceRole.entities.Terminal.filter({
-                ativo: true,
-                created_by: ownerEmail,
+            // Verificar por created_by OU usuario_email (terminais podem ser criados via service role)
+            const [byCreator, byEmail] = await Promise.all([
+                base44.asServiceRole.entities.Terminal.filter({ ativo: true, created_by: ownerEmail }),
+                base44.asServiceRole.entities.Terminal.filter({ ativo: true, usuario_email: ownerEmail }),
+            ]);
+            const seen = new Set();
+            const terminaisDoUtilizador = [...byCreator, ...byEmail].filter(t => {
+                if (seen.has(t.id)) return false;
+                seen.add(t.id);
+                return true;
             });
             terminal = terminaisDoUtilizador.find(t => t.id === terminal_id);
             if (!terminal) {
