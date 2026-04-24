@@ -29,9 +29,10 @@ Deno.serve(async (req) => {
 
         const ownerEmail = match.user_email;
 
-        // Verificar se o dono da key é admin
-        const ownerUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail });
-        const isAdmin = ownerUsers.length > 0 && ownerUsers[0].role === 'admin';
+        // Verificar se o dono da key é admin (sem sessão: usar list + filtro em memória)
+        const allUsers = await base44.asServiceRole.entities.User.list();
+        const ownerUser = allUsers.find(u => u.email === ownerEmail);
+        const isAdmin = ownerUser?.role === 'admin';
 
         // 3. Admin → todos os terminais; utilizador normal → apenas os seus
         let allTerminals;

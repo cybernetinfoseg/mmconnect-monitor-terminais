@@ -31,9 +31,10 @@ Deno.serve(async (req) => {
             return Response.json({ error: "status deve ser 'online' ou 'offline'" }, { status: 400 });
         }
 
-        // Verificar se o dono da key é admin
-        const ownerUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail });
-        const isAdmin = ownerUsers.length > 0 && ownerUsers[0].role === 'admin';
+        // Verificar se o dono da key é admin (sem sessão: usar list + filtro em memória)
+        const allUsers = await base44.asServiceRole.entities.User.list();
+        const ownerUser = allUsers.find(u => u.email === ownerEmail);
+        const isAdmin = ownerUser?.role === 'admin';
 
         // Verificar que o terminal existe; admin pode reportar qualquer um
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id).catch(() => null);
