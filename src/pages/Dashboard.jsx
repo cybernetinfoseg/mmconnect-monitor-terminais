@@ -103,40 +103,25 @@ export default function Dashboard() {
     enabled: !!currentUser,
   });
 
-  // Ciclo de monitoramento — chamado no mount e a cada refreshInterval
-  const runMonitorCycle = useCallback(async () => {
-    try {
-      await base44.functions.invoke('monitorAllTerminals', {});
-      // Expirar manutenções e processar regras de alerta em paralelo (fire-and-forget)
-      base44.functions.invoke('expireMaintenanceWindows', {}).catch(() => {});
-      base44.functions.invoke('processAlertRules', {}).catch(() => {});
-      setLastRefresh(new Date());
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY }), 1500);
-    } catch (error) {
-      console.error('Erro no ciclo de monitoramento:', error);
-    }
+  // Refrescar dados da UI periodicamente (NÃO chama monitorAllTerminals — isso é responsabilidade da automação agendada)
+  const runRefreshCycle = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY });
+    setLastRefresh(new Date());
   }, [queryClient]);
 
-  // Disparar ciclo ao abrir o Dashboard (assim que tiver user e terminais carregados)
-  useEffect(() => {
-    if (!currentUser) return;
-    runMonitorCycle();
-  }, [currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Ciclo automático independente do refetchInterval dos dados
+  // Ciclo automático de refresh da UI
   useEffect(() => {
     if (!currentUser || !refreshInterval) return;
-    const interval = setInterval(runMonitorCycle, refreshInterval);
+    const interval = setInterval(runRefreshCycle, refreshInterval);
     return () => clearInterval(interval);
-  }, [currentUser, refreshInterval, runMonitorCycle]);
+  }, [currentUser, refreshInterval, runRefreshCycle]);
 
-  // Monitorar todos os terminais (botão manual)
+  // Botão manual — apenas invalida o cache para forçar novo fetch
   const handleMonitorAll = async () => {
     setIsMonitoring(true);
     try {
-      await runMonitorCycle();
-    } catch (error) {
-      console.error('Erro ao monitorar:', error);
+      await queryClient.invalidateQueries({ queryKey: TERMINALS_QUERY_KEY });
+      setLastRefresh(new Date());
     } finally {
       setIsMonitoring(false);
     }
