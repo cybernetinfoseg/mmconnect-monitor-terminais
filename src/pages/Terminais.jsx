@@ -73,11 +73,12 @@ export default function Terminais() {
   const [editingTerminal, setEditingTerminal] = useState(null);
   const [formData, setFormData] = useState({});
   const [currentUser, setCurrentUser] = useState(null);
+  const [userLoaded, setUserLoaded] = useState(false);
   
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    base44.auth.me().then(setCurrentUser).catch(() => {});
+    base44.auth.me().then(u => { setCurrentUser(u); setUserLoaded(true); }).catch(() => setUserLoaded(true));
   }, []);
 
   const perms = resolvePermissions(currentUser);
@@ -85,11 +86,11 @@ export default function Terminais() {
   const limiteTerminais = perms.limite_terminais;
 
   // Terminais — hook centralizado, query key partilhada com todas as páginas
-  const { data: terminals = [], isLoading } = useTerminals({ enabled: !!currentUser });
+  const { data: terminals = [], isLoading } = useTerminals({ enabled: userLoaded && !!currentUser });
 
   const terminalCount = terminals.length;
-  // limiteTerminais === 0 significa "sem permissão para adicionar" (igual à lógica do backend)
-  const atLimit = !isAdmin && terminalCount >= limiteTerminais;
+  // Só calcular atLimit quando o user estiver carregado — evita falso positivo enquanto user=null
+  const atLimit = userLoaded && !isAdmin && limiteTerminais > 0 && terminalCount >= limiteTerminais;
 
 
   const logAudit = (acao, entidade_id, descricao) =>
