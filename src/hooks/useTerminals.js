@@ -6,7 +6,7 @@
  * - Intervalo de polling configurável via MonitorConfig (default: 30s)
  * - Elimina o rate-limit causado por múltiplos refetchIntervals em páginas distintas
  */
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { base44 } from '@/api/base44Client';
 
