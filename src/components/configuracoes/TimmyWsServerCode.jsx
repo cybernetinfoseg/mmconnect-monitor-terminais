@@ -431,32 +431,13 @@ export default function TimmyWsServerCode() {
 
       {/* Config */}
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
-        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\NOCMonitor\config.json <span className="text-violet-600 font-normal">(ficheiro partilhado com noc_server)</span></p>
+        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\NOCMonitor\config.json</p>
         <p className="text-slate-700">{`{`}</p>
         <p className="text-slate-700 pl-4">{`"API_KEY": "a_sua_api_key_pessoal",`}</p>
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
-        <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 30,`}</p>
-        <p className="text-slate-700 pl-4 text-slate-400">{`"ADMS_PORT": 8080,`}<span className="font-sans text-slate-400 font-normal pl-2">{"// usado pelo noc_server"}</span></p>
-        <p className="text-slate-700 pl-4 font-semibold text-violet-700">{`"WS_PORT": 7788`}<span className="font-sans text-violet-500 font-normal pl-2">{"// usado pelo timmy_ws_server"}</span></p>
+        <p className="text-slate-700 pl-4 font-semibold text-violet-700">{`"WS_PORT": 7788,`}</p>
+        <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 30`}</p>
         <p className="text-slate-700">{`}`}</p>
-      </div>
-
-      {/* Nota de coexistência */}
-      <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg text-xs text-violet-800 space-y-1">
-        <p className="font-semibold">ℹ️ Coexistência com NOC Server</p>
-        <p>Os dois serviços partilham o <strong>mesmo ficheiro</strong> <code className="bg-violet-100 px-1 rounded">config.json</code> mas escutam <strong>portas diferentes</strong>:</p>
-        <div className="grid grid-cols-2 gap-1 font-mono mt-1">
-          <div className="bg-violet-100 px-2 py-1 rounded">
-            <p className="font-sans font-semibold text-violet-900">noc_server.py</p>
-            <p>ADMS HTTP → <strong>:8080</strong></p>
-            <p>Heartbeat TCP → <strong>:5005+</strong></p>
-          </div>
-          <div className="bg-violet-100 px-2 py-1 rounded">
-            <p className="font-sans font-semibold text-violet-900">timmy_ws_server.py</p>
-            <p>WebSocket → <strong>:7788</strong></p>
-          </div>
-        </div>
-        <p className="text-violet-600 mt-1">Ambos podem correr em simultâneo no mesmo servidor sem conflito.</p>
       </div>
 
       {/* Firewall */}
@@ -486,7 +467,7 @@ export default function TimmyWsServerCode() {
         <p className="font-semibold">⚡ Instalação no Windows Server</p>
         <p>1. Python 3.9+ → <code className="bg-emerald-100 px-1 rounded">pip install websockets requests</code></p>
         <p>2. Copiar <code className="bg-emerald-100 px-1 rounded">timmy_ws_server.py</code> para <code className="bg-emerald-100 px-1 rounded">C:\Program Files\NOCMonitor\</code></p>
-        <p>3. Adicionar <code className="bg-emerald-100 px-1 rounded">"WS_PORT": 7788</code> ao <code className="bg-emerald-100 px-1 rounded">config.json</code> existente (mesmo ficheiro do noc_server)</p>
+        <p>3. Partilhar o <code className="bg-emerald-100 px-1 rounded">config.json</code> com o NOC Server (mesmo ficheiro)</p>
         <p>4. Instalar como serviço:</p>
         <code className="bg-emerald-100 px-2 py-1 rounded block">
           nssm install TimmyWSServer "C:\Python311\python.exe" "C:\Program Files\NOCMonitor\timmy_ws_server.py"

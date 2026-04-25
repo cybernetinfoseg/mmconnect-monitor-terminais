@@ -598,13 +598,12 @@ export default function NocServerCode() {
 
       {/* Config */}
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
-        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\NOCMonitor\config.json <span className="text-blue-600 font-normal">(partilhado com timmy_ws_server se instalado)</span></p>
+        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\NOCMonitor\config.json</p>
         <p className="text-slate-700">{`{`}</p>
         <p className="text-slate-700 pl-4">{`"API_KEY": "a_sua_api_key_pessoal",`}</p>
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
         <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 30,`}</p>
-        <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"ADMS_PORT": 8080,`}<span className="font-sans text-blue-500 font-normal pl-2">{"// usado pelo noc_server"}</span></p>
-        <p className="text-slate-700 pl-4 text-slate-400">{`"WS_PORT": 7788`}<span className="font-sans text-slate-400 font-normal pl-2">{"// opcional — só se usar timmy_ws_server"}</span></p>
+        <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"ADMS_PORT": 8080`}</p>
         <p className="text-slate-700">{`}`}</p>
       </div>
 
