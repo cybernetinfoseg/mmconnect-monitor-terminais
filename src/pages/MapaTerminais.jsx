@@ -3,6 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import FloorPlanCanvas from '@/components/mapa/FloorPlanCanvas';
+import IconConfigPanel from '@/components/mapa/IconConfigPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,7 @@ export default function MapaTerminais() {
   const [newPlanOwner, setNewPlanOwner] = useState('');
   const [uploading, setUploading] = useState(false);
   const [userFilter, setUserFilter] = useState('all');
+  const [iconConfig, setIconConfig] = useState({});
 
   const queryClient = useQueryClient();
 
@@ -388,6 +390,9 @@ export default function MapaTerminais() {
               </Card>
             )}
 
+            {/* Configuração de ícones */}
+            <IconConfigPanel iconConfig={iconConfig} onChange={setIconConfig} />
+
             {/* Lista de terminais na planta */}
             {selectedPlan && terminalsForPlan.length > 0 && (
               <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
@@ -455,13 +460,14 @@ export default function MapaTerminais() {
                   <div style={{ height: '560px' }} className="w-full">
                     {selectedPlan.imagem_url ? (
                       <FloorPlanCanvas
-                        imageUrl={selectedPlan.imagem_url}
-                        terminals={terminalsForPlan}
-                        positions={positions}
-                        editMode={editMode}
-                        onPositionChange={handlePositionChange}
-                        selectedTerminalId={selectedTerminal?.id}
-                        onSelectTerminal={setSelectedTerminal}
+                       imageUrl={selectedPlan.imagem_url}
+                       terminals={terminalsForPlan}
+                       positions={positions}
+                       editMode={editMode}
+                       onPositionChange={handlePositionChange}
+                       selectedTerminalId={selectedTerminal?.id}
+                       onSelectTerminal={setSelectedTerminal}
+                       iconConfig={iconConfig}
                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-3 bg-slate-50">
