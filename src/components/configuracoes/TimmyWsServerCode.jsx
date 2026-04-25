@@ -12,7 +12,7 @@ const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket 
 #   2. cmd:"sendlog" — logs de presença em tempo real (heartbeat implícito)
 #   3. Heartbeat a cada 3s (configurável no terminal)
 #
-# Config: C:\\ProgramData\\NOCMonitor\\config.json
+# Config: C:\\ProgramData\\TimmyWSServer\\config.json
 # {
 #   "API_KEY": "a_sua_api_key_pessoal",
 #   "APP_ID":  "697aa46c9998c30665e2e19a",
@@ -21,7 +21,7 @@ const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket 
 #
 # Instalação (Windows):
 #   pip install websockets requests
-#   nssm install TimmyWSServer "C:\\Python311\\python.exe" "C:\\Program Files\\NOCMonitor\\timmy_ws_server.py"
+#   nssm install TimmyWSServer "C:\\Python311\\python.exe" "C:\\Program Files\\TimmyWSServer\\timmy_ws_server.py"
 #   nssm start TimmyWSServer
 #
 # Configuração no terminal Timmy:
@@ -46,7 +46,7 @@ except ImportError:
 # Constantes e Paths
 # ──────────────────────────────────────────────────────────────
 PROGRAMDATA  = os.environ.get("PROGRAMDATA", r"C:\\ProgramData")
-APP_DIR      = os.path.join(PROGRAMDATA, "NOCMonitor")
+APP_DIR      = os.path.join(PROGRAMDATA, "TimmyWSServer")
 CONFIG_FILE  = os.path.join(APP_DIR, "config.json")
 LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
 
@@ -344,7 +344,7 @@ if __name__ == "__main__":
 
     cfg = load_config()
     if not cfg:
-        logger.error("config.json ausente ou inválido. Verifique C:\\ProgramData\\NOCMonitor\\config.json")
+        logger.error("config.json ausente ou inválido. Verifique C:\\ProgramData\\TimmyWSServer\\config.json")
         sys.exit(1)
 
     if args.port:
@@ -431,7 +431,7 @@ export default function TimmyWsServerCode() {
 
       {/* Config */}
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
-        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\NOCMonitor\config.json</p>
+        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\TimmyWSServer\config.json</p>
         <p className="text-slate-700">{`{`}</p>
         <p className="text-slate-700 pl-4">{`"API_KEY": "a_sua_api_key_pessoal",`}</p>
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
@@ -466,11 +466,11 @@ export default function TimmyWsServerCode() {
       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 space-y-1">
         <p className="font-semibold">⚡ Instalação no Windows Server</p>
         <p>1. Python 3.9+ → <code className="bg-emerald-100 px-1 rounded">pip install websockets requests</code></p>
-        <p>2. Copiar <code className="bg-emerald-100 px-1 rounded">timmy_ws_server.py</code> para <code className="bg-emerald-100 px-1 rounded">C:\Program Files\NOCMonitor\</code></p>
-        <p>3. Partilhar o <code className="bg-emerald-100 px-1 rounded">config.json</code> com o NOC Server (mesmo ficheiro)</p>
+        <p>2. Copiar <code className="bg-emerald-100 px-1 rounded">timmy_ws_server.py</code> para <code className="bg-emerald-100 px-1 rounded">C:\Program Files\TimmyWSServer\</code></p>
+        <p>3. Criar <code className="bg-emerald-100 px-1 rounded">C:\ProgramData\TimmyWSServer\config.json</code> (separado do NOC Server)</p>
         <p>4. Instalar como serviço:</p>
         <code className="bg-emerald-100 px-2 py-1 rounded block">
-          nssm install TimmyWSServer "C:\Python311\python.exe" "C:\Program Files\NOCMonitor\timmy_ws_server.py"
+          nssm install TimmyWSServer "C:\Python311\python.exe" "C:\Program Files\TimmyWSServer\timmy_ws_server.py"
         </code>
         <code className="bg-emerald-100 px-2 py-1 rounded block mt-1">
           nssm start TimmyWSServer
