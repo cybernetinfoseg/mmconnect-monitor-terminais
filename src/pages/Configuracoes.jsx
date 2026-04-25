@@ -283,8 +283,8 @@ export default function Configuracoes() {
           <TelegramConfig />
         </motion.div>
 
-        {/* Delete Account — apenas admin */}
-        {perms.isAdmin && (
+        {/* Delete Account — todos os utilizadores */}
+        {currentUser && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <Card className="bg-white/80 backdrop-blur-sm border-red-200">
               <CardHeader>

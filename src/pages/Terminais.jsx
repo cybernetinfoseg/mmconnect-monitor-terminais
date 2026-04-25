@@ -126,8 +126,20 @@ export default function Terminais() {
       if (editingTerminal) {
         return base44.entities.Terminal.update(editingTerminal.id, data);
       }
-      // Preencher automaticamente o email do utilizador ao criar
       return base44.entities.Terminal.create({ ...data, usuario_email: data.usuario_email || currentUser?.email });
+    },
+    onMutate: async (data) => {
+      await queryClient.cancelQueries(['terminals-manage']);
+      const previous = queryClient.getQueryData(['terminals-manage']);
+      if (editingTerminal) {
+        queryClient.setQueryData(['terminals-manage'], (old = []) =>
+          old.map(t => t.id === editingTerminal.id ? { ...t, ...data } : t)
+        );
+      } else {
+        const optimistic = { ...data, id: `optimistic-${Date.now()}`, status: 'offline', created_date: new Date().toISOString() };
+        queryClient.setQueryData(['terminals-manage'], (old = []) => [optimistic, ...old]);
+      }
+      return { previous };
     },
     onSuccess: async (result, data) => {
       const isEdit = !!editingTerminal;
@@ -142,25 +154,36 @@ export default function Terminais() {
       setEditingTerminal(null);
       setFormData({});
       toast.success(isEdit ? 'Terminal atualizado' : 'Terminal criado');
-      // Para tipos não-locais, verificar status imediatamente após criação/edição
       const tipo = data.tipo_conexao || 'ip_local';
       if (tipo !== 'ip_local' && terminalId) {
-        await base44.functions.invoke('monitorTerminal', { terminalId }).catch(() => {});
+        base44.functions.invoke('monitorTerminal', { terminalId }).catch(() => {});
       }
       queryClient.invalidateQueries(['terminals-manage']);
     },
-    onError: (error) => toast.error(`Erro: ${error.message}`),
+    onError: (error, _data, context) => {
+      if (context?.previous) queryClient.setQueryData(['terminals-manage'], context.previous);
+      toast.error(`Erro: ${error.message}`);
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Terminal.delete(id),
-    onSuccess: (_, id) => {
-      const terminal = terminals.find(t => t.id === id);
-      logAudit('terminal_excluido', id, `Terminal "${terminal?.nome || id}" excluído`);
-      queryClient.invalidateQueries(['terminals-manage']);
-      toast.success('Terminal eliminado');
+    onMutate: async (id) => {
+      await queryClient.cancelQueries(['terminals-manage']);
+      const previous = queryClient.getQueryData(['terminals-manage']);
+      queryClient.setQueryData(['terminals-manage'], (old = []) => old.filter(t => t.id !== id));
+      return { previous, id };
     },
-    onError: () => toast.error('Erro ao eliminar terminal'),
+    onSuccess: (_, id, context) => {
+      const terminal = (context?.previous || []).find(t => t.id === id);
+      logAudit('terminal_excluido', id, `Terminal "${terminal?.nome || id}" excluído`);
+      toast.success('Terminal eliminado');
+      queryClient.invalidateQueries(['terminals-manage']);
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(['terminals-manage'], context.previous);
+      toast.error('Erro ao eliminar terminal');
+    },
   });
 
   const [refreshingTerminalId, setRefreshingTerminalId] = useState(null);
@@ -169,16 +192,24 @@ export default function Terminais() {
     mutationFn: async (terminal) => {
       setRefreshingTerminalId(terminal.id);
       if (terminal.tipo_conexao === 'ip_local') {
-        // ip_local: apenas recarregar dados sem chamar monitorTerminal
         return { success: true, status: terminal.status, info: 'ip_local usa agente local' };
       }
       const response = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
       return response.data;
     },
+    onMutate: async (terminal) => {
+      // Optimistically show a "checking" state by clearing latency to indicate pending
+      queryClient.setQueryData(['terminals-manage'], (old = []) =>
+        old.map(t => t.id === terminal.id ? { ...t, ultimo_check: new Date().toISOString() } : t)
+      );
+    },
     onSuccess: (data, terminal) => {
       setRefreshingTerminalId(null);
-      queryClient.invalidateQueries(['terminals-manage']);
-      if (data?.success) {
+      if (data?.success && data.status) {
+        // Apply result optimistically before refetch
+        queryClient.setQueryData(['terminals-manage'], (old = []) =>
+          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia ?? t.latencia_ms } : t)
+        );
         if (data.status === 'online') {
           toast.success(`${terminal.nome}: ✅ ONLINE${data.latencia ? ' (' + data.latencia + 'ms)' : ''}`);
         } else {
@@ -187,6 +218,7 @@ export default function Terminais() {
       } else if (data?.error) {
         toast.info(`${terminal.nome}: ${data.error}`);
       }
+      queryClient.invalidateQueries(['terminals-manage']);
     },
     onError: (error) => { setRefreshingTerminalId(null); toast.error(`Erro: ${error.message}`); },
   });

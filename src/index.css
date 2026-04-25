@@ -82,8 +82,19 @@
     @apply border-border outline-ring/50;
   }
 
-  body {
+  html, body {
+    overscroll-behavior: auto;
     @apply bg-background text-foreground;
+  }
+
+  button,
+  a,
+  [role="button"],
+  nav,
+  nav *,
+  svg {
+    user-select: none;
+    -webkit-user-select: none;
   }
 }
 
