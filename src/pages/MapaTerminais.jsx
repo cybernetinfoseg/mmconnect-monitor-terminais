@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import FloorPlanCanvas from '@/components/mapa/FloorPlanCanvas';
-import IconConfigPanel from '@/components/mapa/IconConfigPanel';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -390,9 +390,6 @@ export default function MapaTerminais() {
               </Card>
             )}
 
-            {/* Configuração de ícones */}
-            <IconConfigPanel iconConfig={iconConfig} onChange={setIconConfig} />
-
             {/* Lista de terminais na planta */}
             {selectedPlan && terminalsForPlan.length > 0 && (
               <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
@@ -468,7 +465,8 @@ export default function MapaTerminais() {
                        selectedTerminalId={selectedTerminal?.id}
                        onSelectTerminal={setSelectedTerminal}
                        iconConfig={iconConfig}
-                      />
+                       onIconConfigChange={setIconConfig}
+                       />
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-3 bg-slate-50">
                         <Upload className="h-10 w-10 opacity-30" />
@@ -491,7 +489,7 @@ export default function MapaTerminais() {
                 </CardContent>
                 {editMode && (
                   <div className="px-4 py-2 bg-violet-50 border-t border-violet-100 text-xs text-violet-700">
-                    💡 Clique e arraste os marcadores para reposicioná-los. Terminais sem posição aparecem em baixo — arraste-os para a planta.
+                    💡 Arraste marcadores para reposicionar. Clique num marcador para editar o seu ícone e tamanho. Terminais sem posição aparecem em baixo.
                   </div>
                 )}
               </Card>
