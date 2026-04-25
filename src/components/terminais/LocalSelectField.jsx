@@ -94,11 +94,13 @@ export default function LocalSelectField({ locais, value, onChange, onRefresh, i
                     className="flex-1 min-w-0 cursor-pointer px-1 py-1 rounded"
                     onClick={() => { onChange(l.nome); setOpen(false); }}
                   >
-                    <div className={cn("text-sm truncate", value === l.nome ? "font-semibold text-blue-600" : "text-slate-700")}>
+                    <span className={cn("text-sm block truncate", value === l.nome ? "font-semibold text-blue-600" : "text-slate-700")}>
                       {l.nome}
-                    </div>
+                    </span>
                     {isAdmin && l.created_by && (
-                      <div className="text-[10px] text-slate-400 truncate">{l.created_by}</div>
+                      <span className="text-[10px] text-slate-400 truncate block leading-tight">
+                        {l.created_by}
+                      </span>
                     )}
                   </div>
                   <Button type="button" variant="ghost" size="sm" onClick={e => { e.stopPropagation(); handleEdit(l); }} className="h-7 w-7 p-0 text-slate-300 hover:text-blue-500 shrink-0">

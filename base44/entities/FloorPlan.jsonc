@@ -2,25 +2,69 @@
   "name": "FloorPlan",
   "type": "object",
   "properties": {
-    "local": {
+    "nome": {
       "type": "string",
-      "description": "Nome do local associado \u00e0 planta"
+      "description": "Nome da planta"
     },
     "owner_email": {
       "type": "string",
-      "description": "Email do utilizador dono desta planta"
+      "description": "Email do utilizador dono da planta"
     },
-    "image_url": {
+    "imagem_url": {
       "type": "string",
       "description": "URL da imagem da planta baixa"
     },
-    "positions": {
+    "terminais_posicoes": {
       "type": "string",
-      "description": "JSON com posi\u00e7\u00f5es dos terminais: { terminalId: {x, y} }"
+      "description": "JSON com posi\u00e7\u00f5es dos terminais: [{terminal_id, x, y}]"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se a planta est\u00e1 ativa"
     }
   },
   "required": [
-    "local",
+    "nome",
     "owner_email"
-  ]
+  ],
+  "rls": {
+    "create": true,
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
 }

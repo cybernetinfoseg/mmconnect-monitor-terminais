@@ -23,7 +23,6 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import ContactMessagesPanel from '../components/admin/ContactMessagesPanel';
-import WebhooksPanel from '../components/configuracoes/WebhooksPanel';
 
 const EMPTY_FORM = {
   email: '',
@@ -140,7 +139,7 @@ export default function Administracao() {
     queryFn: () => base44.entities.Terminal.list(),
   });
 
-  // Conta terminais por utilizador responsável (usuario_email tem prioridade sobre created_by)
+  // Conta por usuario_email (ownership real definido pelo admin) com fallback para created_by
   const terminalCountByUser = terminals.reduce((acc, t) => {
     const owner = t.usuario_email || t.created_by;
     if (owner) acc[owner] = (acc[owner] || 0) + 1;
@@ -432,9 +431,9 @@ export default function Administracao() {
                           </Badge>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className={cn("font-mono text-xs font-semibold", count >= limit && user.role !== 'admin' ? "text-red-600" : user.role === 'admin' ? "text-violet-600" : "text-emerald-600")}>
-                                                             {user.role === 'admin' ? `${count}/∞` : `${count}/${limit}`} terminais
-                                                           </span>
+                          <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>
+                            {count}{limit > 0 ? `/${limit}` : ''} terminais
+                          </span>
                           <div className="flex items-center gap-1">
                             <Button variant="ghost" size="icon" onClick={() => handleEdit(user)} className="h-7 w-7 text-slate-400 hover:text-blue-600">
                               <Pencil className="h-3.5 w-3.5" />
@@ -475,9 +474,9 @@ export default function Administracao() {
                               </Badge>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <span className={cn("font-mono text-xs font-semibold", count >= limit && user.role !== 'admin' ? "text-red-600" : user.role === 'admin' ? "text-violet-600" : "text-emerald-600")}>
-                                                                {user.role === 'admin' ? `${count} / ∞` : `${count}/${limit}`}
-                                                              </span>
+                              <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>
+                                {count}{limit > 0 ? `/${limit}` : ''}
+                              </span>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="flex items-center justify-center gap-1">
@@ -534,7 +533,7 @@ export default function Administracao() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Radio className="h-5 w-5 text-violet-600" />
-            NOC Server — Windows Server
+            NOC Server — Windows Server (51.91.219.145)
           </CardTitle>
           <p className="text-sm text-slate-500">Servidor unificado para terminais: Heartbeat TCP, ADMS/Push (ZKTeco, Anviz) e SDK-TCP.</p>
         </CardHeader>
@@ -570,9 +569,6 @@ export default function Administracao() {
           <TimmyWsServerCode />
         </CardContent>
       </Card>
-
-      {/* Webhooks & Integrações Externas */}
-      <WebhooksPanel />
 
       {/* Agent Installation Guide — admin only */}
       <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">

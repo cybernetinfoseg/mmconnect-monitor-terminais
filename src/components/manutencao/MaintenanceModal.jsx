@@ -23,10 +23,7 @@ export default function MaintenanceModal({ open, onClose, onSaved, editItem, cur
 
     const { data: terminals = [] } = useQuery({
         queryKey: ['terminals-list'],
-        queryFn: async () => {
-            const response = await base44.functions.invoke('getMyTerminals', {});
-            return (response.data?.terminals || []).filter(t => t.ativo !== false);
-        },
+        queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
         enabled: open,
     });
 
