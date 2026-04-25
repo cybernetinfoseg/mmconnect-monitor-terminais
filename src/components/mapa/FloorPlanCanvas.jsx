@@ -220,18 +220,25 @@ export default function FloorPlanCanvas({
     setTooltip(null);
   }, [editMode]);
 
-  // Compute tooltip position in screen space
+  // Compute tooltip position always inside the map
   const computeTooltipPos = (x, y) => {
-    const TW = 200; const TH = 120;
+    const TW = 210; const TH = 130;
+    const MARGIN = 8;
     const cW = imgSize.w; const cH = imgSize.h;
     const markerX = (x / 100) * cW * zoom + pan.x + cW / 2 - cW * zoom / 2;
     const markerY = (y / 100) * cH * zoom + pan.y + cH / 2 - cH * zoom / 2;
-    let left = markerX + 18;
-    let top = markerY - 55;
-    if (left + TW > cW) left = markerX - TW - 18;
-    if (left < 0) left = 4;
-    if (top < 0) top = markerY + 18;
-    if (top + TH > cH) top = cH - TH - 4;
+
+    // Try right of marker, then left
+    let left = markerX + 20;
+    if (left + TW > cW - MARGIN) left = markerX - TW - 20;
+    // Clamp horizontally
+    left = Math.max(MARGIN, Math.min(cW - TW - MARGIN, left));
+
+    // Try above marker, then below
+    let top = markerY - TH / 2;
+    // Clamp vertically
+    top = Math.max(MARGIN, Math.min(cH - TH - MARGIN, top));
+
     return { left, top };
   };
 

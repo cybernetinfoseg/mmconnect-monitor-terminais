@@ -76,33 +76,33 @@ export default function MapaTerminais() {
     setIsMonitoring(false);
   };
 
-  // Determina o dono efectivo da planta a mostrar:
-  // - Admin com filtro de utilizador activo → planta do utilizador filtrado
-  // - Admin sem filtro → planta do próprio admin
-  // - Utilizador normal → sempre a sua própria planta
-  const effectiveOwner = isAdmin
-    ? (userFilter !== 'all' ? userFilter : currentUser?.email)
-    : currentUser?.email;
+  // Dono efectivo da planta:
+  // - Utilizador normal → sempre o próprio
+  // - Admin sem filtro → o próprio admin
+  // - Admin com filtro de utilizador → o utilizador seleccionado
+  const effectiveOwner = !isAdmin
+    ? currentUser?.email
+    : (userFilter !== 'all' ? userFilter : currentUser?.email);
+
+  // Admin só pode editar quando está a ver as suas próprias plantas
+  const canEditPlan = !isAdmin || userFilter === 'all' || userFilter === currentUser?.email;
 
   const getPlan = (local) => {
     const plan = floorPlans.find(p => p.local === local && p.owner_email === effectiveOwner);
     if (!plan) return null;
     return {
       imageUrl:  plan.image_url || null,
-      positions: plan.positions ? JSON.parse(plan.positions) : {},
+      positions: plan.positions ? (() => { try { return JSON.parse(plan.positions); } catch { return {}; } })() : {},
     };
   };
 
-  // Pode editar apenas se for o próprio dono (ou admin a ver a sua própria planta)
-  const canEditPlan = !isAdmin
-    ? true  // utilizador normal pode sempre editar as suas plantas
-    : userFilter === 'all' || userFilter === currentUser?.email; // admin só edita quando está a ver as suas próprias plantas
-
   const savePlan = async (local, { imageUrl, positions }) => {
-    const existing = floorPlans.find(p => p.local === local && p.owner_email === effectiveOwner);
+    const saveOwner = currentUser?.email; // always save under the current user
+    const existing = floorPlans.find(p => p.local === local && p.owner_email === saveOwner);
     const data = {
       local,
-      owner_email: effectiveOwner,
+      nome:        local,
+      owner_email: saveOwner,
       image_url:   imageUrl || null,
       positions:   JSON.stringify(positions || {}),
     };
@@ -114,8 +114,14 @@ export default function MapaTerminais() {
     queryClient.invalidateQueries(['floor-plans']);
   };
 
-  const terminals = useMemo(() => allTerminals.filter(t => t.ativo !== false), [allTerminals]);
-  const locais    = useMemo(() => [...new Set(terminals.map(t => t.local).filter(Boolean))].sort(), [terminals]);
+  // Non-admins only see their own terminals
+  const terminals = useMemo(() => allTerminals.filter(t => {
+    if (t.ativo === false) return false;
+    if (!isAdmin) return (t.usuario_email || t.created_by) === currentUser?.email;
+    return true;
+  }), [allTerminals, isAdmin, currentUser]);
+
+  const locais = useMemo(() => [...new Set(terminals.map(t => t.local).filter(Boolean))].sort(), [terminals]);
 
   const filtered = useMemo(() => {
     return terminals.filter(t => {

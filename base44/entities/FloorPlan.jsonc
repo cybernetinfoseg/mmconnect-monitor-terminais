@@ -6,17 +6,21 @@
       "type": "string",
       "description": "Nome da planta"
     },
+    "local": {
+      "type": "string",
+      "description": "Local ao qual a planta pertence"
+    },
     "owner_email": {
       "type": "string",
       "description": "Email do utilizador dono da planta"
     },
-    "imagem_url": {
+    "image_url": {
       "type": "string",
       "description": "URL da imagem da planta baixa"
     },
-    "terminais_posicoes": {
+    "positions": {
       "type": "string",
-      "description": "JSON com posi\u00e7\u00f5es dos terminais: [{terminal_id, x, y}]"
+      "description": "JSON com posi\u00e7\u00f5es dos terminais: {terminal_id: {x, y}}"
     },
     "ativo": {
       "type": "boolean",
@@ -25,7 +29,6 @@
     }
   },
   "required": [
-    "nome",
     "owner_email"
   ],
   "rls": {
