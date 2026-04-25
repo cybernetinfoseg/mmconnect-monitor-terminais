@@ -5,7 +5,6 @@ import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Manutencao from './pages/Manutencao';
-import MapaTerminais from './pages/MapaTerminais';
 import Agendamentos from './pages/Agendamentos';
 import Relatorios from './pages/Relatorios';
 import CompletarPerfil from './pages/CompletarPerfil';
@@ -67,7 +66,6 @@ const AuthenticatedApp = () => {
       <Route path="/Relatorios" element={<LayoutWrapper currentPageName="Relatorios"><Relatorios /></LayoutWrapper>} />
       <Route path="/Agendamentos" element={<LayoutWrapper currentPageName="Agendamentos"><Agendamentos /></LayoutWrapper>} />
       <Route path="/CompletarPerfil" element={<LayoutWrapper currentPageName="CompletarPerfil"><CompletarPerfil /></LayoutWrapper>} />
-      <Route path="/MapaTerminais" element={<LayoutWrapper currentPageName="MapaTerminais"><MapaTerminais /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

@@ -31,15 +31,12 @@ Deno.serve(async (req) => {
             return Response.json({ error: "status deve ser 'online' ou 'offline'" }, { status: 400 });
         }
 
-        // is_admin está guardado diretamente na ApiKey — sem necessidade de consultar User
-        const isAdmin = keyRecord.is_admin === true;
-
-        // Verificar que o terminal existe; admin pode reportar qualquer um
+        // Verificar que o terminal existe e pertence ao utilizador
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id).catch(() => null);
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
         }
-        if (!isAdmin && terminal.created_by !== ownerEmail) {
+        if (terminal.created_by !== ownerEmail) {
             return Response.json({ error: 'Sem permissão para este terminal' }, { status: 403 });
         }
         if (terminal.tipo_conexao !== 'p2s') {
@@ -76,10 +73,7 @@ Deno.serve(async (req) => {
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
         const statusAnterior = cache?.ultimo_status ?? null;
-        // Se não há cache anterior, criar incidente apenas se chegar offline (evitar "restored" espúrio)
-        const mudouDeEstado = statusAnterior === null
-            ? status === 'offline'
-            : statusAnterior !== status;
+        const mudouDeEstado = statusAnterior !== null && statusAnterior !== status;
 
         if (mudouDeEstado) {
             console.log(`[p2sReport] '${terminal.nome}' mudou: ${statusAnterior} → ${status}`);

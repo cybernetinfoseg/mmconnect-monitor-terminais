@@ -12,7 +12,7 @@ const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket 
 #   2. cmd:"sendlog" — logs de presença em tempo real (heartbeat implícito)
 #   3. Heartbeat a cada 3s (configurável no terminal)
 #
-# Config: C:\\ProgramData\\TimmyWSServer\\config.json
+# Config: C:\\ProgramData\\NOCMonitor\\config.json
 # {
 #   "API_KEY": "a_sua_api_key_pessoal",
 #   "APP_ID":  "697aa46c9998c30665e2e19a",
@@ -46,12 +46,12 @@ except ImportError:
 # Constantes e Paths
 # ──────────────────────────────────────────────────────────────
 PROGRAMDATA  = os.environ.get("PROGRAMDATA", r"C:\\ProgramData")
-APP_DIR      = os.path.join(PROGRAMDATA, "TimmyWSServer")
+APP_DIR      = os.path.join(PROGRAMDATA, "NOCMonitor")
 CONFIG_FILE  = os.path.join(APP_DIR, "config.json")
 LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
 
 DEFAULT_WS_PORT  = 7788
-OFFLINE_TIMEOUT  = 30    # segundos sem mensagem → offline (3x o heartbeat padrão de 3s com margem)
+OFFLINE_TIMEOUT  = 15    # segundos sem mensagem → offline
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
 logger = logging.getLogger("timmy_ws")
@@ -237,37 +237,27 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
     logger.info(f"[REPORT-WS] Ciclo de reporte activo — intervalo={intervalo}s")
     while not (stop_event and stop_event.is_set()):
         time.sleep(intervalo)
-        agora = time.time()
+        with ws_lock:
+            snapshot = dict(ws_state)
 
-        # Reportar todos os terminais mapeados — mesmo os que nunca se conectaram
-        for sn, tid in list(sn_to_terminal.items()):
-            nome = sn_to_nome.get(sn, sn)
-
-            with ws_lock:
-                estado = ws_state.get(sn)
-
-            if estado is None:
-                # Terminal nunca se ligou — reportar como offline
-                try:
-                    reportar_status_ws(app_id, api_key, tid, "offline", None, 0)
-                    logger.info(f"[REPORT-WS] '{nome}' (SN={sn}) → OFFLINE (nunca conectou)")
-                except Exception as e:
-                    logger.error(f"[REPORT-WS] Erro ao reportar '{nome}': {e}")
-                continue
-
+        for sn, estado in snapshot.items():
+            tid       = estado.get("terminal_id")
+            nome      = estado.get("nome", sn)
             connected = estado.get("connected", False)
             last_seen = estado.get("last_seen", 0)
             latencia  = estado.get("latencia_ms")
 
-            # Verificar timeout de heartbeat (sem mensagem > OFFLINE_TIMEOUT → offline)
-            if connected and last_seen > 0 and (agora - last_seen) > OFFLINE_TIMEOUT:
+            if not tid:
+                continue
+
+            # Verificar timeout de heartbeat
+            if connected and last_seen > 0 and (time.time() - last_seen) > OFFLINE_TIMEOUT:
                 with ws_lock:
                     if sn in ws_state:
                         ws_state[sn]["connected"] = False
                 connected = False
-                logger.info(f"[REPORT-WS] '{nome}' (SN={sn}) → timeout ({OFFLINE_TIMEOUT}s) → OFFLINE")
 
-            seg_offline = int(agora - last_seen) if not connected and last_seen > 0 else 0
+            seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
             status = "online" if connected else "offline"
 
             try:
@@ -354,7 +344,7 @@ if __name__ == "__main__":
 
     cfg = load_config()
     if not cfg:
-        logger.error("config.json ausente ou inválido. Verifique C:\\ProgramData\\TimmyWSServer\\config.json")
+        logger.error("config.json ausente ou inválido. Verifique C:\\ProgramData\\NOCMonitor\\config.json")
         sys.exit(1)
 
     if args.port:
@@ -441,7 +431,7 @@ export default function TimmyWsServerCode() {
 
       {/* Config */}
       <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
-        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\TimmyWSServer\config.json</p>
+        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\NOCMonitor\config.json</p>
         <p className="text-slate-700">{`{`}</p>
         <p className="text-slate-700 pl-4">{`"API_KEY": "a_sua_api_key_pessoal",`}</p>
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
@@ -476,11 +466,11 @@ export default function TimmyWsServerCode() {
       <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 space-y-1">
         <p className="font-semibold">⚡ Instalação no Windows Server</p>
         <p>1. Python 3.9+ → <code className="bg-emerald-100 px-1 rounded">pip install websockets requests</code></p>
-        <p>2. Copiar <code className="bg-emerald-100 px-1 rounded">timmy_ws_server.py</code> para <code className="bg-emerald-100 px-1 rounded">C:\Program Files\TimmyWSServer\</code></p>
-        <p>3. Criar <code className="bg-emerald-100 px-1 rounded">C:\ProgramData\TimmyWSServer\config.json</code> com API_KEY, APP_ID e WS_PORT</p>
+        <p>2. Copiar <code className="bg-emerald-100 px-1 rounded">timmy_ws_server.py</code> para <code className="bg-emerald-100 px-1 rounded">C:\Program Files\NOCMonitor\</code></p>
+        <p>3. Partilhar o <code className="bg-emerald-100 px-1 rounded">config.json</code> com o NOC Server (mesmo ficheiro)</p>
         <p>4. Instalar como serviço:</p>
         <code className="bg-emerald-100 px-2 py-1 rounded block">
-          nssm install TimmyWSServer "C:\Python311\python.exe" "C:\Program Files\TimmyWSServer\timmy_ws_server.py"
+          nssm install TimmyWSServer "C:\Python311\python.exe" "C:\Program Files\NOCMonitor\timmy_ws_server.py"
         </code>
         <code className="bg-emerald-100 px-2 py-1 rounded block mt-1">
           nssm start TimmyWSServer

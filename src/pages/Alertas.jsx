@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Plus, Trash2, ToggleLeft, ToggleRight, Mail, Zap, Clock, AlertTriangle, CheckCircle, Edit2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +29,6 @@ const GATILHO_ICONS = {
 export default function Alertas() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
-  const [userFilter, setUserFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
   const queryClient = useQueryClient();
 
@@ -42,23 +40,28 @@ export default function Alertas() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
-  const isAdmin = perms.isAdmin;
 
-  const { data: rules = [], isLoading } = useQuery({
-    queryKey: ['alert-rules', currentUser?.email],
+  const canSeeAll = perms.isAdmin;
+
+  const { data: allRules = [], isLoading } = useQuery({
+    queryKey: ['alert-rules'],
     queryFn: () => base44.entities.AlertRule.list('-created_date', 100),
     enabled: !!currentUser,
   });
+
+  const rules = useMemo(() => {
+    if (!currentUser) return [];
+    if (canSeeAll) return allRules;
+    return allRules.filter(r => r.created_by === currentUser.email);
+  }, [allRules, currentUser, canSeeAll]);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.AlertRule.delete(id),
     onSuccess: (_, id) => {
       const rule = rules.find(r => r.id === id);
       logAudit('alerta_excluido', id, `Regra de alerta "${rule?.nome || id}" excluída`);
-      queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
-      toast.success('Regra de alerta eliminada');
+      queryClient.invalidateQueries(['alert-rules']);
     },
-    onError: () => toast.error('Erro ao eliminar regra'),
   });
 
   const toggleMutation = useMutation({
@@ -66,10 +69,8 @@ export default function Alertas() {
     onSuccess: (_, { id, ativo }) => {
       const rule = rules.find(r => r.id === id);
       logAudit(ativo ? 'alerta_ativado' : 'alerta_desativado', id, `Regra "${rule?.nome || id}" ${ativo ? 'ativada' : 'desativada'}`);
-      queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
-      toast.success(ativo ? 'Regra ativada' : 'Regra desativada');
+      queryClient.invalidateQueries(['alert-rules']);
     },
-    onError: () => toast.error('Erro ao atualizar regra'),
   });
 
   const handleEdit = (rule) => {
@@ -82,19 +83,7 @@ export default function Alertas() {
     setModalOpen(true);
   };
 
-  // Utilizadores únicos para filtro admin
-  const usuarios = useMemo(() =>
-    [...new Set(rules.map(r => r.created_by).filter(Boolean))].sort(),
-    [rules]
-  );
-
-  // Filtrar regras por utilizador (admin only)
-  const filteredRules = useMemo(() => {
-    if (!isAdmin || userFilter === 'all') return rules;
-    return rules.filter(r => r.created_by === userFilter);
-  }, [rules, isAdmin, userFilter]);
-
-  const activeRules = filteredRules.filter(r => r.ativo).length;
+  const activeRules = rules.filter(r => r.ativo).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full overflow-x-hidden">
@@ -110,17 +99,7 @@ export default function Alertas() {
               <p className="text-sm text-slate-500">{activeRules} regra(s) ativa(s)</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            {isAdmin && usuarios.length > 0 && (
-              <select
-                value={userFilter}
-                onChange={e => setUserFilter(e.target.value)}
-                className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <option value="all">Todos os utilizadores</option>
-                {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
             <BrowserNotificationToggle />
             {perms.pode_configurar_alertas && (
               <Button onClick={handleNew} className="bg-slate-900 hover:bg-slate-800 text-white gap-2">
@@ -132,7 +111,7 @@ export default function Alertas() {
         </div>
 
         {/* Empty state */}
-        {!isLoading && filteredRules.length === 0 && (
+        {!isLoading && rules.length === 0 && (
           <Card className="bg-white/80 border-slate-200/50">
             <CardContent className="py-16 text-center">
               <Bell className="h-12 w-12 mx-auto mb-4 text-slate-300" />
@@ -150,7 +129,7 @@ export default function Alertas() {
         {/* Rules list */}
         <div className="space-y-3">
           <AnimatePresence>
-            {filteredRules.map((rule, index) => {
+            {rules.map((rule, index) => {
               const Icon = GATILHO_ICONS[rule.gatilho] || Bell;
               return (
                 <motion.div
@@ -266,8 +245,7 @@ export default function Alertas() {
                 ? `Regra "${editingRule?.nome}" editada`
                 : `Nova regra de alerta "${result?.nome || ''}" criada`
             );
-            queryClient.invalidateQueries({ queryKey: ['alert-rules'] });
-            toast.success(isEdit ? 'Regra de alerta atualizada' : 'Regra de alerta criada');
+            queryClient.invalidateQueries(['alert-rules']);
             setModalOpen(false);
             setEditingRule(null);
           }}

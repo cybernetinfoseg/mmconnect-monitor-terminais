@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
@@ -62,7 +62,6 @@ function formatFrequencia(sched) {
 export default function Agendamentos() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [userFilter, setUserFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
   const [runningId, setRunningId] = useState(null);
   const queryClient = useQueryClient();
@@ -72,22 +71,24 @@ export default function Agendamentos() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
-  const isAdmin = perms.isAdmin;
+  const canSeeAll = perms.isAdmin;
 
-  const { data: schedules = [], isLoading } = useQuery({
-    queryKey: ['scheduled-actions', currentUser?.email],
+  const { data: allSchedules = [], isLoading } = useQuery({
+    queryKey: ['scheduled-actions'],
     queryFn: () => base44.entities.ScheduledAction.list('-created_date', 100),
     refetchInterval: 30000,
     enabled: !!currentUser,
   });
 
+  const schedules = useMemo(() => {
+    if (!currentUser) return [];
+    if (canSeeAll) return allSchedules;
+    return allSchedules.filter(s => s.criado_por === currentUser.email);
+  }, [allSchedules, currentUser, canSeeAll]);
+
   const toggleMutation = useMutation({
     mutationFn: ({ id, ativo }) => base44.entities.ScheduledAction.update(id, { ativo }),
-    onSuccess: (_, { ativo }) => {
-      queryClient.invalidateQueries({ queryKey: ['scheduled-actions'] });
-      toast.success(ativo ? 'Agendamento ativado' : 'Agendamento pausado');
-    },
-    onError: () => toast.error('Erro ao atualizar agendamento'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['scheduled-actions'] }),
   });
 
   const deleteMutation = useMutation({
@@ -96,7 +97,6 @@ export default function Agendamentos() {
       queryClient.invalidateQueries({ queryKey: ['scheduled-actions'] });
       toast.success('Agendamento eliminado');
     },
-    onError: () => toast.error('Erro ao eliminar agendamento'),
   });
 
   const handleRunNow = async (sched) => {
@@ -139,16 +139,8 @@ export default function Agendamentos() {
     toast.success('Agendamento guardado');
   };
 
-  // Utilizadores únicos para filtro admin
-  const usuarios = [...new Set(schedules.map(s => s.criado_por).filter(Boolean))].sort();
-
-  // Schedules filtrados por utilizador (admin only)
-  const schedulesFiltrados = isAdmin && userFilter !== 'all'
-    ? schedules.filter(s => s.criado_por === userFilter)
-    : schedules;
-
-  const ativos = schedulesFiltrados.filter(s => s.ativo);
-  const inativos = schedulesFiltrados.filter(s => !s.ativo);
+  const ativos = schedules.filter(s => s.ativo);
+  const inativos = schedules.filter(s => !s.ativo);
 
   const ScheduleCard = ({ sched, index }) => (
     <motion.div
@@ -252,23 +244,11 @@ export default function Agendamentos() {
             <p className="text-sm text-slate-500">Ações remotas automáticas nos terminais</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {isAdmin && usuarios.length > 0 && (
-            <select
-              value={userFilter}
-              onChange={e => setUserFilter(e.target.value)}
-              className="h-9 rounded-md border border-input bg-white px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="all">Todos os utilizadores</option>
-              {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
-          )}
-          <Button onClick={() => { setEditItem(null); setModalOpen(true); }} className="gap-2">
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Novo Agendamento</span>
-            <span className="sm:hidden">Novo</span>
-          </Button>
-        </div>
+        <Button onClick={() => { setEditItem(null); setModalOpen(true); }} className="gap-2">
+          <Plus className="h-4 w-4" />
+          <span className="hidden sm:inline">Novo Agendamento</span>
+          <span className="sm:hidden">Novo</span>
+        </Button>
       </div>
 
       {/* Info */}

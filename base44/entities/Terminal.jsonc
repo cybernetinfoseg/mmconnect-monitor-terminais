@@ -137,9 +137,6 @@
           "created_by": "{{user.email}}"
         },
         {
-          "usuario_email": "{{user.email}}"
-        },
-        {
           "user_condition": {
             "role": "admin"
           }
@@ -150,9 +147,6 @@
       "$or": [
         {
           "created_by": "{{user.email}}"
-        },
-        {
-          "usuario_email": "{{user.email}}"
         },
         {
           "user_condition": {
