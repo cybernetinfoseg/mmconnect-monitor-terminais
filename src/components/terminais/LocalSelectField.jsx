@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
-export default function LocalSelectField({ locais, value, onChange, onRefresh }) {
+export default function LocalSelectField({ locais, value, onChange, onRefresh, isAdmin = false }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editVal, setEditVal] = useState('');
@@ -90,12 +90,19 @@ export default function LocalSelectField({ locais, value, onChange, onRefresh })
                 </>
               ) : (
                 <>
-                  <span
-                    className={cn("flex-1 text-sm cursor-pointer truncate px-1 py-1 rounded", value === l.nome ? "font-semibold text-blue-600" : "text-slate-700")}
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer px-1 py-1 rounded"
                     onClick={() => { onChange(l.nome); setOpen(false); }}
                   >
-                    {l.nome}
-                  </span>
+                    <span className={cn("text-sm block truncate", value === l.nome ? "font-semibold text-blue-600" : "text-slate-700")}>
+                      {l.nome}
+                    </span>
+                    {isAdmin && l.created_by && (
+                      <span className="text-[10px] text-slate-400 truncate block leading-tight">
+                        {l.created_by}
+                      </span>
+                    )}
+                  </div>
                   <Button type="button" variant="ghost" size="sm" onClick={e => { e.stopPropagation(); handleEdit(l); }} className="h-7 w-7 p-0 text-slate-300 hover:text-blue-500 shrink-0">
                     <Pencil className="h-3 w-3" />
                   </Button>
