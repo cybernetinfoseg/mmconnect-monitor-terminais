@@ -1,10 +1,5 @@
-import React, { useState } from 'react';
-import { Copy, Check, Download, Server, ChevronDown, ChevronUp } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
-
-const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket Cloud (Protocolo Timmy/THbio)
-# ✅ VERSÃO CORRIGIDA: Sistema de Futures para controlo remoto
+# timmy_ws_server.py — NOC Monitor: Servidor WebSocket Cloud (Protocolo Timmy/THbio)
+# ✅ VERSÃO CORRIGIDA: Sistema de Futures para correlacionar respostas com comandos
 # Compatível com: Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros modelos THbio
 # Protocolo: WebSocket + JSON (RFC 6455) — porta padrão 7788 (configurável)
 #
@@ -13,7 +8,7 @@ const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket 
 #   2. cmd:"sendlog" — logs de presença em tempo real (heartbeat implícito)
 #   3. Heartbeat a cada 3s (configurável no terminal)
 #
-# Config: C:\\ProgramData\\TimmyWSServer\\config.json
+# Config: C:\ProgramData\TimmyWSServer\config.json
 # {
 #   "API_KEY": "a_sua_api_key_pessoal",
 #   "APP_ID":  "697aa46c9998c30665e2e19a",
@@ -22,12 +17,12 @@ const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket 
 #
 # Instalação (Windows):
 #   pip install websockets requests
-#   nssm install TimmyWSServer "C:\\Python311\\python.exe" "C:\\Program Files\\TimmyWSServer\\timmy_ws_server.py"
+#   nssm install TimmyWSServer "C:\Python311\python.exe" "C:\Program Files\TimmyWSServer\timmy_ws_server.py"
 #   nssm start TimmyWSServer
 #
 # Configuração no terminal Timmy:
 #   MENU → Comm Set → Server → Server Req: Yes
-#   Use domainNm: Yes → DomainNm: SEU_IP_OU_DOMINIO
+#   Use domainNm: Yes → DomainNm: 51.91.219.145
 #   SerPortNo: 7788
 #   Heartbeat: 3s
 #   Server approval: No
@@ -47,7 +42,7 @@ except ImportError:
 # ──────────────────────────────────────────────────────────────
 # Constantes e Paths
 # ──────────────────────────────────────────────────────────────
-PROGRAMDATA  = os.environ.get("PROGRAMDATA", r"C:\\ProgramData")
+PROGRAMDATA  = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
 APP_DIR      = os.path.join(PROGRAMDATA, "TimmyWSServer")
 CONFIG_FILE  = os.path.join(APP_DIR, "config.json")
 LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
@@ -125,13 +120,11 @@ def reportar_status_ws(app_id, api_key, terminal_id, status, latencia_ms=None, s
 # ──────────────────────────────────────────────────────────────
 # Handler WebSocket por terminal conectado
 # ──────────────────────────────────────────────────────────────
-async def handle_terminal(websocket):
+async def handle_terminal(websocket, path=None):
     """Trata uma ligação WebSocket de um terminal Timmy."""
     peer = websocket.remote_address
     sn   = None
     logger.info(f"[WS] Nova ligação de {peer[0]}:{peer[1]}")
-    # Fila de respostas esperadas para comandos enviados pelo NOC Monitor
-    pending_responses = {}  # cmd → asyncio.Future
 
     try:
         async for raw_msg in websocket:
@@ -143,6 +136,7 @@ async def handle_terminal(websocket):
 
             cmd = msg.get("cmd", "")
             msg_sn = msg.get("sn", "")
+            ret = msg.get("ret", "")
 
             if cmd == "reg":
                 # Terminal registou-se: { cmd:"reg", sn:"ZX...", cpusn:"...", devinfo:{...} }
@@ -177,7 +171,7 @@ async def handle_terminal(websocket):
                         "latencia_ms": None,
                     }
 
-                # Responder ao terminal com a hora atual do servidor
+                # Responder ao terminal com a hora actual do servidor
                 await websocket.send(json.dumps({
                     "ret": "reg",
                     "result": True,
@@ -497,179 +491,10 @@ if __name__ == "__main__":
 
     cfg = load_config()
     if not cfg:
-        logger.error("config.json ausente ou inválido. Verifique C:\\ProgramData\\TimmyWSServer\\config.json")
+        logger.error("config.json ausente ou inválido. Verifique C:\ProgramData\TimmyWSServer\config.json")
         sys.exit(1)
 
     if args.port:
         cfg["WS_PORT"] = args.port
 
     sys.exit(run(cfg) or 0)
-`;
-
-const SECTIONS = [
-  {
-    key: 'ws',
-    label: 'WebSocket Persistente',
-    color: 'violet',
-    badge: 'WS',
-    desc: 'Terminal conecta via WebSocket e mantém ligação permanente. Heartbeat a cada 3s.',
-  },
-  {
-    key: 'reg',
-    label: 'Registo Automático',
-    color: 'blue',
-    badge: 'REG',
-    desc: 'Terminal envia cmd:"reg" com SN, modelo e firmware ao conectar. Identificação por SN.',
-  },
-  {
-    key: 'log',
-    label: 'Logs em Tempo Real',
-    color: 'emerald',
-    badge: 'LOG',
-    desc: 'cmd:"sendlog" — logs de presença enviados imediatamente (impressão digital, face, RFID).',
-  },
-];
-
-const MODELS = [
-  'TM-AI07F', 'TM-AIFace11F', 'TM-AI08', 'TFS30', 'TFS50', 'TM3800', 'TM20',
-];
-
-export default function TimmyWsServerCode() {
-  const [copied, setCopied] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(TIMMY_WS_CODE);
-    setCopied(true);
-    toast.success('Código copiado!');
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleDownload = () => {
-    const blob = new Blob([TIMMY_WS_CODE], { type: 'text/plain' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = 'timmy_ws_server.py';
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success('timmy_ws_server.py descarregado!');
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Modelos compatíveis */}
-      <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg">
-        <p className="text-xs font-semibold text-violet-800 mb-2">📱 Modelos Timmy/THbio compatíveis</p>
-        <div className="flex flex-wrap gap-1.5">
-          {MODELS.map(m => (
-            <span key={m} className="text-xs bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full font-mono">{m}</span>
-          ))}
-          <span className="text-xs bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full">e outros modelos THbio...</span>
-        </div>
-      </div>
-
-      {/* Modos */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {SECTIONS.map(s => (
-          <div key={s.key} className={`p-3 rounded-xl border bg-${s.color}-50 border-${s.color}-200 space-y-1`}>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full bg-${s.color}-200 text-${s.color}-800`}>{s.badge}</span>
-              <span className={`font-semibold text-sm text-${s.color}-900`}>{s.label}</span>
-            </div>
-            <p className={`text-xs text-${s.color}-700`}>{s.desc}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Config */}
-      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
-        <p className="text-slate-500 font-sans font-semibold mb-2 text-xs">📄 C:\ProgramData\TimmyWSServer\config.json</p>
-        <p className="text-slate-700">{`{`}</p>
-        <p className="text-slate-700 pl-4">{`"API_KEY": "a_sua_api_key_pessoal",`}</p>
-        <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
-        <p className="text-slate-700 pl-4 font-semibold text-violet-700">{`"WS_PORT": 7788,`}</p>
-        <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"CTRL_PORT": 7789,`}</p>
-        <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 30`}</p>
-        <p className="text-slate-700">{`}`}</p>
-      </div>
-
-      {/* Firewall */}
-      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
-        <p className="font-semibold">🔥 Portas a abrir no Firewall Windows</p>
-        <p>• <strong>7788 TCP</strong> — WebSocket entrada dos terminais (WS_PORT)</p>
-        <p>• <strong>7789 TCP</strong> — HTTP controlo remoto NOC Monitor (CTRL_PORT) — <em>apenas acessível pelo Base44</em></p>
-        <p className="text-amber-700">Configure em: <em>Windows Defender Firewall → Regras de Entrada → Nova Regra → Porta TCP → 7788, 7789</em></p>
-      </div>
-
-      {/* Configuração no terminal */}
-      <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg text-xs text-violet-800 space-y-2">
-        <p className="font-semibold">⚙️ Configuração no terminal Timmy</p>
-        <p>Aceda ao terminal: <strong>MENU → Comm Set → Server</strong></p>
-        <div className="font-mono bg-violet-100 px-2 py-2 rounded space-y-0.5">
-          <p>Server Req: <strong>Yes</strong></p>
-          <p>Use domainNm: <strong>Yes</strong> (ou No se usar IP)</p>
-          <p>DomainNm: <strong>SEU_IP_OU_DOMINIO</strong></p>
-          <p>SerPortNo: <strong>7788</strong></p>
-          <p>Heartbeat: <strong>3s</strong></p>
-          <p>Server approval: <strong>No</strong></p>
-        </div>
-        <p className="text-violet-700">⚠️ O <strong>número de série (SN)</strong> do terminal deve ser registado no painel NOC Monitor ao criar o terminal (campo "Número de Série"). Aceda ao SN via: <em>MENU → Sys Info → Info → SN</em></p>
-      </div>
-
-      {/* Passos instalação */}
-      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800 space-y-1">
-        <p className="font-semibold">⚡ Instalação no Windows Server</p>
-        <p>1. Python 3.9+ → <code className="bg-emerald-100 px-1 rounded">pip install websockets requests</code></p>
-        <p>2. Copiar <code className="bg-emerald-100 px-1 rounded">timmy_ws_server.py</code> para <code className="bg-emerald-100 px-1 rounded">C:\Program Files\TimmyWSServer\</code></p>
-        <p>3. Criar <code className="bg-emerald-100 px-1 rounded">C:\ProgramData\TimmyWSServer\config.json</code> (separado do NOC Server)</p>
-        <p>4. Instalar como serviço:</p>
-        <code className="bg-emerald-100 px-2 py-1 rounded block">
-          nssm install TimmyWSServer "C:\Python311\python.exe" "C:\Program Files\TimmyWSServer\timmy_ws_server.py"
-        </code>
-        <code className="bg-emerald-100 px-2 py-1 rounded block mt-1">
-          nssm start TimmyWSServer
-        </code>
-      </div>
-
-      {/* Adicionar terminal no NOC Monitor */}
-      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
-        <p className="font-semibold">📋 Como adicionar um terminal Timmy no NOC Monitor</p>
-        <ol className="list-decimal list-inside space-y-0.5">
-          <li>Ir a <strong>Terminais → Adicionar Terminal</strong></li>
-          <li>Seleccionar <strong>Fabricante: Timmy</strong></li>
-          <li>Seleccionar <strong>Tipo de Conexão: WebSocket Cloud</strong></li>
-          <li>Inserir o <strong>Número de Série (SN)</strong> do terminal</li>
-          <li>Reiniciar o <code className="bg-blue-100 px-1 rounded">timmy_ws_server.py</code> para carregar o novo terminal</li>
-        </ol>
-      </div>
-
-      {/* Botões download */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-          <Server className="h-4 w-4 text-slate-500" />
-          timmy_ws_server.py — Servidor WebSocket Cloud
-        </p>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setExpanded(v => !v)}>
-            {expanded ? <><ChevronUp className="h-4 w-4 mr-1" />Ocultar</> : <><ChevronDown className="h-4 w-4 mr-1" />Ver código</>}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDownload}>
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleCopy}>
-            {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-            {copied ? 'Copiado!' : 'Copiar'}
-          </Button>
-        </div>
-      </div>
-
-      {expanded && (
-        <pre className="bg-slate-900 text-emerald-400 p-4 rounded-lg text-xs overflow-x-auto max-h-[600px] overflow-y-auto font-mono leading-relaxed whitespace-pre">
-          {TIMMY_WS_CODE}
-        </pre>
-      )}
-    </div>
-  );
-}
