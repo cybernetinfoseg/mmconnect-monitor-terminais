@@ -33,6 +33,7 @@ const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket 
 
 import os, sys, json, time, logging, asyncio, threading
 from logging.handlers import RotatingFileHandler
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 
 try:
@@ -50,8 +51,9 @@ APP_DIR      = os.path.join(PROGRAMDATA, "TimmyWSServer")
 CONFIG_FILE  = os.path.join(APP_DIR, "config.json")
 LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
 
-DEFAULT_WS_PORT  = 7788
-OFFLINE_TIMEOUT  = 15    # segundos sem mensagem → offline
+DEFAULT_WS_PORT   = 7788
+DEFAULT_CTRL_PORT = 7789  # porta HTTP de controlo (NOC Monitor → servidor → terminal)
+OFFLINE_TIMEOUT   = 15    # segundos sem mensagem → offline
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
 logger = logging.getLogger("timmy_ws")
@@ -63,6 +65,11 @@ ws_lock  = threading.Lock()
 # Mapa SN → terminal_id (carregado da API)
 sn_to_terminal = {}
 sn_to_nome     = {}
+
+# Mapa SN → websocket ativo (para enviar comandos)
+# { sn: websocket_object }
+ws_connections = {}
+ws_conn_lock   = threading.Lock()
 
 
 # ──────────────────────────────────────────────────────────────
@@ -119,6 +126,8 @@ async def handle_terminal(websocket):
     peer = websocket.remote_address
     sn   = None
     logger.info(f"[WS] Nova ligação de {peer[0]}:{peer[1]}")
+    # Fila de respostas esperadas para comandos enviados pelo NOC Monitor
+    pending_responses = {}  # cmd → asyncio.Future
 
     try:
         async for raw_msg in websocket:
@@ -142,7 +151,6 @@ async def handle_terminal(websocket):
 
                 if not tid:
                     logger.warning(f"[WS] SN={sn} não mapeado — adicione o número de série no painel NOC Monitor")
-                    # Responder mesmo assim para não recusar o terminal
                     await websocket.send(json.dumps({
                         "ret": "reg",
                         "result": True,
@@ -150,6 +158,10 @@ async def handle_terminal(websocket):
                         "nosenduser": True
                     }))
                     continue
+
+                # Guardar referência da sessão WS activa para controlo remoto
+                with ws_conn_lock:
+                    ws_connections[sn] = websocket
 
                 # Marcar online
                 with ws_lock:
@@ -178,7 +190,6 @@ async def handle_terminal(websocket):
                 records = msg.get("record", [])
                 logindex = msg.get("logindex", 0)
 
-                # Actualizar estado
                 if sn and sn in sn_to_terminal:
                     with ws_lock:
                         if sn in ws_state:
@@ -187,7 +198,6 @@ async def handle_terminal(websocket):
 
                 logger.info(f"[WS] SENDLOG SN={sn} count={count} logindex={logindex}")
 
-                # Responder ao terminal
                 await websocket.send(json.dumps({
                     "ret": "sendlog",
                     "result": True,
@@ -198,7 +208,6 @@ async def handle_terminal(websocket):
                 }))
 
             elif cmd == "senduser":
-                # Terminal enviou dados de utilizador
                 if not sn: sn = msg_sn
                 logger.debug(f"[WS] SENDUSER SN={sn} enrollid={msg.get('enrollid')}")
                 await websocket.send(json.dumps({
@@ -208,25 +217,139 @@ async def handle_terminal(websocket):
                 }))
 
             else:
-                # Comando desconhecido — responder genérico
-                logger.debug(f"[WS] CMD desconhecido: {cmd} de SN={msg_sn}")
-                if "ret" not in msg:
-                    await websocket.send(json.dumps({
-                        "ret": cmd,
-                        "result": True
-                    }))
+                # Pode ser uma resposta a um comando enviado pelo NOC Monitor
+                ret = msg.get("ret", "")
+                if ret and ret in pending_responses:
+                    fut = pending_responses.pop(ret)
+                    if not fut.done():
+                        fut.get_loop().call_soon_threadsafe(fut.set_result, msg)
+                    logger.debug(f"[WS] Resposta ao comando '{ret}' recebida de SN={sn}: {msg}")
+                else:
+                    logger.debug(f"[WS] CMD desconhecido: {cmd} de SN={msg_sn}")
+                    if "ret" not in msg:
+                        await websocket.send(json.dumps({
+                            "ret": cmd,
+                            "result": True
+                        }))
 
     except Exception as e:
         if "ConnectionClosed" not in type(e).__name__:
             logger.error(f"[WS] Erro com {peer[0]}: {e}")
     finally:
         if sn:
+            with ws_conn_lock:
+                if ws_connections.get(sn) is websocket:
+                    del ws_connections[sn]
             with ws_lock:
                 if sn in ws_state:
                     ws_state[sn]["connected"] = False
             logger.info(f"[WS] Ligação encerrada: SN={sn} ({peer[0]})")
         else:
             logger.info(f"[WS] Ligação encerrada: {peer[0]} (sem registo)")
+
+
+# ──────────────────────────────────────────────────────────────
+# Servidor HTTP de Controlo (porta 7789)
+# NOC Monitor → POST /cmd { sn, command } → WS → Terminal → resposta
+# ──────────────────────────────────────────────────────────────
+
+# Loop asyncio global (partilhado entre thread HTTP e WS)
+_loop = None
+
+class CtrlHandler(BaseHTTPRequestHandler):
+    """Recebe comandos do NOC Monitor e faz relay via WebSocket ao terminal."""
+
+    def log_message(self, fmt, *args):
+        pass  # silenciar logs HTTP
+
+    def do_POST(self):
+        if self.path != "/cmd":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        body   = self.rfile.read(length)
+        try:
+            payload = json.loads(body)
+        except Exception:
+            self._respond(400, {"success": False, "error": "JSON inválido"})
+            return
+
+        sn      = (payload.get("sn") or "").strip()
+        command = payload.get("command")
+
+        if not sn or not command:
+            self._respond(400, {"success": False, "error": "sn e command são obrigatórios"})
+            return
+
+        with ws_conn_lock:
+            ws = ws_connections.get(sn)
+
+        if not ws:
+            self._respond(503, {"success": False, "error": f"Terminal SN={sn} não está conectado ao servidor WebSocket"})
+            return
+
+        # Enviar comando ao terminal via WS e aguardar resposta (com timeout)
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                self._send_and_wait(ws, command),
+                _loop
+            )
+            result = future.result(timeout=10)
+            self._respond(200, {"success": True, "result": result})
+        except Exception as e:
+            self._respond(500, {"success": False, "error": str(e)})
+
+    async def _send_and_wait(self, ws, command):
+        """Envia comando e aguarda a resposta do terminal."""
+        cmd_key = command.get("cmd", "")
+        await ws.send(json.dumps(command))
+        # Aguardar resposta (ret == cmd_key) por até 9 segundos
+        deadline = asyncio.get_event_loop().time() + 9
+        while asyncio.get_event_loop().time() < deadline:
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=2)
+                msg = json.loads(raw)
+                if msg.get("ret") == cmd_key or msg.get("cmd") == cmd_key:
+                    return msg
+                # recolocar mensagem no fluxo normal ignorando (já foi processada)
+            except asyncio.TimeoutError:
+                continue
+            except Exception as e:
+                raise Exception(f"Erro ao aguardar resposta do terminal: {e}")
+        raise Exception(f"Timeout — terminal não respondeu ao comando '{cmd_key}' em 9s")
+
+    def do_GET(self):
+        if self.path == "/status":
+            with ws_conn_lock:
+                connected_sns = list(ws_connections.keys())
+            self._respond(200, {"connected_terminals": connected_sns, "count": len(connected_sns)})
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def _respond(self, code, data):
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", len(body))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def start_ctrl_server(port, stop_event):
+    """Inicia o servidor HTTP de controlo numa thread dedicada."""
+    try:
+        server = HTTPServer(("0.0.0.0", port), CtrlHandler)
+        server.timeout = 1
+        logger.info(f"[CTRL] Servidor HTTP de controlo activo em http://0.0.0.0:{port}/cmd")
+        logger.info(f"[CTRL] O NOC Monitor envia comandos via POST /cmd {{sn, command}}")
+        while not stop_event.is_set():
+            server.handle_request()
+        server.server_close()
+    except Exception as e:
+        logger.error(f"[CTRL] Erro no servidor HTTP de controlo: {e}")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -272,10 +395,13 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
 # Main
 # ──────────────────────────────────────────────────────────────
 async def main_async(app_id, api_key, ws_port, stop_event):
+    global _loop
+    _loop = asyncio.get_event_loop()
     async with serve(handle_terminal, "0.0.0.0", ws_port) as server:
         logger.info("=" * 65)
         logger.info(f"  Timmy WebSocket Server — NOC Monitor")
-        logger.info(f"  Porta WebSocket: {ws_port}")
+        logger.info(f"  Porta WebSocket (terminais): {ws_port}")
+        logger.info(f"  Porta HTTP controlo (NOC Monitor): {ws_port + 1}")
         logger.info(f"  Terminais mapeados: {len(sn_to_terminal)}")
         logger.info("=" * 65)
         await asyncio.get_event_loop().run_in_executor(None, stop_event.wait)
@@ -285,9 +411,10 @@ def run(config, stop_event=None):
     if stop_event is None:
         stop_event = threading.Event()
 
-    app_id   = config["APP_ID"]
-    api_key  = config["API_KEY"]
-    ws_port  = config.get("WS_PORT", DEFAULT_WS_PORT)
+    app_id    = config["APP_ID"]
+    api_key   = config["API_KEY"]
+    ws_port   = config.get("WS_PORT", DEFAULT_WS_PORT)
+    ctrl_port = config.get("CTRL_PORT", DEFAULT_CTRL_PORT)
     intervalo = config.get("INTERVALO_REPORT", 30)
 
     # Carregar terminais websocket_cloud
@@ -314,7 +441,15 @@ def run(config, stop_event=None):
     )
     t_report.start()
 
-    # Servidor WebSocket (asyncio)
+    # Thread do servidor HTTP de controlo (NOC Monitor → terminal)
+    t_ctrl = threading.Thread(
+        target=start_ctrl_server,
+        args=(ctrl_port, stop_event),
+        name="ctrl-http", daemon=True
+    )
+    t_ctrl.start()
+
+    # Servidor WebSocket (asyncio — bloqueia aqui)
     try:
         asyncio.run(main_async(app_id, api_key, ws_port, stop_event))
     except KeyboardInterrupt:
@@ -436,6 +571,7 @@ export default function TimmyWsServerCode() {
         <p className="text-slate-700 pl-4">{`"API_KEY": "a_sua_api_key_pessoal",`}</p>
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
         <p className="text-slate-700 pl-4 font-semibold text-violet-700">{`"WS_PORT": 7788,`}</p>
+        <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"CTRL_PORT": 7789,`}</p>
         <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 30`}</p>
         <p className="text-slate-700">{`}`}</p>
       </div>
@@ -443,8 +579,9 @@ export default function TimmyWsServerCode() {
       {/* Firewall */}
       <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
         <p className="font-semibold">🔥 Portas a abrir no Firewall Windows</p>
-        <p>• <strong>7788 TCP</strong> (ou o porto configurado em WS_PORT) — WebSocket entrada dos terminais</p>
-        <p className="text-amber-700">Configure em: <em>Windows Defender Firewall → Regras de Entrada → Nova Regra → Porta TCP → 7788</em></p>
+        <p>• <strong>7788 TCP</strong> — WebSocket entrada dos terminais (WS_PORT)</p>
+        <p>• <strong>7789 TCP</strong> — HTTP controlo remoto NOC Monitor (CTRL_PORT) — <em>apenas acessível pelo Base44</em></p>
+        <p className="text-amber-700">Configure em: <em>Windows Defender Firewall → Regras de Entrada → Nova Regra → Porta TCP → 7788, 7789</em></p>
       </div>
 
       {/* Configuração no terminal */}

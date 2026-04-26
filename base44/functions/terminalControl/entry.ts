@@ -19,46 +19,54 @@ function nowStr() {
   return new Date().toISOString().replace('T', ' ').substring(0, 19);
 }
 
-function buildTimmyWsUrl(terminal) {
-  const host = terminal.ip_publico || terminal.dns || '51.91.219.145';
-  const port = terminal.porta || 7788;
-  return `ws://${host}:${port}`;
+/**
+ * buildTimmyCtrlUrl — URL do servidor HTTP de controlo Timmy (porta 7789)
+ */
+function buildTimmyCtrlUrl(terminal) {
+  const host = terminal.ip_publico || terminal.dns;
+  if (!host) return null;
+  const ctrlPort = 7789;
+  return `http://${host}:${ctrlPort}/cmd`;
 }
 
+/**
+ * sendTimmyCommand — envia comando ao timmy_ws_server.py via HTTP (porta 7789).
+ * O servidor mantém a sessão WebSocket com o terminal e faz o relay do comando.
+ * 
+ * Fluxo: Base44 → POST http://<servidor>:7789/cmd → timmy_ws_server.py → WS → Terminal → resposta
+ * 
+ * O campo "ip_publico" ou "dns" do terminal deve apontar para o Windows Server
+ * onde o timmy_ws_server.py está a correr.
+ */
 async function sendTimmyCommand(terminal, command) {
-  // Timmy WebSocket Cloud: abre WS nativo Deno, envia comando, aguarda resposta
-  const wsUrl = buildTimmyWsUrl(terminal);
+  const host = terminal.ip_publico || terminal.dns;
+  if (!host) {
+    throw new Error('IP/DNS do servidor Timmy não configurado no terminal. Preencha o campo "IP Público" com o IP do Windows Server.');
+  }
+  const ctrlPort = 7789; // porta HTTP de controlo do timmy_ws_server.py
+  const sn = terminal.numero_serie || '';
+  if (!sn) {
+    throw new Error('Número de série (SN) não configurado no terminal.');
+  }
 
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl);
-    const timeout = setTimeout(() => {
-      ws.close();
-      reject(new Error('Timeout — terminal não respondeu em 8s'));
-    }, 8000);
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify(command));
-    };
-
-    ws.onmessage = (event) => {
-      clearTimeout(timeout);
-      ws.close();
-      try {
-        resolve(JSON.parse(event.data));
-      } catch {
-        resolve({ result: true, raw: event.data });
-      }
-    };
-
-    ws.onerror = (err) => {
-      clearTimeout(timeout);
-      reject(new Error(`WS erro: ${err.message || 'conexão falhou'}`));
-    };
-
-    ws.onclose = () => {
-      clearTimeout(timeout);
-    };
+  const url = `http://${host}:${ctrlPort}/cmd`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sn, command }),
+    signal: AbortSignal.timeout(12000),
   });
+
+  if (!resp.ok) {
+    const errBody = await resp.text().catch(() => '');
+    throw new Error(`Servidor Timmy respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
+  }
+
+  const data = await resp.json();
+  if (!data.success) {
+    throw new Error(data.error || 'Servidor Timmy não conseguiu enviar o comando ao terminal');
+  }
+  return data.result || { result: true };
 }
 
 function buildTerminalBaseUrl(terminal) {
@@ -230,17 +238,9 @@ async function actionOpenDoor(terminal) {
 
 async function actionReboot(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const wsUrl = buildTimmyWsUrl(terminal);
-    await new Promise((resolve) => {
-      const ws = new WebSocket(wsUrl);
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ cmd: 'reboot' }));
-        setTimeout(() => { ws.close(); resolve(); }, 1000);
-      };
-      ws.onerror = () => resolve();
-      setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 5000);
-    });
-    return { success: true, message: 'Comando de reinício enviado. Terminal reiniciará imediatamente.' };
+    // reboot: terminal fecha WS após receber, por isso pode não haver resposta — aceitamos sempre como sucesso
+    const resp = await sendTimmyCommand(terminal, { cmd: 'reboot' }).catch(() => ({ result: true }));
+    return { success: true, message: 'Comando de reinício enviado. Terminal reiniciará imediatamente.', data: resp };
   }
 
   if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
