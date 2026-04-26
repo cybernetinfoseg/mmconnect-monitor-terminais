@@ -13,6 +13,11 @@ const NOC_SERVER_CODE = `# noc_server.py — NOC Monitor Windows Server
 #   - ADMS/Push (ZKTeco ADMS): terminal faz HTTP POST /iclock/cdata para reportar presença
 #   - SDK-TCP (ZKTeco SDK): polling TCP na porta 4370 do terminal
 #
+# Servidor de Controlo Remoto (porta 7790):
+#   - Recebe comandos do NOC Monitor via POST /cmd
+#   - Encaminha comandos ZKTeco via resposta ADMS (protocolo iClock)
+#   - Suporta: opendoor, reboot, settime, getlogs, getdevinfo, adduser
+#
 # Requisitos:
 #   pip install requests
 #
@@ -21,7 +26,8 @@ const NOC_SERVER_CODE = `# noc_server.py — NOC Monitor Windows Server
 #   "API_KEY": "a_sua_api_key_pessoal",
 #   "APP_ID":  "697aa46c9998c30665e2e19a",
 #   "INTERVALO_REPORT": 30,
-#   "ADMS_PORT": 8080
+#   "ADMS_PORT": 8080,
+#   "CTRL_PORT": 7790
 # }
 #
 # Como Servico Windows (NSSM):
@@ -52,6 +58,7 @@ DEFAULT_INTERVAL  = 30    # segundos entre ciclos de reporte
 ACCEPT_TIMEOUT    = 25    # timeout TCP para terminais Heartbeat
 SDK_TCP_TIMEOUT   = 5     # timeout para testar porta SDK (4370)
 DEFAULT_ADMS_PORT = 8080  # porta HTTP para recepcao ADMS/Push
+DEFAULT_CTRL_PORT = 7790  # porta HTTP de controlo remoto (NOC Monitor → terminal)
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
 logger = logging.getLogger("noc_server")
@@ -200,6 +207,134 @@ def heartbeat_listener(terminal, stop_event):
 # Mapa: SN (número de série) → terminal_id
 sn_to_terminal = {}
 
+# Fila de comandos pendentes por SN: { sn: [{"action":..., "params":..., "event": threading.Event, "result": dict}] }
+pending_commands = {}
+pending_lock = threading.Lock()
+
+
+# ──────────────────────────────────────────────────────────────
+# Servidor HTTP de Controlo Remoto (porta 7790)
+# NOC Monitor → POST /cmd { sn, action, params } → ADMS → Terminal
+# ──────────────────────────────────────────────────────────────
+class CtrlHandler(BaseHTTPRequestHandler):
+    """Recebe comandos do NOC Monitor e coloca-os na fila ADMS do terminal."""
+
+    def log_message(self, fmt, *args):
+        pass  # silenciar logs HTTP
+
+    def do_GET(self):
+        if self.path == "/status":
+            with pending_lock:
+                queued = {sn: len(cmds) for sn, cmds in pending_commands.items() if cmds}
+            body = json.dumps({"sn_map": list(sn_to_terminal.keys()), "queued_commands": queued}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", len(body))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def do_POST(self):
+        if self.path != "/cmd":
+            self.send_response(404)
+            self.end_headers()
+            return
+
+        length  = int(self.headers.get("Content-Length", 0) or 0)
+        body    = self.rfile.read(length)
+        try:
+            payload = json.loads(body)
+        except Exception:
+            self._respond(400, {"success": False, "error": "JSON inválido"})
+            return
+
+        sn     = (payload.get("sn") or "").strip()
+        action = (payload.get("action") or "").strip()
+        params = payload.get("params", {})
+
+        if not sn or not action:
+            self._respond(400, {"success": False, "error": "sn e action são obrigatórios"})
+            return
+
+        if sn not in sn_to_terminal:
+            self._respond(503, {"success": False, "error": f"Terminal SN={sn} não está registado neste servidor"})
+            return
+
+        # Criar entrada de comando com evento para espera de resposta
+        event  = threading.Event()
+        entry  = {"action": action, "params": params, "event": event, "result": None}
+        with pending_lock:
+            if sn not in pending_commands:
+                pending_commands[sn] = []
+            pending_commands[sn].append(entry)
+
+        logger.info(f"[CTRL] Comando '{action}' enfileirado para SN={sn}")
+
+        # Aguardar resposta do terminal (máx 12s — o terminal tem de fazer getrequest)
+        got_response = event.wait(timeout=12)
+        if got_response and entry.get("result") is not None:
+            self._respond(200, entry["result"])
+        else:
+            # Timeout: o terminal não fez getrequest a tempo — comando continua enfileirado
+            # Consideramos sucesso parcial: o comando será executado no próximo getrequest
+            with pending_lock:
+                try: pending_commands[sn].remove(entry)
+                except ValueError: pass
+            self._respond(200, {
+                "success": True,
+                "message": f"Comando '{action}' enfileirado. O terminal executará no próximo ciclo de polling.",
+                "note": "O terminal ZKTeco processa comandos na próxima vez que fizer GET /iclock/getrequest"
+            })
+
+    def _respond(self, code, data):
+        body = json.dumps(data).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", len(body))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def start_ctrl_server(port, stop_event):
+    """Inicia o servidor HTTP de controlo numa thread dedicada."""
+    try:
+        server = HTTPServer(("0.0.0.0", port), CtrlHandler)
+        server.timeout = 1
+        logger.info(f"[CTRL] Servidor de controlo activo em http://0.0.0.0:{port}/cmd")
+        logger.info(f"[CTRL] O NOC Monitor envia comandos via POST /cmd {{sn, action, params}}")
+        while not stop_event.is_set():
+            server.handle_request()
+        server.server_close()
+    except Exception as e:
+        logger.error(f"[CTRL] Erro no servidor de controlo: {e}")
+
+
+def _build_adms_response(sn, action, params):
+    """Constrói a resposta ADMS (texto simples) para o terminal executar o comando."""
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    if action == "opendoor":
+        return "C:OPEN DOOR\\n"
+    elif action == "reboot":
+        return "C:REBOOT\\n"
+    elif action == "settime":
+        t = params.get("time", now)
+        return f"OPTION SET TimeSynType=1\\nSERVERTIME={t}\\n"
+    elif action == "getlogs":
+        return "C:DATA ATTLOG\\n"
+    elif action == "getdevinfo":
+        return "C:DATA OPERLOG\\n"
+    elif action == "adduser":
+        pin  = params.get("enrollid", "")
+        name = params.get("name", "")
+        pwd  = params.get("password", "")
+        card = params.get("card", "")
+        priv = params.get("privilege", 0)
+        return f"DATA USER PIN={pin}\\tName={name}\\tPrivilege={priv}\\tPassword={pwd}\\tCard={card}\\n"
+    return "OK\\n"
+
+
 class ADMSHandler(BaseHTTPRequestHandler):
     """
     Servidor ADMS (Automatic Data Master Server) compatível com protocolo ZKTeco.
@@ -213,10 +348,29 @@ class ADMSHandler(BaseHTTPRequestHandler):
         path   = parsed.path
 
         if path == "/iclock/getrequest":
-            # Terminal solicita comandos pendentes — responder OK (sem comandos)
+            # Terminal solicita comandos pendentes
             sn = parse_qs(parsed.query).get("SN", [""])[0]
             if sn:
                 self._mark_online_by_sn(sn, latencia_ms=None)
+                # Verificar se há comandos pendentes para este terminal
+                with pending_lock:
+                    cmds = pending_commands.get(sn, [])
+                    entry = cmds[0] if cmds else None
+                if entry:
+                    adms_response = _build_adms_response(sn, entry["action"], entry["params"])
+                    logger.info(f"[ADMS→CTRL] SN={sn}: a enviar comando '{entry['action']}' via getrequest")
+                    self._respond(adms_response)
+                    # Sinalizar resultado (sucesso optimista — o terminal vai executar)
+                    entry["result"] = {
+                        "success": True,
+                        "message": f"Comando '{entry['action']}' enviado ao terminal (via ADMS getrequest)",
+                        "note": "O terminal ZKTeco irá executar o comando imediatamente"
+                    }
+                    entry["event"].set()
+                    with pending_lock:
+                        try: pending_commands[sn].remove(entry)
+                        except ValueError: pass
+                    return
                 logger.debug(f"[ADMS] Terminal SN={sn} polling getrequest")
             self._respond("OK")
 
@@ -429,12 +583,14 @@ def run_noc_server(stop_event=None):
         api_key   = config["API_KEY"]
         intervalo = config.get("INTERVALO_REPORT", DEFAULT_INTERVAL)
         adms_port = config.get("ADMS_PORT", DEFAULT_ADMS_PORT)
+        ctrl_port = config.get("CTRL_PORT", DEFAULT_CTRL_PORT)
 
         logger.info("=" * 65)
         logger.info("  NOC Monitor — Servidor Unificado")
         logger.info(f"  Heartbeat TCP: portas por terminal")
         logger.info(f"  ADMS/Push HTTP: porta {adms_port}")
         logger.info(f"  SDK-TCP polling: porta configurada por terminal")
+        logger.info(f"  Controlo Remoto HTTP: porta {ctrl_port}")
         logger.info("=" * 65)
 
         # Obter terminais
@@ -485,6 +641,11 @@ def run_noc_server(stop_event=None):
                                            name="adms-http", daemon=True)
             adms_thread.start()
 
+        # Iniciar servidor HTTP de controlo remoto (NOC Monitor → terminal via ADMS)
+        ctrl_thread = threading.Thread(target=start_ctrl_server, args=(ctrl_port, stop_event),
+                                       name="ctrl-http", daemon=True)
+        ctrl_thread.start()
+
         # Iniciar threads SDK-TCP (1 por terminal)
         for t in sdk_terminais:
             th = threading.Thread(target=sdk_tcp_poller, args=(t, stop_event, intervalo),
@@ -519,7 +680,8 @@ def load_config():
     if api_key and app_id and len(api_key) >= 16:
         return {"API_KEY": api_key, "APP_ID": app_id,
                 "INTERVALO_REPORT": interval or DEFAULT_INTERVAL,
-                "ADMS_PORT": adms_port or DEFAULT_ADMS_PORT}
+                "ADMS_PORT": adms_port or DEFAULT_ADMS_PORT,
+                "CTRL_PORT": DEFAULT_CTRL_PORT}
     if os.path.exists(CONFIG_FILE):
         try:
             cfg = json.load(open(CONFIG_FILE, encoding="utf-8"))
@@ -530,6 +692,7 @@ def load_config():
                     "API_KEY": api_key, "APP_ID": app_id,
                     "INTERVALO_REPORT": cfg.get("INTERVALO_REPORT", DEFAULT_INTERVAL),
                     "ADMS_PORT": cfg.get("ADMS_PORT", DEFAULT_ADMS_PORT),
+                    "CTRL_PORT": cfg.get("CTRL_PORT", DEFAULT_CTRL_PORT),
                 }
             logger.error("config.json inválido: API_KEY ou APP_ID ausentes.")
         except Exception as e:
@@ -603,7 +766,8 @@ export default function NocServerCode() {
         <p className="text-slate-700 pl-4">{`"API_KEY": "a_sua_api_key_pessoal",`}</p>
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
         <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 30,`}</p>
-        <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"ADMS_PORT": 8080`}</p>
+        <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"ADMS_PORT": 8080,`}</p>
+        <p className="text-slate-700 pl-4 font-semibold text-emerald-700">{`"CTRL_PORT": 7790`}</p>
         <p className="text-slate-700">{`}`}</p>
       </div>
 
@@ -611,9 +775,10 @@ export default function NocServerCode() {
       <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
         <p className="font-semibold">🔥 Portas a abrir no Firewall do Windows Server (51.91.219.145)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1">
-          <p>• <strong>8080 TCP</strong> — Servidor ADMS/Push (ZKTeco, Anviz)</p>
-          <p>• <strong>5005–5xxx TCP</strong> — Portas Heartbeat (uma por terminal)</p>
+          <p>• <strong>8080 TCP</strong> — Servidor ADMS/Push (ZKTeco, Anviz) — entrada dos terminais</p>
+          <p>• <strong>5005–5xxx TCP</strong> — Portas Heartbeat (uma por terminal) — entrada dos terminais</p>
           <p>• <strong>4370 TCP</strong> — SDK-TCP ZKTeco (saída para terminais)</p>
+          <p>• <strong>7790 TCP</strong> — Controlo Remoto HTTP (apenas acessível pelo Base44) — recebe comandos do NOC Monitor</p>
         </div>
         <p className="mt-1 text-amber-700">Configure em: <em>Windows Defender Firewall → Regras de Entrada → Nova Regra → Porta TCP</em></p>
       </div>

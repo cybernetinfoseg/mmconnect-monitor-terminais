@@ -20,13 +20,47 @@ function nowStr() {
 }
 
 /**
- * buildTimmyCtrlUrl — URL do servidor HTTP de controlo Timmy (porta 7789)
+ * sendAdmsCommand — envia comando ao noc_server.py via HTTP interno (porta 7790).
+ * O noc_server.py expõe um servidor HTTP de controlo que recebe comandos e os envia
+ * ao terminal ZKTeco/Anviz via protocolo ADMS (como resposta ao próximo getrequest).
+ *
+ * Fluxo: Base44 → POST http://<servidor>:7790/cmd → noc_server.py → ADMS → Terminal → resposta
+ *
+ * O campo "ip_publico" ou "dns" deve apontar para o Windows Server onde o noc_server.py corre.
+ * O campo "numero_serie" (SN) é obrigatório para identificar o terminal no servidor ADMS.
  */
-function buildTimmyCtrlUrl(terminal) {
+async function sendAdmsCommand(terminal, action, params = {}) {
   const host = terminal.ip_publico || terminal.dns;
-  if (!host) return null;
-  const ctrlPort = 7789;
-  return `http://${host}:${ctrlPort}/cmd`;
+  if (!host) {
+    return { success: false, error: 'IP/DNS do servidor NOC (noc_server.py) não configurado. Preencha o campo "IP Público" com o IP do Windows Server.' };
+  }
+  const sn = terminal.numero_serie || '';
+  if (!sn) {
+    return { success: false, error: 'Número de série (SN) não configurado no terminal — obrigatório para terminais ADMS/ZKTeco.' };
+  }
+
+  const ctrlPort = 7790; // porta HTTP de controlo do noc_server.py
+  const url = `http://${host}:${ctrlPort}/cmd`;
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sn, action, params }),
+    signal: AbortSignal.timeout(15000),
+  }).catch(e => { throw new Error(`Não foi possível contactar o noc_server.py em ${host}:${ctrlPort} — ${e.message}`); });
+
+  if (!resp.ok) {
+    const errBody = await resp.text().catch(() => '');
+    throw new Error(`noc_server.py respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
+  }
+
+  const data = await resp.json();
+  return {
+    success: data.success !== false,
+    message: data.message || (data.success ? 'Comando executado pelo servidor ADMS' : 'Falha no servidor ADMS'),
+    data: data.result || data,
+    note: data.note,
+  };
 }
 
 /**
@@ -113,7 +147,13 @@ async function actionSetTime(terminal) {
     return { success: resp.result === true, message: `Relógio acertado para ${now}`, data: resp };
   }
 
-  if (terminal.tipo_conexao === 'sdk_tcp' || terminal.tipo_conexao === 'adms_push') {
+  if (terminal.tipo_conexao === 'adms_push') {
+    // ZKTeco ADMS: o servidor local (noc_server.py) encaminha o comando via HTTP interno
+    const result = await sendAdmsCommand(terminal, 'settime', { time: now });
+    return result;
+  }
+
+  if (terminal.tipo_conexao === 'sdk_tcp') {
     if (terminal.fabricante === 'hikvision') {
       const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/time', {
         timeMode: 'manual', localTime: now, timeZone: 'UTC+0:00'
@@ -121,17 +161,13 @@ async function actionSetTime(terminal) {
       return { success: true, message: `Relógio acertado (Hikvision)`, data: resp };
     }
     if (terminal.fabricante === 'dahua') {
+      // Dahua CGI: setCurrentTime via magicBox
       const resp = await dahuaRequest(terminal, `/cgi-bin/global.cgi?action=setCurrentTime&time=${encodeURIComponent(now)}`);
       return { success: resp.status === 200, message: `Relógio acertado (Dahua)`, data: resp };
     }
-    // ZKTeco via HTTP direto
-    const ip = terminal.ip_publico || terminal.dns;
-    if (ip) {
-      const port = terminal.porta || 80;
-      const resp = await fetch(`http://${ip}:${port}/iclock/getrequest`, { method: 'GET' });
-      return { success: resp.status < 400, message: `Comando enviado ao ZKTeco (${now})`, note: 'O terminal processará na próxima sincronização ADMS' };
-    }
-    return { success: false, error: 'IP do terminal não configurado para controlo direto' };
+    // ZKTeco SDK: tenta via noc_server.py local
+    const result = await sendAdmsCommand(terminal, 'settime', { time: now });
+    return result;
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
@@ -144,6 +180,10 @@ async function actionSetTime(terminal) {
     if (terminal.fabricante === 'dahua') {
       const resp = await dahuaRequest(terminal, `/cgi-bin/global.cgi?action=setCurrentTime&time=${encodeURIComponent(now)}`);
       return { success: resp.status === 200, message: `Relógio acertado (Dahua)`, data: resp };
+    }
+    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+      const result = await sendAdmsCommand(terminal, 'settime', { time: now });
+      return result;
     }
   }
 
@@ -158,6 +198,26 @@ async function actionGetLogs(terminal) {
     return { success: resp.result === true, message: `${count} marcações recolhidas`, count, records: records.slice(0, 50) };
   }
 
+  if (terminal.tipo_conexao === 'adms_push') {
+    return { success: true, message: 'Terminais ADMS enviam marcações automaticamente ao servidor noc_server.py.', note: 'Os logs chegam em tempo real via POST /iclock/cdata. Consulte o histórico no painel.' };
+  }
+
+  if (terminal.tipo_conexao === 'sdk_tcp') {
+    if (terminal.fabricante === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', {
+        AcsEventCond: { searchID: '1', searchResultPosition: 0, maxResults: 50 }
+      });
+      return { success: true, message: 'Marcações Hikvision recolhidas', data: resp };
+    }
+    if (terminal.fabricante === 'dahua') {
+      // Dahua: GET com recordFinder para registos de acesso
+      const resp = await dahuaRequest(terminal, '/cgi-bin/recordFinder.cgi?action=find&name=AccessControlCardRec&StartTime=2000-01-01%2000%3A00%3A00&EndTime=2099-12-31%2023%3A59%3A59&count=50');
+      return { success: resp.status === 200, message: 'Marcações Dahua recolhidas', data: resp.body };
+    }
+    // ZKTeco SDK-TCP: solicitar ao noc_server.py local para fazer upload de logs
+    return await sendAdmsCommand(terminal, 'getlogs', {});
+  }
+
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
     if (terminal.fabricante === 'hikvision') {
       const resp = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', {
@@ -166,32 +226,12 @@ async function actionGetLogs(terminal) {
       return { success: true, message: 'Marcações Hikvision recolhidas', data: resp };
     }
     if (terminal.fabricante === 'dahua') {
-      const resp = await dahuaRequest(terminal, '/cgi-bin/recordFinder.cgi?action=find&name=AttendanceRecord&StartTime=2000-01-01%2000:00:00&EndTime=2099-12-31%2023:59:59');
+      const resp = await dahuaRequest(terminal, '/cgi-bin/recordFinder.cgi?action=find&name=AccessControlCardRec&StartTime=2000-01-01%2000%3A00%3A00&EndTime=2099-12-31%2023%3A59%3A59&count=50');
       return { success: resp.status === 200, message: 'Marcações Dahua recolhidas', data: resp.body };
     }
-  }
-
-  if (terminal.tipo_conexao === 'adms_push') {
-    return { success: true, message: 'Terminais ADMS enviam marcações automaticamente ao servidor.', note: 'Verifique o Histórico de Marcações no NOC Monitor.' };
-  }
-
-  if (terminal.tipo_conexao === 'sdk_tcp') {
-    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-    const port = terminal.porta || 80;
-    // ZKTeco SDK-TCP: tenta buscar logs via HTTP iClock
-    const resp = await fetch(`http://${ip}:${port}/iclock/cdata?SN=${terminal.numero_serie || ''}&table=ATTLOG&Stamp=0000-00-00+00:00:00`, {
-      method: 'GET',
-    }).catch(() => null);
-    if (!resp) return { success: false, error: 'Terminal não respondeu' };
-    const body = await resp.text().catch(() => '');
-    const lines = body.split('\n').filter(l => l.trim() && !l.startsWith('GET'));
-    return { 
-      success: resp.status < 400, 
-      message: `${lines.length} marcações obtidas (ZKTeco SDK)`,
-      count: lines.length,
-      data: { raw: body.substring(0, 2000) }
-    };
+    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+      return await sendAdmsCommand(terminal, 'getlogs', {});
+    }
   }
 
   return { success: false, error: `getlogs não suportado para ${terminal.tipo_conexao}` };
@@ -203,23 +243,23 @@ async function actionOpenDoor(terminal) {
     return { success: resp.result === true, message: 'Porta aberta remotamente', data: resp };
   }
 
-  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-    const port = terminal.porta || 80;
-    const sn = terminal.numero_serie || '';
-    // ZKTeco iClock: comando OpenDoor via ADMS/HTTP
-    const resp = await fetch(`http://${ip}:${port}/iclock/getrequest`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
-    // Também tenta via cdata para push imediato
-    await fetch(`http://${ip}:${port}/iclock/cdata`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `SN=${sn}&CMD=OPEN_DOOR&Lock=1`,
-    }).catch(() => {});
-    return { success: resp.status < 400, message: 'Comando de abertura enviado ao ZKTeco', note: 'Será processado na próxima sincronização ADMS' };
+  if (terminal.tipo_conexao === 'adms_push') {
+    // ZKTeco ADMS: o noc_server.py encaminha o comando "OPEN DOOR" como resposta ao próximo getrequest do terminal
+    return await sendAdmsCommand(terminal, 'opendoor', {});
+  }
+
+  if (terminal.tipo_conexao === 'sdk_tcp') {
+    if (terminal.fabricante === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
+      return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
+    }
+    if (terminal.fabricante === 'dahua') {
+      // Dahua CGI: GET com openDoor (método correto conforme documentação oficial)
+      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
+      return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
+    }
+    // ZKTeco SDK-TCP: via noc_server.py
+    return await sendAdmsCommand(terminal, 'opendoor', {});
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
@@ -228,8 +268,11 @@ async function actionOpenDoor(terminal) {
       return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
     }
     if (terminal.fabricante === 'dahua') {
-      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1');
+      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
       return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
+    }
+    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+      return await sendAdmsCommand(terminal, 'opendoor', {});
     }
   }
 
@@ -243,22 +286,22 @@ async function actionReboot(terminal) {
     return { success: true, message: 'Comando de reinício enviado. Terminal reiniciará imediatamente.', data: resp };
   }
 
-  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-    const port = terminal.porta || 80;
-    const sn = terminal.numero_serie || '';
-    // ZKTeco ADMS reboot command
-    const resp = await fetch(`http://${ip}:${port}/iclock/cdata`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `SN=${sn}&CMD=REBOOT`,
-    }).catch(() => ({ status: 0 }));
-    return { 
-      success: resp.status < 400, 
-      message: 'Comando de reinício enviado ao ZKTeco',
-      note: 'Terminal irá reiniciar assim que processar o comando'
-    };
+  if (terminal.tipo_conexao === 'adms_push') {
+    // ZKTeco ADMS: noc_server.py envia "REBOOT" como resposta ao próximo getrequest
+    return await sendAdmsCommand(terminal, 'reboot', {});
+  }
+
+  if (terminal.tipo_conexao === 'sdk_tcp') {
+    if (terminal.fabricante === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/reboot');
+      return { success: true, message: 'Reinício enviado (Hikvision)', data: resp };
+    }
+    if (terminal.fabricante === 'dahua') {
+      // Dahua: reboot via magicBox CGI
+      const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=reboot');
+      return { success: resp.status === 200, message: 'Reinício enviado (Dahua)' };
+    }
+    return await sendAdmsCommand(terminal, 'reboot', {});
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
@@ -269,6 +312,9 @@ async function actionReboot(terminal) {
     if (terminal.fabricante === 'dahua') {
       const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=reboot');
       return { success: resp.status === 200, message: 'Reinício enviado (Dahua)' };
+    }
+    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+      return await sendAdmsCommand(terminal, 'reboot', {});
     }
   }
 
@@ -281,24 +327,30 @@ async function actionGetDevInfo(terminal) {
     return { success: resp.result === true, message: 'Informação do dispositivo obtida', data: resp };
   }
 
-  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-    const port = terminal.porta || 80;
-    // ZKTeco: buscar info via iClock HTTP
-    const resp = await fetch(`http://${ip}:${port}/iclock/getrequest?action=getinfo`, {
-      method: 'GET',
-    }).catch(() => null);
-    if (!resp) return { success: false, error: 'Terminal não respondeu' };
-    const body = await resp.text().catch(() => '');
-    // Também tenta endpoint alternativo para modelos mais novos
-    const resp2 = await fetch(`http://${ip}:${port}/deviceinfo`, { method: 'GET' }).catch(() => null);
-    const body2 = resp2 ? await resp2.text().catch(() => '') : '';
+  if (terminal.tipo_conexao === 'adms_push') {
+    // ZKTeco ADMS: devolver info registada no sistema e solicitar info ao noc_server.py
+    const result = await sendAdmsCommand(terminal, 'getdevinfo', {});
+    if (result.success) return result;
+    // Fallback: devolver dados do registo
     return {
-      success: resp.status < 400,
-      message: 'Informação do dispositivo ZKTeco obtida',
-      data: { iclock_response: body, device_info: body2, sn: terminal.numero_serie, modelo: terminal.modelo }
+      success: true,
+      message: 'Informação do terminal (registo NOC Monitor)',
+      data: { sn: terminal.numero_serie, modelo: terminal.modelo, fabricante: terminal.fabricante, tipo_conexao: terminal.tipo_conexao }
     };
+  }
+
+  if (terminal.tipo_conexao === 'sdk_tcp') {
+    if (terminal.fabricante === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'GET', '/ISAPI/System/deviceInfo');
+      return { success: true, message: 'Info Hikvision obtida', data: resp };
+    }
+    if (terminal.fabricante === 'dahua') {
+      // Dahua: getSystemInfo + getSoftwareVersion
+      const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo');
+      const resp2 = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSoftwareVersion');
+      return { success: resp.status === 200, message: 'Info Dahua obtida', data: { system: resp.body, version: resp2.body } };
+    }
+    return await sendAdmsCommand(terminal, 'getdevinfo', {});
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
@@ -308,7 +360,11 @@ async function actionGetDevInfo(terminal) {
     }
     if (terminal.fabricante === 'dahua') {
       const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo');
-      return { success: resp.status === 200, message: 'Info Dahua obtida', data: resp.body };
+      const resp2 = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSoftwareVersion');
+      return { success: resp.status === 200, message: 'Info Dahua obtida', data: { system: resp.body, version: resp2.body } };
+    }
+    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+      return await sendAdmsCommand(terminal, 'getdevinfo', {});
     }
   }
 
@@ -343,18 +399,8 @@ async function actionAddUser(terminal, params) {
   }
 
   if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    // ZKTeco ADMS: enviar via HTTP query
-    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-    const port = terminal.porta || 80;
-    const sn = terminal.numero_serie || '';
-    const body = `SN=${sn}&CMD=SET_USER&PIN=${enrollid}&Name=${encodeURIComponent(name)}&Password=${password}&Card=${card}&Privilege=${privilege}&ACC=${accgroup}&TZ=${timezone}`;
-    const resp = await fetch(`http://${ip}:${port}/iclock/cdata`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    return { success: resp.status < 400, message: `Utilizador "${name}" enviado ao ZKTeco ADMS`, note: 'Será registado na próxima sincronização' };
+    // ZKTeco ADMS: via noc_server.py — envia DATA USER como resposta ao próximo getrequest
+    return await sendAdmsCommand(terminal, 'adduser', { enrollid, name, password, card, privilege, accgroup, timezone });
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
@@ -372,7 +418,8 @@ async function actionAddUser(terminal, params) {
       return { success: true, message: `Utilizador "${name}" adicionado (Hikvision)`, data: resp };
     }
     if (terminal.fabricante === 'dahua') {
-      const resp = await dahuaRequest(terminal, `/cgi-bin/AccessUser.cgi?action=insertUser&UserID=${enrollid}&UserName=${encodeURIComponent(name)}&Password=${password}&Doors[0]=0&AuthorityType=0`);
+      // Dahua CGI correto: recordUpdater.cgi?action=insert&name=AccessControlCard (documentação oficial Dahua v1.0)
+      const resp = await dahuaRequest(terminal, `/cgi-bin/recordUpdater.cgi?action=insert&name=AccessControlCard&CardName=${encodeURIComponent(name)}&CardNo=${enrollid}&UserID=${enrollid}&CardStatus=0&CardType=0&Password=${password}&Doors[0]=0`);
       return { success: resp.status === 200, message: `Utilizador "${name}" adicionado (Dahua)`, data: resp };
     }
   }
@@ -396,17 +443,8 @@ async function actionBlockUser(terminal, params) {
   }
 
   if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-    if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-    const port = terminal.porta || 80;
-    const sn = terminal.numero_serie || '';
-    const body = `SN=${sn}&CMD=SET_USER&PIN=${enrollid}&Privilege=${block ? 255 : 0}`;
-    const resp = await fetch(`http://${ip}:${port}/iclock/cdata`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    return { success: resp.status < 400, message: `Utilizador ID:${enrollid} ${statusLabel} (ZKTeco ADMS)` };
+    // ZKTeco ADMS: via noc_server.py — envia DATA USER com privilege=255 (bloquear) ou 0 (desbloquear)
+    return await sendAdmsCommand(terminal, 'adduser', { enrollid, privilege: block ? 255 : 0, name: '', password: '', card: '' });
   }
 
   if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
