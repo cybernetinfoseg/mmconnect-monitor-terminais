@@ -120,7 +120,7 @@ export default function Terminais() {
     refetchInterval: refreshInterval,
   });
 
-  const atLimit = !isAdmin && (limiteTerminais === 0 || (limiteTerminais > 0 && terminalCount >= limiteTerminais));
+
 
 
   const logAudit = (acao, entidade_id, descricao) =>
@@ -263,10 +263,12 @@ export default function Terminais() {
   );
 
   // Contagem de terminais do utilizador atual (para limite) — usa usuario_email como ownership real
-  const terminalCount = useMemo(() =>
-    terminals.filter(t => (t.usuario_email || t.created_by) === currentUser?.email).length,
-    [terminals, currentUser]
-  );
+  const terminalCount = useMemo(() => {
+    const count = terminals.filter(t => (t.usuario_email || t.created_by) === currentUser?.email).length;
+    return count;
+  }, [terminals, currentUser]);
+
+  const atLimit = !isAdmin && (limiteTerminais === 0 || (limiteTerminais > 0 && terminalCount >= limiteTerminais));
 
   const filteredTerminals = useMemo(() => {
     return terminals.filter(t => {
