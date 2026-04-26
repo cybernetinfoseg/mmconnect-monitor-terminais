@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useEffect } from 'react';
-import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { motion } from 'framer-motion';
 import { 
   Settings, 
@@ -16,7 +15,10 @@ import {
   EyeOff,
   CheckCircle,
   XCircle,
-  Plug
+  Plug,
+  Radio,
+  Save,
+  Shield
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -37,6 +39,12 @@ import { toast } from 'sonner';
 
 import TelegramConfig from '../components/configuracoes/TelegramConfig';
 import AdmsServerCode from '../components/configuracoes/AdmsServerCode';
+import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
+import NocServerCode from '../components/configuracoes/NocServerCode';
+import P2sServerCode from '../components/configuracoes/P2sServerCode';
+import TimmyWsServerCode from '../components/configuracoes/TimmyWsServerCode';
+import { useQuery } from '@tanstack/react-query';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
 
@@ -47,6 +55,8 @@ export default function Configuracoes() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [testingConn, setTestingConn] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [refreshInterval, setRefreshInterval] = useState('5');
+  const [savingInterval, setSavingInterval] = useState(false);
 
   useEffect(() => {
     base44.auth.me().then(async (me) => {
@@ -71,7 +81,37 @@ export default function Configuracoes() {
     }).catch(() => {});
   }, []);
 
-  const perms = resolvePermissions(currentUser);
+  const isAdmin = currentUser?.role === 'admin';
+
+  const { data: monitorConfig = [], refetch: refetchMonitorConfig } = useQuery({
+    queryKey: ['monitor-config'],
+    queryFn: () => base44.entities.MonitorConfig.list(),
+    enabled: isAdmin,
+  });
+
+  useEffect(() => {
+    if (monitorConfig[0]?.intervalo_sync_minutos) {
+      setRefreshInterval(String(monitorConfig[0].intervalo_sync_minutos));
+    }
+  }, [monitorConfig]);
+
+  const handleSaveInterval = async () => {
+    setSavingInterval(true);
+    try {
+      const interval = Math.max(1, parseInt(refreshInterval) || 5);
+      if (monitorConfig[0]?.id) {
+        await base44.entities.MonitorConfig.update(monitorConfig[0].id, { intervalo_sync_minutos: interval });
+      } else {
+        await base44.entities.MonitorConfig.create({ tipo: 'api_externa', intervalo_sync_minutos: interval, ativo: true });
+      }
+      toast.success('Intervalo de sincronização atualizado!');
+      refetchMonitorConfig();
+    } catch {
+      toast.error('Erro ao salvar configuração');
+    } finally {
+      setSavingInterval(false);
+    }
+  };
 
   const copyToClipboard = (value, label) => {
     navigator.clipboard.writeText(value);
@@ -301,6 +341,140 @@ export default function Configuracoes() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }}>
           <TelegramConfig />
         </motion.div>
+
+        {/* Intervalo de Sincronização — admin only */}
+        {isAdmin && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+            <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-blue-600" />
+                  Intervalo de Sincronização
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-slate-500">Frequência de atualização dos dados em Dashboard, Terminais e Modo TV.</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={refreshInterval}
+                    onChange={(e) => setRefreshInterval(e.target.value)}
+                    className="flex h-9 w-[120px] rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm"
+                  />
+                  <span className="text-sm text-slate-500">minuto(s)</span>
+                  <button onClick={handleSaveInterval} disabled={savingInterval} className="inline-flex items-center gap-2 h-9 px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                    <Save className="h-4 w-4" />
+                    {savingInterval ? 'Salvando...' : 'Salvar'}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* NOC Server — admin only */}
+        {isAdmin && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }}>
+            <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-violet-600" />
+                  NOC Server — Windows Server (51.91.219.145)
+                </CardTitle>
+                <p className="text-sm text-slate-500">Servidor unificado para terminais: Heartbeat TCP, ADMS/Push (ZKTeco, Anviz) e SDK-TCP.</p>
+              </CardHeader>
+              <CardContent>
+                <NocServerCode />
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* P2S Server — admin only */}
+        {isAdmin && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }}>
+            <Card className="bg-white/80 backdrop-blur-sm border-violet-200/60">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-violet-600" />
+                  P2S Server — Push to Server (Windows Server)
+                </CardTitle>
+                <p className="text-sm text-slate-500">Serviço dedicado para terminais P2S: ZKTeco, Anviz, Suprema, Hikvision, Dahua, Nitgen.</p>
+              </CardHeader>
+              <CardContent>
+                <P2sServerCode />
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Timmy WS Server — admin only */}
+        {isAdmin && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}>
+            <Card className="bg-white/80 backdrop-blur-sm border-violet-200/60">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-violet-600" />
+                  Timmy WebSocket Cloud Server
+                </CardTitle>
+                <p className="text-sm text-slate-500">Servidor WebSocket para terminais Timmy/THbio: TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros.</p>
+              </CardHeader>
+              <CardContent>
+                <TimmyWsServerCode />
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Agent Installation Guide — admin only */}
+        {isAdmin && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }}>
+            <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-emerald-600" />
+                  Instalação do Agente Local
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3 text-sm">
+                  <div className="flex gap-3 items-start">
+                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
+                    <div>
+                      <p className="font-medium text-slate-700">Baixe o NSSM (gerenciador de serviços Windows)</p>
+                      <a href="https://nssm.cc/download" target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs">nssm.cc/download</a>
+                      <p className="text-xs text-slate-500 mt-1">Extraia e copie <code className="bg-slate-100 px-1 rounded">nssm.exe</code> para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\</code></p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 items-start">
+                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
+                    <div>
+                      <p className="font-medium text-slate-700">Copie o código fonte para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\core_agent.py</code></p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 items-start">
+                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
+                    <div>
+                      <p className="font-medium text-slate-700">Crie o ficheiro de configuração:</p>
+                      <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto whitespace-pre-wrap">{`{\n  "API_KEY": "SUA_API_KEY",\n  "APP_ID": "697aa46c9998c30665e2e19a"\n}`}</pre>
+                      <p className="text-xs text-slate-500 mt-1">Guarde em <code className="bg-slate-100 px-1 rounded">C:\ProgramData\Base44Agent\config.json</code></p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 items-start">
+                    <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">4</span>
+                    <div>
+                      <p className="font-medium text-slate-700">Instale como serviço Windows:</p>
+                      <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto whitespace-pre-wrap">{`nssm install Base44Agent python "C:\\Program Files\\Base44Agent\\core_agent.py"\nnssm start Base44Agent`}</pre>
+                    </div>
+                  </div>
+                </div>
+                <AgentSourceCode />
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Delete Account — todos os utilizadores */}
         {currentUser && (

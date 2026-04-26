@@ -16,7 +16,7 @@ const ALL_PAGES = [
   'Auditoria', 'Configuracoes', 'Administracao',
 ];
 
-const ADMIN_ONLY_PAGES = ['Administracao'];
+const ADMIN_ONLY_PAGES = ['Administracao', 'Configuracoes'];
 
 export function resolvePermissions(user) {
   const isAdmin = user?.role === 'admin';

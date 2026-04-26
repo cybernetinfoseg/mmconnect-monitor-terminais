@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Shield, UserPlus, Pencil, X, Check, Clock, UserCheck, Settings, Activity, AlertCircle, Mail, Trash2, Ban, Terminal, Bot, Key, Radio, Save } from 'lucide-react';
-import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
-import NocServerCode from '../components/configuracoes/NocServerCode';
-import P2sServerCode from '../components/configuracoes/P2sServerCode';
-import TimmyWsServerCode from '../components/configuracoes/TimmyWsServerCode';
+import { Shield, UserPlus, Pencil, X, Check, Clock, UserCheck, Settings, Activity, AlertCircle, Mail, Trash2, Ban, Terminal, Bot, Key } from 'lucide-react';
 import PendingUserRow from '../components/admin/PendingUserRow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,8 +31,7 @@ export default function Administracao() {
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [currentUser, setCurrentUser] = useState(null);
-  const [refreshInterval, setRefreshInterval] = useState('5');
-  const [savingInterval, setSavingInterval] = useState(false);
+
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -158,35 +153,7 @@ export default function Administracao() {
     onError: () => toast.error('Erro ao atualizar permissões'),
   });
 
-  // Fetch system config
-  const { data: monitorConfig = [], refetch: refetchMonitorConfig } = useQuery({
-    queryKey: ['monitor-config-admin'],
-    queryFn: () => base44.entities.MonitorConfig.list(),
-  });
 
-  useEffect(() => {
-    if (monitorConfig[0]?.intervalo_sync_minutos) {
-      setRefreshInterval(String(monitorConfig[0].intervalo_sync_minutos));
-    }
-  }, [monitorConfig]);
-
-  const handleSaveInterval = async () => {
-    setSavingInterval(true);
-    try {
-      const interval = Math.max(1, parseInt(refreshInterval) || 5);
-      if (monitorConfig[0]?.id) {
-        await base44.entities.MonitorConfig.update(monitorConfig[0].id, { intervalo_sync_minutos: interval });
-      } else {
-        await base44.entities.MonitorConfig.create({ tipo: 'api_externa', intervalo_sync_minutos: interval, ativo: true });
-      }
-      toast.success('Intervalo de sincronização atualizado!');
-      refetchMonitorConfig();
-    } catch {
-      toast.error('Erro ao salvar configuração');
-    } finally {
-      setSavingInterval(false);
-    }
-  };
 
   const { data: alertRules = [] } = useQuery({
     queryKey: ['alert-rules-admin'],
@@ -272,7 +239,7 @@ export default function Administracao() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Intervalo Sync</p>
-                  <p className="text-2xl font-bold text-blue-900 mt-2">{monitorConfig[0]?.intervalo_sync_minutos || 5}m</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-2">—</p>
                   <p className="text-xs text-blue-600 mt-1">Atualização automática</p>
                 </div>
                 <Activity className="h-8 w-8 text-blue-400 opacity-50" />
@@ -500,120 +467,6 @@ export default function Administracao() {
             )}
           </CardContent>
         </Card>
-      {/* Intervalo de Sincronização */}
-      <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-blue-600" />
-            Intervalo de Sincronização
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-slate-500">Frequência de atualização dos dados em Dashboard, Terminais e Modo TV.</p>
-          <div className="flex items-center gap-3">
-            <Input
-              type="number"
-              min="1"
-              max="60"
-              value={refreshInterval}
-              onChange={(e) => setRefreshInterval(e.target.value)}
-              className="max-w-[120px]"
-            />
-            <span className="text-sm text-slate-500">minuto(s)</span>
-            <Button onClick={handleSaveInterval} disabled={savingInterval} size="sm" className="bg-blue-600 hover:bg-blue-700 gap-2">
-              <Save className="h-4 w-4" />
-              {savingInterval ? 'Salvando...' : 'Salvar'}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* NOC Server */}
-      <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Radio className="h-5 w-5 text-violet-600" />
-            NOC Server — Windows Server (51.91.219.145)
-          </CardTitle>
-          <p className="text-sm text-slate-500">Servidor unificado para terminais: Heartbeat TCP, ADMS/Push (ZKTeco, Anviz) e SDK-TCP.</p>
-        </CardHeader>
-        <CardContent>
-          <NocServerCode />
-        </CardContent>
-      </Card>
-
-      {/* P2S Server */}
-      <Card className="bg-white/80 backdrop-blur-sm border-violet-200/60">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Radio className="h-5 w-5 text-violet-600" />
-            P2S Server — Push to Server (Windows Server)
-          </CardTitle>
-          <p className="text-sm text-slate-500">Serviço dedicado para terminais P2S: ZKTeco, Anviz, Suprema, Hikvision, Dahua, Nitgen.</p>
-        </CardHeader>
-        <CardContent>
-          <P2sServerCode />
-        </CardContent>
-      </Card>
-
-      {/* Timmy WebSocket Cloud Server */}
-      <Card className="bg-white/80 backdrop-blur-sm border-violet-200/60">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Radio className="h-5 w-5 text-violet-600" />
-            Timmy WebSocket Cloud Server
-          </CardTitle>
-          <p className="text-sm text-slate-500">Servidor WebSocket para terminais Timmy/THbio: TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros modelos com protocolo WebSocket+JSON.</p>
-        </CardHeader>
-        <CardContent>
-          <TimmyWsServerCode />
-        </CardContent>
-      </Card>
-
-      {/* Agent Installation Guide — admin only */}
-      <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="h-5 w-5 text-emerald-600" />
-            Instalação do Agente Local
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 text-sm">
-            <div className="flex gap-3 items-start">
-              <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">1</span>
-              <div>
-                <p className="font-medium text-slate-700">Baixe o NSSM (gerenciador de serviços Windows)</p>
-                <a href="https://nssm.cc/download" target="_blank" rel="noreferrer" className="text-blue-600 underline text-xs">nssm.cc/download</a>
-                <p className="text-xs text-slate-500 mt-1">Extraia e copie <code className="bg-slate-100 px-1 rounded">nssm.exe</code> para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\</code></p>
-              </div>
-            </div>
-            <div className="flex gap-3 items-start">
-              <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">2</span>
-              <div>
-                <p className="font-medium text-slate-700">Copie o código fonte para <code className="bg-slate-100 px-1 rounded">C:\Program Files\Base44Agent\core_agent.py</code></p>
-              </div>
-            </div>
-            <div className="flex gap-3 items-start">
-              <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">3</span>
-              <div>
-                <p className="font-medium text-slate-700">Crie o ficheiro de configuração:</p>
-                <pre className="bg-slate-900 text-emerald-400 p-2 rounded text-xs mt-1 overflow-x-auto whitespace-pre-wrap">{`{\n  "API_KEY": "SUA_API_KEY",\n  "APP_ID": "697aa46c9998c30665e2e19a"\n}`}</pre>
-                <p className="text-xs text-slate-500 mt-1">Guarde em <code className="bg-slate-100 px-1 rounded">C:\ProgramData\Base44Agent\config.json</code></p>
-              </div>
-            </div>
-            <div className="flex gap-3 items-start">
-              <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0">4</span>
-              <div>
-                <p className="font-medium text-slate-700">Instale como serviço Windows:</p>
-                <pre className="bg-slate-900 text-emerald-400 p-1.5 rounded text-xs mt-1 overflow-x-auto whitespace-pre-wrap">{`nssm install Base44Agent python "C:\\Program Files\\Base44Agent\\core_agent.py"\nnssm start Base44Agent`}</pre>
-              </div>
-            </div>
-          </div>
-          <AgentSourceCode />
-        </CardContent>
-      </Card>
-
       </div>
     </div>
   );
