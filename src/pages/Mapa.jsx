@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import {
   MapPin, Upload, ZoomIn, ZoomOut, Maximize2, Minimize2,
-  AlertTriangle, Move, Save, RefreshCw, Plus, Trash2, X, ChevronDown
+  AlertTriangle, Move, Save, RefreshCw, Plus, Trash2, X, ChevronDown, SlidersHorizontal
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,11 +14,12 @@ import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import TerminalIcon from '@/components/mapa/TerminalIcon';
 import MapTooltip from '@/components/mapa/MapTooltip';
+import MarkerConfigPanel from '@/components/mapa/MarkerConfigPanel';
 
 const GRID_SIZE = 40;
 
 // ─── Marker component ───────────────────────────────────────────────────────
-function TerminalMarker({ terminal, position, isEditMode, onDragEnd, onClick, isSelected }) {
+function TerminalMarker({ terminal, position, isEditMode, onDragEnd, onClick, isSelected, iconOverride, iconSize = 40 }) {
   const [isDragging, setIsDragging] = useState(false);
   const markerRef = useRef(null);
 
@@ -87,14 +88,14 @@ function TerminalMarker({ terminal, position, isEditMode, onDragEnd, onClick, is
         {/* Offline pulse ring */}
         {terminal.status === 'offline' && (
           <span className="absolute rounded-full animate-ping bg-red-400 opacity-40 pointer-events-none"
-            style={{ width: 48, height: 48, top: -4, left: -4 }} />
+            style={{ width: iconSize + 8, height: iconSize + 8, top: -4, left: -4 }} />
         )}
         {/* Icon with ring if selected */}
         <div className={cn(
           "rounded-xl overflow-hidden shadow-lg",
           isSelected && "ring-2 ring-offset-2 ring-blue-400"
         )}>
-          <TerminalIcon terminal={terminal} size={40} />
+          <TerminalIcon terminal={terminal} size={iconSize} iconOverride={iconOverride} />
         </div>
         {/* Name label */}
         <span className="text-[9px] font-semibold text-slate-800 bg-white/90 px-1.5 py-0.5 rounded shadow-sm max-w-[70px] truncate text-center leading-tight whitespace-nowrap">
@@ -117,6 +118,9 @@ export default function Mapa() {
   const [selectedPlantaId, setSelectedPlantaId] = useState(null);
   const [showNewPlantaForm, setShowNewPlantaForm] = useState(false);
   const [newPlantaNome, setNewPlantaNome] = useState('');
+  const [showMarkerConfig, setShowMarkerConfig] = useState(false);
+  const [iconOverrides, setIconOverrides] = useState({}); // { terminalId: fabricanteKey }
+  const [iconSize, setIconSize] = useState(40);
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
 
@@ -174,12 +178,19 @@ export default function Mapa() {
 
   const selectedPlanta = plantas.find(p => p.id === selectedPlantaId) || null;
 
-  // Load positions from selected planta
+  // Load positions + icon config from selected planta
   useEffect(() => {
     if (selectedPlanta?.posicoes) {
-      try { setPositions(JSON.parse(selectedPlanta.posicoes)); } catch { setPositions({}); }
+      try {
+        const parsed = JSON.parse(selectedPlanta.posicoes);
+        setPositions(parsed._positions || parsed);
+        setIconOverrides(parsed._iconOverrides || {});
+        setIconSize(parsed._iconSize || 40);
+      } catch { setPositions({}); setIconOverrides({}); setIconSize(40); }
     } else {
       setPositions({});
+      setIconOverrides({});
+      setIconSize(40);
     }
   }, [selectedPlanta?.id]);
 
@@ -227,17 +238,40 @@ export default function Mapa() {
     },
   });
 
+  const savePlantaData = (newPositions, newIconOverrides, newIconSize) => {
+    if (!selectedPlantaId) return;
+    const payload = {
+      _positions: newPositions ?? positions,
+      _iconOverrides: newIconOverrides ?? iconOverrides,
+      _iconSize: newIconSize ?? iconSize,
+    };
+    updatePlantaMutation.mutate({ id: selectedPlantaId, data: { posicoes: JSON.stringify(payload) } });
+  };
+
   const handleSavePositions = () => {
     if (!selectedPlantaId) {
       toast.error('Selecione ou crie uma planta primeiro');
       return;
     }
-    updatePlantaMutation.mutate({
-      id: selectedPlantaId,
-      data: { posicoes: JSON.stringify(positions) },
-    });
+    savePlantaData(positions, iconOverrides, iconSize);
     toast.success('Posições guardadas!');
     setIsEditMode(false);
+  };
+
+  const handleIconChange = (terminalId, iconKey) => {
+    const updated = { ...iconOverrides, [terminalId]: iconKey };
+    setIconOverrides(updated);
+    savePlantaData(positions, updated, iconSize);
+    toast.success('Ícone atualizado!');
+  };
+
+  const handleSizeChange = (size) => {
+    setIconSize(size);
+  };
+
+  const handleSaveSize = () => {
+    savePlantaData(positions, iconOverrides, iconSize);
+    toast.success('Tamanho guardado!');
   };
 
   const handleDragEnd = useCallback((terminalId, x, y) => {
@@ -427,6 +461,15 @@ export default function Mapa() {
             </div>
 
             <div className="flex items-center gap-1">
+              <Button
+                size="icon" variant={showMarkerConfig ? 'default' : 'ghost'}
+                className="h-7 w-7"
+                onClick={() => setShowMarkerConfig(v => !v)}
+                title="Configurar marcadores"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5" />
+              </Button>
+              <div className="w-px h-4 bg-slate-200 mx-0.5" />
               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setZoom(z => Math.max(50, z - 10))}><ZoomOut className="h-3.5 w-3.5" /></Button>
               <span className="text-xs text-slate-500 w-10 text-center font-mono">{zoom}%</span>
               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setZoom(z => Math.min(200, z + 10))}><ZoomIn className="h-3.5 w-3.5" /></Button>
@@ -435,6 +478,20 @@ export default function Mapa() {
               </Button>
             </div>
           </div>
+
+          {/* Marker Config Panel */}
+          {showMarkerConfig && (
+            <div className="relative">
+              <MarkerConfigPanel
+                terminals={visibleTerminals}
+                iconOverrides={iconOverrides}
+                onIconChange={handleIconChange}
+                iconSize={iconSize}
+                onSizeChange={handleSizeChange}
+                onClose={() => { setShowMarkerConfig(false); handleSaveSize(); }}
+              />
+            </div>
+          )}
 
           {/* Canvas */}
           <div className="relative overflow-auto bg-slate-100" style={{ height: mapHeight }}>
@@ -492,6 +549,8 @@ export default function Mapa() {
                       onDragEnd={handleDragEnd}
                       onClick={setSelectedTerminal}
                       isSelected={isSelected}
+                      iconOverride={iconOverrides[terminal.id]}
+                      iconSize={iconSize}
                     />
                   );
                 })}
