@@ -90,10 +90,17 @@ async function sendTimmyCommand(terminal, command) {
   }
 
   const url = `http://${host}:${ctrlPort}/cmd`;
+  
+  // Estruturar o comando correctamente para o formato Timmy
+  const payload = {
+    sn: sn,
+    command: command
+  };
+  
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sn, command }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(12000),
   });
 
