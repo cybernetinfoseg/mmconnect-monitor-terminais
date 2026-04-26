@@ -30,6 +30,7 @@ export function resolvePermissions(user) {
     paginas_permitidas,
     pode_editar_terminais: true,
     pode_configurar_alertas: isAdmin,
+    pode_filtrar_por_utilizador: isAdmin,
     limite_terminais: user?.limite_terminais ?? 0,
   };
 }
