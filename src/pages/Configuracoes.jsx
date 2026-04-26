@@ -36,6 +36,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 import TelegramConfig from '../components/configuracoes/TelegramConfig';
+import AdmsServerCode from '../components/configuracoes/AdmsServerCode';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
 
@@ -274,6 +275,24 @@ export default function Configuracoes() {
               </div>
 
 
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* ADMS Server */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.03 }}>
+          <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="h-5 w-5 text-blue-600" />
+                Servidor ADMS (ZKTeco / Anviz)
+              </CardTitle>
+              <CardDescription>
+                Servidor que recebe os push HTTP dos terminais ZKTeco e Anviz (protocolo iClock/ADMS) e reporta o status ao NOC Monitor.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdmsServerCode />
             </CardContent>
           </Card>
         </motion.div>
