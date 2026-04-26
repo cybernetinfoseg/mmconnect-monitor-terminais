@@ -67,26 +67,24 @@ async function sendAdmsCommand(terminal, action, params = {}) {
  * sendTimmyCommand — envia comando ao timmy_ws_server.py via HTTP (porta 7789).
  * O servidor mantém a sessão WebSocket com o terminal e faz o relay do comando.
  * 
- * Fluxo: Base44 → POST http://<servidor>:7789/cmd → timmy_ws_server.py → WS → Terminal → resposta
+ * Fluxo: Base44 → POST http://51.91.219.145:7789/cmd → timmy_ws_server.py → WS → Terminal → resposta
  * 
- * O campo "ip_publico" ou "dns" do terminal deve apontar para o Windows Server
- * onde o timmy_ws_server.py está a correr.
+ * O servidor Timmy corre sempre em 51.91.219.145:7789 (IP público do NOC Server).
+ * O campo "Número de Série (SN)" é obrigatório para identificar o terminal.
  */
 async function sendTimmyCommand(terminal, command) {
-  const host = terminal.ip_publico || terminal.dns;
-  if (!host) {
-    throw new Error(`[Timmy WebSocket Cloud] Servidor não configurado.\n\n` +
-      `O terminal "${terminal.nome}" está configurado como WebSocket Cloud (Timmy).\n` +
-      `Para usar controlo remoto, DEVE estar a correr um servidor Timmy (timmy_ws_server.py) numa máquina Windows ou servidor.\n\n` +
-      `SOLUÇÃO:\n` +
-      `1. Coloque o IP público ou DNS do Windows Server no campo "IP Público" do terminal\n` +
-      `2. Certifique-se que a porta 7789 está acessível do exterior\n` +
-      `3. O servidor Timmy (timmy_ws_server.py) deve estar a correr nesse IP`);
-  }
   const ctrlPort = 7789; // porta HTTP de controlo do timmy_ws_server.py
+  const host = '51.91.219.145'; // Servidor Timmy central (NOC Server IP público)
   const sn = terminal.numero_serie || '';
+  
   if (!sn) {
-    throw new Error('Número de série (SN) não configurado no terminal.');
+    throw new Error(`[Timmy WebSocket Cloud] Número de série (SN) não configurado.\n\n` +
+      `O terminal "${terminal.nome}" não tem o Número de Série preenchido.\n` +
+      `Este campo é obrigatório para controlo remoto via WebSocket Cloud.\n\n` +
+      `SOLUÇÃO:\n` +
+      `1. Aceda ao terminal: MENU → Sys Info → Info → SN\n` +
+      `2. Copie o número de série (ex: AYSK02012617)\n` +
+      `3. Coloque-o no campo "Número de Série (SN)" do terminal no NOC Monitor`);
   }
 
   const url = `http://${host}:${ctrlPort}/cmd`;
@@ -106,7 +104,7 @@ async function sendTimmyCommand(terminal, command) {
 
   if (!resp.ok) {
     const errBody = await resp.text().catch(() => '');
-    throw new Error(`Servidor Timmy respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
+    throw new Error(`Servidor Timmy (${host}:${ctrlPort}) respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
   }
 
   const data = await resp.json();
