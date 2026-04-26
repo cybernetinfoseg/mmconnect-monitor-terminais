@@ -75,7 +75,13 @@ async function sendAdmsCommand(terminal, action, params = {}) {
 async function sendTimmyCommand(terminal, command) {
   const host = terminal.ip_publico || terminal.dns;
   if (!host) {
-    throw new Error('IP/DNS do servidor Timmy não configurado no terminal. Preencha o campo "IP Público" com o IP do Windows Server.');
+    throw new Error(`[Timmy WebSocket Cloud] Servidor não configurado.\n\n` +
+      `O terminal "${terminal.nome}" está configurado como WebSocket Cloud (Timmy).\n` +
+      `Para usar controlo remoto, DEVE estar a correr um servidor Timmy (timmy_ws_server.py) numa máquina Windows ou servidor.\n\n` +
+      `SOLUÇÃO:\n` +
+      `1. Coloque o IP público ou DNS do Windows Server no campo "IP Público" do terminal\n` +
+      `2. Certifique-se que a porta 7789 está acessível do exterior\n` +
+      `3. O servidor Timmy (timmy_ws_server.py) deve estar a correr nesse IP`);
   }
   const ctrlPort = 7789; // porta HTTP de controlo do timmy_ws_server.py
   const sn = terminal.numero_serie || '';
