@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket Cloud (Protocolo Timmy/THbio)
-# ✅ VERSÃO CORRIGIDA: Sistema de Futures para controlo remoto
+# ✅ VERSÃO CORRIGIDA v2: Grace period para evitar falsos OFFLINE durante reconexão
 # Compatível com: Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros modelos THbio
 # Protocolo: WebSocket + JSON (RFC 6455) — porta padrão 7788 (configurável)
 #
@@ -54,12 +54,13 @@ LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
 
 DEFAULT_WS_PORT   = 7788
 DEFAULT_CTRL_PORT = 7789  # porta HTTP de controlo (NOC Monitor → servidor → terminal)
-OFFLINE_TIMEOUT   = 15    # segundos sem mensagem → offline
+OFFLINE_TIMEOUT   = 60    # segundos sem mensagem → offline (aumentado para tolerar reconexões)
+RECONNECT_GRACE   = 30    # segundos de grace period após desconexão antes de reportar offline
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
 logger = logging.getLogger("timmy_ws")
 
-# Estado em memória: SN → { terminal_id, nome, last_seen, latencia_ms, connected }
+# Estado em memória: SN → { terminal_id, nome, last_seen, latencia_ms, connected, disconnected_at }
 ws_state = {}
 ws_lock  = threading.Lock()
 
@@ -167,7 +168,7 @@ async def handle_terminal(websocket):
                 with ws_conn_lock:
                     ws_connections[sn] = (websocket, asyncio.get_event_loop())
 
-                # Marcar online
+                # Marcar online (limpar disconnected_at para cancelar grace period)
                 with ws_lock:
                     ws_state[sn] = {
                         "terminal_id": tid,
@@ -175,6 +176,7 @@ async def handle_terminal(websocket):
                         "connected": True,
                         "last_seen": time.time(),
                         "latencia_ms": None,
+                        "disconnected_at": None,
                     }
 
                 # Responder ao terminal com a hora atual do servidor
@@ -199,6 +201,7 @@ async def handle_terminal(websocket):
                         if sn in ws_state:
                             ws_state[sn]["last_seen"] = time.time()
                             ws_state[sn]["connected"] = True
+                            ws_state[sn]["disconnected_at"] = None  # cancelar grace period
 
                 logger.info(f"[WS] SENDLOG SN={sn} count={count} logindex={logindex}")
 
@@ -251,8 +254,10 @@ async def handle_terminal(websocket):
                     del ws_connections[sn]
             with ws_lock:
                 if sn in ws_state:
+                    # Não marcar offline imediatamente — usar grace period para tolerar reconexões rápidas
                     ws_state[sn]["connected"] = False
-            logger.info(f"[WS] Ligação encerrada: SN={sn} ({peer[0]})")
+                    ws_state[sn]["disconnected_at"] = time.time()
+            logger.info(f"[WS] Ligação encerrada: SN={sn} ({peer[0]}) — grace period {RECONNECT_GRACE}s")
         else:
             logger.info(f"[WS] Ligação encerrada: {peer[0]} (sem registo)")
 
@@ -396,21 +401,32 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
             snapshot = dict(ws_state)
 
         for sn, estado in snapshot.items():
-            tid       = estado.get("terminal_id")
-            nome      = estado.get("nome", sn)
-            connected = estado.get("connected", False)
-            last_seen = estado.get("last_seen", 0)
-            latencia  = estado.get("latencia_ms")
+            tid            = estado.get("terminal_id")
+            nome           = estado.get("nome", sn)
+            connected      = estado.get("connected", False)
+            last_seen      = estado.get("last_seen", 0)
+            latencia       = estado.get("latencia_ms")
+            disconnected_at = estado.get("disconnected_at")
 
             if not tid:
                 continue
 
-            # Verificar timeout de heartbeat
+            disconnected_at = estado.get("disconnected_at")
+
+            # Verificar timeout de heartbeat (terminal conectado mas sem mensagens)
             if connected and last_seen > 0 and (time.time() - last_seen) > OFFLINE_TIMEOUT:
                 with ws_lock:
                     if sn in ws_state:
                         ws_state[sn]["connected"] = False
+                        ws_state[sn]["disconnected_at"] = time.time()
                 connected = False
+                disconnected_at = time.time()
+
+            # Grace period: se desconectou há menos de RECONNECT_GRACE segundos, não reportar offline
+            # (pode estar a reconectar — evita falsos offline durante reconexões rápidas)
+            if not connected and disconnected_at and (time.time() - disconnected_at) < RECONNECT_GRACE:
+                logger.debug(f"[REPORT-WS] '{nome}' (SN={sn}) em grace period — aguardando reconexão...")
+                continue
 
             seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
             status = "online" if connected else "offline"
@@ -602,7 +618,7 @@ export default function TimmyWsServerCode() {
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
         <p className="text-slate-700 pl-4 font-semibold text-violet-700">{`"WS_PORT": 7788,`}</p>
         <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"CTRL_PORT": 7789,`}</p>
-        <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 30`}</p>
+        <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 10`}</p>
         <p className="text-slate-700">{`}`}</p>
       </div>
 
