@@ -311,11 +311,23 @@ class CtrlHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self._respond(500, {"success": False, "error": str(e)})
 
+    # Comandos que o terminal executa mas não envia resposta (fire-and-forget)
+    FIRE_AND_FORGET_CMDS = {"settime", "reboot"}
+
     async def _send_and_wait(self, ws, sn, command):
         """
-        Envia comando e aguarda a resposta do terminal.
-        Usa o sistema de futures (pending_commands) para correlacionar respostas.
+        Envia comando ao terminal.
+        - Fire-and-forget (settime, reboot): envia e devolve sucesso imediatamente.
+        - Outros: aguarda resposta via Future com timeout de 11s.
         """
+        cmd_name = command.get("cmd", "")
+        
+        if cmd_name in self.FIRE_AND_FORGET_CMDS:
+            # Enviar e considerar sucesso sem aguardar resposta
+            await ws.send(json.dumps(command))
+            logger.info(f"[CTRL] Fire-and-forget '{cmd_name}' enviado a SN={sn}")
+            return {"result": True, "note": "Comando enviado (sem confirmação do terminal)"}
+        
         cmd_id = str(uuid.uuid4())[:8]  # ID único para este comando
         
         # Criar future para aguardar resposta
