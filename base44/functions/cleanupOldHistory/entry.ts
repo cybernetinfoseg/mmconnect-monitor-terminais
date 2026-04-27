@@ -1,9 +1,26 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 /**
- * cleanupOldHistory — apaga registos de StatusHistory com mais de 30 dias.
- * Chamado pelo scheduler 1x por dia para manter a base de dados saudável.
+ * cleanupOldHistory — apaga registos antigos de StatusHistory, AlertIncidents e OperationLogs.
+ * Chamado pelo scheduler — corre várias vezes por dia para ir limpando gradualmente.
+ * 
+ * Rate limit: apaga no máximo 50 registos por execução com pausa de 300ms entre cada.
+ * StatusHistory: retenção de 7 dias
+ * AlertIncidents resolvidos: retenção de 60 dias
+ * OperationLogs: retenção de 90 dias
  */
+
+async function deleteSequential(entityApi, items, maxItems = 50) {
+    const toDelete = items.slice(0, maxItems);
+    let deleted = 0;
+    for (const r of toDelete) {
+        const ok = await entityApi.delete(r.id).then(() => true).catch(() => false);
+        if (ok) deleted++;
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    return deleted;
+}
+
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
@@ -16,52 +33,33 @@ Deno.serve(async (req) => {
                 return Response.json({ error: 'Forbidden: apenas admins' }, { status: 403 });
             }
         }
-        // Se não autenticado, assume chamada do scheduler — prossegue
 
-        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        // StatusHistory: manter apenas 7 dias (cresce muito rápido)
+        const cutoff7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const oldHistory = await base44.asServiceRole.entities.StatusHistory.list('timestamp', 60).catch(() => []);
+        const historyToDelete = oldHistory.filter(r => r.timestamp < cutoff7);
+        const deletedHistory = await deleteSequential(base44.asServiceRole.entities.StatusHistory, historyToDelete, 50);
 
-        // Buscar registos antigos em batches maiores (500 por batch)
-        let deleted = 0;
-        let batchHistory = await base44.asServiceRole.entities.StatusHistory.list('-timestamp', 500);
-        let toDeleteHistory = batchHistory.filter(r => r.timestamp < cutoff);
-        // Apagar em paralelo (grupos de 20)
-        for (let i = 0; i < toDeleteHistory.length; i += 20) {
-            const chunk = toDeleteHistory.slice(i, i + 20);
-            await Promise.all(chunk.map(r => base44.asServiceRole.entities.StatusHistory.delete(r.id).catch(() => {})));
-            deleted += chunk.length;
-        }
-
-        // Limpar também AlertIncidents resolvidos há mais de 60 dias
+        // AlertIncidents resolvidos há mais de 60 dias
         const cutoff60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-        const oldIncidents = await base44.asServiceRole.entities.AlertIncident.list('-timestamp', 500);
+        const oldIncidents = await base44.asServiceRole.entities.AlertIncident.list('timestamp', 30).catch(() => []);
         const incidentsToDelete = oldIncidents.filter(i => i.resolvido && i.timestamp < cutoff60);
+        const deletedIncidents = await deleteSequential(base44.asServiceRole.entities.AlertIncident, incidentsToDelete, 20);
 
-        let deletedIncidents = 0;
-        for (let i = 0; i < incidentsToDelete.length; i += 20) {
-            const chunk = incidentsToDelete.slice(i, i + 20);
-            await Promise.all(chunk.map(inc => base44.asServiceRole.entities.AlertIncident.delete(inc.id).catch(() => {})));
-            deletedIncidents += chunk.length;
-        }
-
-        // Limpar OperationLogs com mais de 90 dias
+        // OperationLogs com mais de 90 dias
         const cutoff90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-        const oldOpLogs = await base44.asServiceRole.entities.OperationLog.list('-timestamp', 500).catch(() => []);
+        const oldOpLogs = await base44.asServiceRole.entities.OperationLog.list('timestamp', 30).catch(() => []);
         const opLogsToDelete = oldOpLogs.filter(l => l.timestamp < cutoff90);
-        let deletedOpLogs = 0;
-        for (let i = 0; i < opLogsToDelete.length; i += 20) {
-            const chunk = opLogsToDelete.slice(i, i + 20);
-            await Promise.all(chunk.map(l => base44.asServiceRole.entities.OperationLog.delete(l.id).catch(() => {})));
-            deletedOpLogs += chunk.length;
-        }
+        const deletedOpLogs = await deleteSequential(base44.asServiceRole.entities.OperationLog, opLogsToDelete, 20);
+
+        console.log(`Cleanup: history=${deletedHistory} incidents=${deletedIncidents} oplogs=${deletedOpLogs}`);
 
         return Response.json({
             success: true,
-            deleted_history: deleted,
+            deleted_history: deletedHistory,
             deleted_incidents: deletedIncidents,
             deleted_operation_logs: deletedOpLogs,
-            cutoff_history: cutoff,
-            cutoff_incidents: cutoff60,
-            cutoff_operation_logs: cutoff90,
+            remaining_history: historyToDelete.length - deletedHistory,
         });
 
     } catch (error) {
