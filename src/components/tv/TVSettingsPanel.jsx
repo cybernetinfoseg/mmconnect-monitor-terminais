@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const DISPLAY_OPTIONS = [
   { key: 'showLocal', label: 'Mostrar Local' },
-  { key: 'showConexao', label: 'Mostrar Conexão (IP/DNS/API)' },
+  { key: 'showConexao', label: 'Mostrar Tipo/Endereço de Conexão' },
+  { key: 'showEmail', label: 'Mostrar Email do Utilizador' },
   { key: 'showLastPing', label: 'Mostrar Último Ping' },
   { key: 'showLatencia', label: 'Mostrar Latência' },
   { key: 'showKPIs', label: 'Mostrar KPIs (Total/Online/Offline)' },

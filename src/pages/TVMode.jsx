@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS = {
   onlyOffline: false,
   showLocal: true,
   showConexao: true,
+  showEmail: true,
   showLastPing: true,
   showLatencia: false,
   showKPIs: true,
@@ -481,19 +482,43 @@ export default function TVMode() {
                       }
                         {tvSettings.showConexao !== false && (() => {
                           const tipo = terminal.tipo_conexao;
-                          let conexaoLabel = null;
+                          const tipoLabels = {
+                            ip_local: 'IP Local', ip_publico: 'IP Público', dns: 'DNS',
+                            p2s: 'P2S VPN', heartbeat: 'Heartbeat TCP', adms_push: 'ADMS/Push',
+                            sdk_tcp: 'SDK-TCP', websocket_cloud: 'WebSocket Cloud', api: 'API'
+                          };
                           let conexaoVal = null;
-                          if (tipo === 'ip_local' && terminal.ip_local) { conexaoLabel = 'IP Local'; conexaoVal = `${terminal.ip_local}:${terminal.porta || 5005}`; }
-                          else if (tipo === 'ip_publico' && terminal.ip_publico) { conexaoLabel = 'IP Público'; conexaoVal = `${terminal.ip_publico}:${terminal.porta || 5005}`; }
-                          else if (tipo === 'dns' && terminal.dns) { conexaoLabel = 'DNS'; conexaoVal = `${terminal.dns}:${terminal.porta || 5005}`; }
-                          else if (tipo === 'p2s' && terminal.ip_local) { conexaoLabel = 'VPN'; conexaoVal = terminal.ip_local; }
-                          else if (tipo === 'api' && terminal.api_endpoint) { conexaoLabel = 'API'; conexaoVal = terminal.api_endpoint; }
-                          return conexaoVal ? (
-                            <p className="text-slate-400 truncate">
-                              <span className="text-slate-500">{conexaoLabel}:</span> <span className="font-mono text-xs text-emerald-300">{conexaoVal}</span>
-                            </p>
-                          ) : null;
+                          if (tipo === 'ip_local' && terminal.ip_local) conexaoVal = `${terminal.ip_local}:${terminal.porta || 5005}`;
+                          else if (tipo === 'ip_publico' && terminal.ip_publico) conexaoVal = `${terminal.ip_publico}:${terminal.porta || 5005}`;
+                          else if (tipo === 'dns' && terminal.dns) conexaoVal = `${terminal.dns}:${terminal.porta || 5005}`;
+                          else if (tipo === 'p2s') conexaoVal = `Porta :${terminal.porta || 5005}`;
+                          else if (tipo === 'heartbeat') conexaoVal = `${terminal.ip_publico || '—'}:${terminal.porta || 5005}`;
+                          else if (tipo === 'adms_push') conexaoVal = terminal.numero_serie ? `SN: ${terminal.numero_serie}` : 'ADMS :8080';
+                          else if (tipo === 'sdk_tcp' && terminal.ip_publico) conexaoVal = `${terminal.ip_publico}:${terminal.porta || 4370}`;
+                          else if (tipo === 'websocket_cloud') conexaoVal = terminal.numero_serie ? `SN: ${terminal.numero_serie} | WS :${terminal.porta || 7788}` : `WS :${terminal.porta || 7788}`;
+                          else if (tipo === 'api' && terminal.api_endpoint) conexaoVal = terminal.api_endpoint;
+
+                          const tipoLabel = tipoLabels[tipo] || tipo;
+                          return (
+                            <div className="space-y-0.5">
+                              <p className="text-slate-400 text-xs flex items-center gap-1.5">
+                                <span className="text-slate-500">⟳</span>
+                                <span className="text-slate-300 font-medium">{tipoLabel}</span>
+                              </p>
+                              {conexaoVal && (
+                                <p className="font-mono text-xs text-emerald-300 bg-slate-700/40 px-2 py-0.5 rounded truncate">
+                                  {conexaoVal}
+                                </p>
+                              )}
+                            </div>
+                          );
                         })()}
+                        {tvSettings.showEmail !== false && (terminal.usuario_email || terminal.created_by) && (
+                          <p className="text-slate-500 text-xs truncate flex items-center gap-1">
+                            <User className="h-3 w-3 shrink-0" />
+                            {terminal.usuario_email || terminal.created_by}
+                          </p>
+                        )}
                         {tvSettings.showLatencia && terminal.latencia_ms &&
                       <p className="text-slate-400 truncate">
                             <span className="text-slate-500">Latência:</span> {terminal.latencia_ms}ms
