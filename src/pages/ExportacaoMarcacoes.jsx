@@ -64,9 +64,12 @@ export default function ExportacaoMarcacoes() {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
+  const isAdmin = currentUser?.role === 'admin';
+
   const { data: configs = [], isLoading } = useQuery({
     queryKey: ['export-configs'],
     queryFn: () => base44.entities.ExportConfig.list('-created_date'),
+    enabled: !!currentUser && isAdmin,
   });
 
   const saveMutation = useMutation({
@@ -125,6 +128,18 @@ export default function ExportacaoMarcacoes() {
   };
 
   const Icon = (tipo) => TIPO_ICONS[tipo] || Globe;
+
+  // Guard: admin only (after all hooks)
+  if (currentUser && !isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center space-y-3">
+          <Share2 className="h-12 w-12 mx-auto text-slate-300" />
+          <p className="text-slate-500 font-medium">Acesso restrito a administradores</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full overflow-x-hidden">

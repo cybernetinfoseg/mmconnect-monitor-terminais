@@ -41,7 +41,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Mapa', page: 'Mapa', icon: MapPin },
   { name: 'Utilizadores', page: 'Utilizadores', icon: Users },
   { name: 'Marcações', page: 'Marcacoes', icon: Fingerprint },
-  { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2 },
+  { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
   { name: 'Alertas', page: 'Alertas', icon: Bell },
@@ -148,6 +148,7 @@ export default function Layout({ children, currentPageName }) {
   // Filter nav items based on user permissions
   const navItems = ALL_NAV_ITEMS.filter(item => {
     if (!currentUser) return false;
+    if (item.adminOnly && !perms.isAdmin) return false;
     return perms.paginas_permitidas.includes(item.page);
   });
 

@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
     FileBarChart2, Download, TrendingUp, Activity,
-    CheckCircle2, XCircle, Calendar, Printer, Loader2, X, User
+    CheckCircle2, XCircle, Calendar, Printer, Loader2, X, User,
+    ClipboardList, Users, Fingerprint
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import {
@@ -55,6 +56,21 @@ export default function Relatorios() {
     const { data: allIncidents = [] } = useQuery({
         queryKey: ['rel-incidents'],
         queryFn: () => base44.entities.AlertIncident.list('-timestamp', 1000),
+        enabled: !!currentUser,
+    });
+
+    const { data: allMarcacoes = [] } = useQuery({
+        queryKey: ['rel-marcacoes'],
+        queryFn: async () => {
+            if (canSeeAll) return base44.entities.Marcacao.list('-timestamp', 2000);
+            return base44.entities.Marcacao.list('-timestamp', 2000);
+        },
+        enabled: !!currentUser,
+    });
+
+    const { data: allTerminalUsers = [] } = useQuery({
+        queryKey: ['rel-terminal-users'],
+        queryFn: () => base44.entities.TerminalUser.list('nome', 500),
         enabled: !!currentUser,
     });
 
@@ -303,6 +319,38 @@ export default function Relatorios() {
 
     const loading = historyLoading && !history.length;
 
+    // Marcações stats filtered by date and user ownership
+    const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
+    const marcacoesFiltered = useMemo(() => {
+        return allMarcacoes.filter(m => {
+            if (!canSeeAll && !myTerminalIds.has(m.terminal_id)) return false;
+            const t = new Date(m.timestamp);
+            return t >= cutoff && t <= cutoffEnd;
+        });
+    }, [allMarcacoes, canSeeAll, myTerminalIds, cutoff, cutoffEnd]);
+
+    const marcacoesStats = useMemo(() => {
+        const byTerminal = {};
+        marcacoesFiltered.forEach(m => {
+            if (!byTerminal[m.terminal_id]) byTerminal[m.terminal_id] = { nome: m.terminal_nome, count: 0, users: new Set() };
+            byTerminal[m.terminal_id].count++;
+            byTerminal[m.terminal_id].users.add(m.enrollid);
+        });
+        return {
+            total: marcacoesFiltered.length,
+            entradas: marcacoesFiltered.filter(m => m.tipo === 'entrada').length,
+            saidas: marcacoesFiltered.filter(m => m.tipo === 'saida').length,
+            uniqueUsers: new Set(marcacoesFiltered.map(m => m.enrollid)).size,
+            byTerminal: Object.values(byTerminal).sort((a, b) => b.count - a.count).slice(0, 10),
+            naoExportadas: marcacoesFiltered.filter(m => !m.exportado).length,
+        };
+    }, [marcacoesFiltered]);
+
+    const utilizadoresStats = useMemo(() => {
+        const mine = canSeeAll ? allTerminalUsers : allTerminalUsers.filter(u => u.owner_email === currentUser?.email);
+        return { total: mine.length, ativos: mine.filter(u => u.ativo !== false).length, comCartao: mine.filter(u => u.card).length };
+    }, [allTerminalUsers, canSeeAll, currentUser]);
+
     return (
         <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-6xl overflow-x-hidden" ref={printRef}>
             {/* Header */}
@@ -434,6 +482,76 @@ export default function Relatorios() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Marcações Summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card className="bg-white border-slate-200">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                            <Fingerprint className="h-4 w-4 text-blue-600" /> Marcações no Período
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                            {[
+                                { label: 'Total', value: marcacoesStats.total, color: 'text-blue-600' },
+                                { label: 'Entradas', value: marcacoesStats.entradas, color: 'text-emerald-600' },
+                                { label: 'Saídas', value: marcacoesStats.saidas, color: 'text-rose-600' },
+                                { label: 'Utilizadores', value: marcacoesStats.uniqueUsers, color: 'text-violet-600' },
+                            ].map(s => (
+                                <div key={s.label} className="text-center p-3 bg-slate-50 rounded-lg">
+                                    <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                                </div>
+                            ))}
+                        </div>
+                        {marcacoesStats.naoExportadas > 0 && (
+                            <div className="p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+                                ⚠️ {marcacoesStats.naoExportadas} marcação(ões) ainda não exportada(s)
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="bg-white border-slate-200">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                            <Users className="h-4 w-4 text-teal-600" /> Utilizadores dos Terminais
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                            {[
+                                { label: 'Total', value: utilizadoresStats.total, color: 'text-teal-600' },
+                                { label: 'Ativos', value: utilizadoresStats.ativos, color: 'text-emerald-600' },
+                                { label: 'Com Cartão', value: utilizadoresStats.comCartao, color: 'text-blue-600' },
+                            ].map(s => (
+                                <div key={s.label} className="text-center p-3 bg-slate-50 rounded-lg">
+                                    <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+                                </div>
+                            ))}
+                        </div>
+                        {marcacoesStats.byTerminal.length > 0 && (
+                            <div>
+                                <p className="text-xs font-semibold text-slate-600 mb-2">Top terminais por marcações:</p>
+                                <div className="space-y-1">
+                                    {marcacoesStats.byTerminal.slice(0, 5).map((t, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <span className="text-xs text-slate-400 w-4">{i+1}.</span>
+                                            <div className="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, (t.count / marcacoesStats.total) * 100)}%` }} />
+                                            </div>
+                                            <span className="text-xs text-slate-600 truncate max-w-[100px]">{t.nome}</span>
+                                            <span className="text-xs font-semibold text-slate-700 shrink-0">{t.count}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* Terminal Ranking Table */}
             <Card className="bg-white border-slate-200">

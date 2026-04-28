@@ -17,7 +17,7 @@ const ALL_PAGES = [
   'Utilizadores', 'Marcacoes', 'ExportacaoMarcacoes',
 ];
 
-const ADMIN_ONLY_PAGES = ['Administracao', 'Configuracoes'];
+const ADMIN_ONLY_PAGES = ['Administracao', 'Configuracoes', 'ExportacaoMarcacoes'];
 
 export function resolvePermissions(user) {
   const isAdmin = user?.role === 'admin';
