@@ -59,6 +59,9 @@ export default function Terminais() {
   const [tipoFilter, setTipoFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
+  const [fabricanteFilter, setFabricanteFilter] = useState('all');
+  const [localFilter, setLocalFilter] = useState('all');
+  const [showExtraFilters, setShowExtraFilters] = useState(false);
 
   // Limpar filtros ao montar a página (evita persistência ao navegar)
   useEffect(() => {
@@ -66,6 +69,8 @@ export default function Terminais() {
     setTipoFilter('all');
     setStatusFilter('all');
     setUserFilter('all');
+    setFabricanteFilter('all');
+    setLocalFilter('all');
   }, []);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -270,18 +275,36 @@ export default function Terminais() {
 
   const atLimit = !isAdmin && (limiteTerminais === 0 || (limiteTerminais > 0 && terminalCount >= limiteTerminais));
 
+  const fabricantes = useMemo(() =>
+    [...new Set(terminals.map(t => t.fabricante).filter(Boolean))].sort(),
+    [terminals]
+  );
+
+  const locaisDisponiveis = useMemo(() =>
+    [...new Set(terminals.map(t => t.local).filter(Boolean))].sort(),
+    [terminals]
+  );
+
   const filteredTerminals = useMemo(() => {
+    const q = searchTerm.toLowerCase();
     return terminals.filter(t => {
-      const matchSearch = !searchTerm || 
-        t.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.local?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.cliente_nome?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = !searchTerm ||
+        t.nome?.toLowerCase().includes(q) ||
+        t.local?.toLowerCase().includes(q) ||
+        t.cliente_nome?.toLowerCase().includes(q) ||
+        t.numero_serie?.toLowerCase().includes(q) ||
+        t.ip_local?.toLowerCase().includes(q) ||
+        t.ip_publico?.toLowerCase().includes(q) ||
+        t.dns?.toLowerCase().includes(q) ||
+        t.modelo?.toLowerCase().includes(q);
       const matchTipo = tipoFilter === 'all' || t.tipo_conexao === tipoFilter;
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
       const matchUser = userFilter === 'all' || (t.usuario_email || t.created_by) === userFilter;
-      return matchSearch && matchTipo && matchStatus && matchUser;
+      const matchFabricante = fabricanteFilter === 'all' || t.fabricante === fabricanteFilter;
+      const matchLocal = localFilter === 'all' || t.local === localFilter;
+      return matchSearch && matchTipo && matchStatus && matchUser && matchFabricante && matchLocal;
     });
-  }, [terminals, searchTerm, tipoFilter, statusFilter, userFilter]);
+  }, [terminals, searchTerm, tipoFilter, statusFilter, userFilter, fabricanteFilter, localFilter]);
 
   const handleEdit = (terminal) => {
     setEditingTerminal(terminal);
@@ -389,21 +412,22 @@ export default function Terminais() {
 
         {/* Filters */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-           <CardContent className="p-3 sm:p-4">
-             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-               <div className="w-full sm:flex-1 sm:min-w-[180px] relative">
-                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                 <Input
-                   placeholder="Pesquisar por nome ou local..."
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className="pl-10"
-                 />
-               </div>
-               <Select value={tipoFilter} onValueChange={setTipoFilter}>
-                 <SelectTrigger className="w-full sm:w-[160px]">
-                   <SelectValue placeholder="Tipo de conexão" />
-                 </SelectTrigger>
+          <CardContent className="p-3 sm:p-4 space-y-2">
+            {/* Row 1: search + primary filters */}
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
+              <div className="w-full sm:flex-1 sm:min-w-[200px] relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Nome, local, SN, IP, DNS, modelo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <SelectValue placeholder="Tipo de conexão" />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os tipos</SelectItem>
                   <SelectItem value="ip_local">IP Local</SelectItem>
@@ -418,7 +442,7 @@ export default function Terminais() {
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[140px]">
+                <SelectTrigger className="w-full sm:w-[130px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -427,20 +451,67 @@ export default function Terminais() {
                   <SelectItem value="offline">Offline</SelectItem>
                 </SelectContent>
               </Select>
-              {isAdmin && (
-                 <select
-                   value={userFilter}
-                   onChange={(e) => setUserFilter(e.target.value)}
-                   className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                 >
-                  <option value="all">Todos os utilizadores</option>
-                  {usuarios.map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
-              )}
-
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 text-xs shrink-0"
+                onClick={() => setShowExtraFilters(v => !v)}
+              >
+                <Search className="h-3.5 w-3.5" />
+                {showExtraFilters ? 'Menos filtros' : 'Mais filtros'}
+                {(fabricanteFilter !== 'all' || localFilter !== 'all' || userFilter !== 'all') && (
+                  <span className="w-2 h-2 bg-blue-500 rounded-full" />
+                )}
+              </Button>
             </div>
+
+            {/* Row 2: extra filters */}
+            {showExtraFilters && (
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 pt-1 border-t border-slate-100">
+                {/* Local */}
+                <Select value={localFilter} onValueChange={setLocalFilter}>
+                  <SelectTrigger className="w-full sm:w-[160px]">
+                    <SelectValue placeholder="Local" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os locais</SelectItem>
+                    {locaisDisponiveis.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+
+                {/* Fabricante */}
+                {fabricantes.length > 0 && (
+                  <Select value={fabricanteFilter} onValueChange={setFabricanteFilter}>
+                    <SelectTrigger className="w-full sm:w-[160px]">
+                      <SelectValue placeholder="Fabricante" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os fabricantes</SelectItem>
+                      {fabricantes.map(f => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Utilizador (admin only) */}
+                {isAdmin && (
+                  <select
+                    value={userFilter}
+                    onChange={(e) => setUserFilter(e.target.value)}
+                    className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="all">Todos os utilizadores</option>
+                    {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                )}
+
+                {/* Clear extra filters */}
+                {(fabricanteFilter !== 'all' || localFilter !== 'all' || userFilter !== 'all') && (
+                  <Button variant="ghost" size="sm" className="h-9 text-xs text-slate-400" onClick={() => { setFabricanteFilter('all'); setLocalFilter('all'); setUserFilter('all'); }}>
+                    Limpar
+                  </Button>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
