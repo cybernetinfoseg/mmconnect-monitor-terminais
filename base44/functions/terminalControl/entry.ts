@@ -422,14 +422,29 @@ async function actionSetDoorStatus(terminal, params) {
 }
 
 async function actionAddUser(terminal, params) {
-  const { enrollid, name, password = '', card = '', privilege = 0, accgroup = 1, timezone = 1 } = params || {};
+  const { enrollid, name, password = '', card = '', privilege = 0 } = params || {};
   if (!enrollid || !name) return { success: false, error: 'enrollid e name são obrigatórios' };
 
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    // Protocolo v3.0 secção 35: cmd:"adduser" com flag:10 para registo automático
-    const msg = { cmd: 'adduser', enrollid: Number(enrollid), name, admin: Number(privilege), flag: 10 };
-    if (password) msg.pwd = password;
-    if (card) msg.card = Number(card);
+    // Protocolo v3.0 secção 6 "Send user information": cmd:"setuserinfo"
+    // backupnum: 10=password, 11=card — para criar apenas o utilizador com nome usamos password
+    // Se não tiver password nem card, cria apenas com nome (backupnum=10, record=0)
+    let backupnum = 10; // password por defeito
+    let record = password ? Number(password) : 0;
+
+    if (card) {
+      backupnum = 11;
+      record = Number(card);
+    }
+
+    const msg = {
+      cmd: 'setuserinfo',
+      enrollid: Number(enrollid),
+      name,
+      backupnum,
+      admin: Number(privilege),
+      record,
+    };
     const resp = await sendTimmyCommand(terminal, msg);
     return { success: resp.result === true, message: `Utilizador "${name}" (ID:${enrollid}) adicionado`, data: resp };
   }
