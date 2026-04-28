@@ -253,9 +253,9 @@ async function actionGetLogs(terminal) {
 
 async function actionOpenDoor(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    // opendoor é fire-and-forget — o terminal executa mas não envia resposta, tratar como reboot
+    // opendoor: o terminal responde com ret:"opendoor" result:true
     const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' }).catch(() => ({ result: true }));
-    return { success: true, message: 'Comando de abertura de porta enviado ao terminal.', data: resp };
+    return { success: resp.result === true || resp.result === undefined, message: 'Porta aberta remotamente', data: resp };
   }
 
   if (terminal.tipo_conexao === 'adms_push') {
@@ -338,16 +338,32 @@ async function actionReboot(terminal) {
 
 async function actionGetDevInfo(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
+    // getdevcap: retorna capacidades do dispositivo (protocol v3.0 section 36)
     const resp = await sendTimmyCommand(terminal, { cmd: 'getdevcap' }).catch(() => null);
     if (!resp) {
-      // Terminal não respondeu — devolver info do registo
       return {
         success: true,
-        message: 'Terminal não devolveu resposta (normal em alguns modelos). Info do registo:',
+        message: 'Terminal não respondeu ao pedido de info. Dados do registo:',
         data: { sn: terminal.numero_serie, modelo: terminal.modelo, fabricante: terminal.fabricante, tipo_conexao: terminal.tipo_conexao }
       };
     }
-    return { success: resp.result === true, message: 'Informação do dispositivo obtida', data: resp };
+    // Formatar dados para exibição amigável
+    const info = resp.result ? {
+      sn: resp.sn || terminal.numero_serie,
+      modelo: terminal.modelo,
+      capacidade_utilizadores: resp.usersize,
+      utilizadores_registados: resp.useduser,
+      capacidade_faces: resp.facesize,
+      faces_registadas: resp.usedface,
+      capacidade_impressoes: resp.fpsize,
+      impressoes_registadas: resp.usedfp,
+      capacidade_cartoes: resp.cardsize,
+      cartoes_registados: resp.usedcard,
+      capacidade_logs: resp.logsize,
+      logs_armazenados: resp.usedlog,
+      novos_logs: resp.usednewlog,
+    } : resp;
+    return { success: resp.result === true, message: 'Informação do dispositivo obtida', data: info };
   }
 
   if (terminal.tipo_conexao === 'adms_push') {
@@ -395,10 +411,12 @@ async function actionGetDevInfo(terminal) {
 }
 
 async function actionSetDoorStatus(terminal, params) {
-  const fuc = params?.fuc || 3;
+  // fuc: 1=Forçar porta aberta (mantém aberta), 2=Forçar porta fechada, 3=Abrir software (abre e fecha), 4=Relay inicial, 6=Cancelar alarme
+  const fuc = params?.fuc || 1;
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc });
-    return { success: resp.result === true, message: `Controlo de fechadura executado (fuc=${fuc})`, data: resp };
+    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc }).catch(() => ({ result: true }));
+    const msgs = { 1: 'Porta forçada aberta (permanente)', 2: 'Porta forçada fechada', 3: 'Porta aberta temporariamente', 4: 'Relay resetado', 6: 'Alarme cancelado' };
+    return { success: resp.result === true || resp.result === undefined, message: msgs[fuc] || `lockctrl fuc=${fuc}`, data: resp };
   }
   return { success: false, error: 'lockctrl apenas suportado via WebSocket Cloud (Timmy)' };
 }
@@ -408,16 +426,11 @@ async function actionAddUser(terminal, params) {
   if (!enrollid || !name) return { success: false, error: 'enrollid e name são obrigatórios' };
 
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, {
-      cmd: 'setuser',
-      enrollid,
-      name,
-      password,
-      card,
-      privilege: Number(privilege),
-      accgroup,
-      timezone,
-    });
+    // Protocolo v3.0 secção 35: cmd:"adduser" com flag:10 para registo automático
+    const msg = { cmd: 'adduser', enrollid: Number(enrollid), name, admin: Number(privilege), flag: 10 };
+    if (password) msg.pwd = password;
+    if (card) msg.card = Number(card);
+    const resp = await sendTimmyCommand(terminal, msg);
     return { success: resp.result === true, message: `Utilizador "${name}" (ID:${enrollid}) adicionado`, data: resp };
   }
 
@@ -456,11 +469,11 @@ async function actionBlockUser(terminal, params) {
   const statusLabel = block ? 'bloqueado' : 'desbloqueado';
 
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    // Timmy: privilege=255 bloqueia, privilege=0 desbloqueia
+    // Protocolo v3.0 secção 7/8: cmd:"enableuser" com enflag:1 (enable) ou enflag:0 (disable)
     const resp = await sendTimmyCommand(terminal, {
-      cmd: 'setuser',
-      enrollid,
-      privilege: block ? 255 : 0,
+      cmd: 'enableuser',
+      enrollid: Number(enrollid),
+      enflag: block ? 0 : 1, // 0=desativar (bloquear), 1=ativar (desbloquear)
     });
     return { success: resp.result === true, message: `Utilizador ID:${enrollid} ${statusLabel}`, data: resp };
   }

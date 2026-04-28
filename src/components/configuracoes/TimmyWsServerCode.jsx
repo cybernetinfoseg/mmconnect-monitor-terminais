@@ -223,17 +223,20 @@ async def handle_terminal(websocket):
                     "cloudtime": time.strftime("%Y-%m-%d %H:%M:%S")
                 }))
 
-            elif ret:
+            elif msg.get("ret"):
                 # Resposta a um comando enviado pelo NOC Monitor
-                # Procurar no mapa de comandos pendentes
+                # O terminal responde com ret:"<nome_do_comando>" — usar como chave de correlação
+                ret_cmd = msg.get("ret")
+                terminal_sn = sn or msg_sn
                 with pending_lock:
-                    for (cmd_sn, cmd_id), future in list(pending_commands.items()):
-                        if cmd_sn == (sn or msg_sn) and (msg.get("cmd") == cmd_id or msg.get("ret") == cmd_id):
-                            if not future.done():
-                                future.set_result(msg)
-                            del pending_commands[(cmd_sn, cmd_id)]
-                            logger.debug(f"[WS] Resposta ao comando '{cmd_id}' recebida de SN={sn or msg_sn}: {msg}")
-                            break
+                    key = (terminal_sn, ret_cmd)
+                    if key in pending_commands:
+                        future = pending_commands.pop(key)
+                        if not future.done():
+                            future.set_result(msg)
+                        logger.debug(f"[WS] Resposta '{ret_cmd}' recebida de SN={terminal_sn}: result={msg.get('result')}")
+                    else:
+                        logger.debug(f"[WS] Resposta '{ret_cmd}' de SN={terminal_sn} sem comando pendente")
 
             else:
                 logger.debug(f"[WS] CMD/RET desconhecido: {msg}")
@@ -317,7 +320,8 @@ class CtrlHandler(BaseHTTPRequestHandler):
             self._respond(500, {"success": False, "error": str(e)})
 
     # Comandos que o terminal executa mas não envia resposta (fire-and-forget)
-    FIRE_AND_FORGET_CMDS = {"settime", "reboot", "opendoor", "lockctrl"}
+    # Nota: settime e reboot não enviam ret de volta. Todos os outros enviam ret.
+    FIRE_AND_FORGET_CMDS = {"settime", "reboot"}
 
     async def _send_and_wait(self, ws, sn, command):
         """
@@ -333,29 +337,25 @@ class CtrlHandler(BaseHTTPRequestHandler):
             logger.info(f"[CTRL] Fire-and-forget '{cmd_name}' enviado a SN={sn}")
             return {"result": True, "note": "Comando enviado (sem confirmação do terminal)"}
         
-        cmd_id = str(uuid.uuid4())[:8]  # ID único para este comando
-        
-        # Criar future para aguardar resposta
+        # Usar o nome do comando como chave de correlação (o terminal responde com ret:"<cmd>")
+        # Usar tuple (sn, cmd_name) para mapear a resposta
         loop = asyncio.get_event_loop()
         future = loop.create_future()
         
         with pending_lock:
-            pending_commands[(sn, cmd_id)] = future
+            pending_commands[(sn, cmd_name)] = future
         
         try:
-            # Adicionar cmd_id à mensagem de comando (para correlação)
-            msg_to_send = dict(command)
-            msg_to_send["cmd_id"] = cmd_id
-            
             # Enviar comando ao terminal
-            await ws.send(json.dumps(msg_to_send))
+            await ws.send(json.dumps(command))
+            logger.info(f"[CTRL] Comando '{cmd_name}' enviado a SN={sn}, aguardando resposta...")
             
             # Aguardar resposta (timeout 11 segundos)
             result = await asyncio.wait_for(future, timeout=11)
             return result
         finally:
             with pending_lock:
-                pending_commands.pop((sn, cmd_id), None)
+                pending_commands.pop((sn, cmd_name), None)
 
     def do_GET(self):
         if self.path == "/status":
