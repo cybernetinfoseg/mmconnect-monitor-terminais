@@ -37,10 +37,21 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
   const [saving, setSaving] = useState(false);
   const [diasSelecionados, setDiasSelecionados] = useState([1, 2, 3, 4, 5]);
 
+  const isAdmin = currentUser?.role === 'admin';
+
   const { data: terminals = [] } = useQuery({
-    queryKey: ['terminals-sched'],
-    queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
-    enabled: open,
+    queryKey: ['terminals-sched', currentUser?.email, isAdmin],
+    queryFn: async () => {
+      if (isAdmin) return base44.entities.Terminal.filter({ ativo: true }, 'nome');
+      const email = currentUser?.email;
+      const [a, b] = await Promise.all([
+        base44.entities.Terminal.filter({ usuario_email: email, ativo: true }, 'nome'),
+        base44.entities.Terminal.filter({ created_by: email, ativo: true }, 'nome'),
+      ]);
+      const seen = new Set();
+      return [...a, ...b].filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
+    },
+    enabled: open && !!currentUser,
   });
 
   useEffect(() => {
