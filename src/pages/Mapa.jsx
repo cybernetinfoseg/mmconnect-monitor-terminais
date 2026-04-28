@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
@@ -11,100 +11,13 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import TerminalIcon from '@/components/mapa/TerminalIcon';
 import MapTooltip from '@/components/mapa/MapTooltip';
 import MarkerConfigPanel from '@/components/mapa/MarkerConfigPanel';
+import MapCanvas from '@/components/mapa/MapCanvas';
 
 const GRID_SIZE = 40;
-
-// ─── Marker component ───────────────────────────────────────────────────────
-function TerminalMarker({ terminal, position, isEditMode, onDragEnd, onClick, isSelected, iconOverride, iconSize = 40 }) {
-  const [isDragging, setIsDragging] = useState(false);
-  const markerRef = useRef(null);
-
-  const handlePointerDown = (e) => {
-    if (!isEditMode) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const onMove = (me) => {
-      setIsDragging(true);
-      const clientX = me.touches ? me.touches[0].clientX : me.clientX;
-      const clientY = me.touches ? me.touches[0].clientY : me.clientY;
-      const container = markerRef.current?.closest('[data-map-container]');
-      if (!container) return;
-      const rect = container.getBoundingClientRect();
-      onDragEnd(
-        terminal.id,
-        Math.max(1, Math.min(99, ((clientX - rect.left) / rect.width) * 100)),
-        Math.max(1, Math.min(99, ((clientY - rect.top) / rect.height) * 100))
-      );
-    };
-
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.removeEventListener('touchmove', onMove);
-      document.removeEventListener('touchend', onUp);
-      // slight delay to prevent click after drag
-      setTimeout(() => setIsDragging(false), 50);
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onUp);
-  };
-
-  return (
-    <div
-      ref={markerRef}
-      className="absolute"
-      style={{
-        left: `${position.x}%`,
-        top: `${position.y}%`,
-        transform: 'translate(-50%, -50%)',
-        zIndex: isSelected ? 30 : 10,
-        pointerEvents: 'auto',
-      }}
-    >
-      <motion.div
-        whileHover={{ scale: 1.12 }}
-        className={cn(
-          "relative flex flex-col items-center gap-0.5 select-none",
-          isEditMode ? "cursor-move" : "cursor-pointer"
-        )}
-        onMouseDown={handlePointerDown}
-        onTouchStart={handlePointerDown}
-        onClick={(e) => {
-          if (!isDragging && !isEditMode) {
-            e.stopPropagation();
-            onClick(terminal);
-          }
-        }}
-      >
-        {/* Offline pulse ring */}
-        {terminal.status === 'offline' && (
-          <span className="absolute rounded-full animate-ping bg-red-400 opacity-40 pointer-events-none"
-            style={{ width: iconSize + 8, height: iconSize + 8, top: -4, left: -4 }} />
-        )}
-        {/* Icon with ring if selected */}
-        <div className={cn(
-          "rounded-xl overflow-hidden shadow-lg",
-          isSelected && "ring-2 ring-offset-2 ring-blue-400"
-        )}>
-          <TerminalIcon terminal={terminal} size={iconSize} iconOverride={iconOverride} />
-        </div>
-        {/* Name label */}
-        <span className="text-[9px] font-semibold text-slate-800 bg-white/90 px-1.5 py-0.5 rounded shadow-sm max-w-[70px] truncate text-center leading-tight whitespace-nowrap">
-          {terminal.nome}
-        </span>
-      </motion.div>
-    </div>
-  );
-}
 
 // ─── Main page ───────────────────────────────────────────────────────────────
 export default function Mapa() {
@@ -511,100 +424,25 @@ export default function Mapa() {
           )}
 
           {/* Canvas */}
-          <div className="relative overflow-auto bg-slate-100" style={{ height: mapHeight }}>
-            <div style={{
-              width: zoom <= 100 ? '100%' : `${zoom}%`,
-              minWidth: '100%',
-              height: zoom <= 100 ? '100%' : `${zoom}%`,
-              minHeight: 420,
-              position: 'relative',
-            }}>
-              <div
-                data-map-container
-                className="relative w-full h-full"
-                style={{
-                  backgroundImage: selectedPlanta?.planta_url
-                    ? `url(${selectedPlanta.planta_url})`
-                    : `linear-gradient(to right,#dde3ed 1px,transparent 1px),linear-gradient(to bottom,#dde3ed 1px,transparent 1px)`,
-                  backgroundSize: selectedPlanta?.planta_url
-                    ? (imageFit === 'none' ? 'auto' : imageFit)
-                    : `${GRID_SIZE}px ${GRID_SIZE}px`,
-                  backgroundRepeat: 'no-repeat',
-                  backgroundPosition: 'center',
-                  backgroundColor: '#f8fafc',
-                  minHeight: 420,
-                }}
-                onClick={() => setSelectedTerminal(null)}
-              >
-                {/* Planta name label */}
-                {selectedPlanta && (
-                  <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-white/85 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-rose-600 shadow-sm pointer-events-none">
-                    <MapPin className="h-3 w-3" />
-                    PLANTA — {selectedPlanta.nome.toUpperCase()}
-                  </div>
-                )}
-
-                {/* Edit mode banner */}
-                {isEditMode && (
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white text-xs px-4 py-1 rounded-full shadow-lg pointer-events-none">
-                    Modo de edição — arraste os terminais
-                  </div>
-                )}
-
-                {/* No planta selected */}
-                {!selectedPlantaId && !loadingPlantas && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
-                    <MapPin className="h-12 w-12 opacity-20" />
-                    <p className="text-sm font-medium">Crie ou selecione uma planta para começar</p>
-                    <Button size="sm" variant="outline" className="mt-1" onClick={() => setShowNewPlantaForm(true)}>
-                      <Plus className="h-4 w-4 mr-1" /> Nova planta
-                    </Button>
-                  </div>
-                )}
-
-                {/* Markers */}
-                {selectedPlantaId && visibleTerminals.map(terminal => {
-                  const pos = positions[terminal.id] || { x: 50, y: 50 };
-                  const isSelected = selectedTerminal?.id === terminal.id;
-                  return (
-                    <TerminalMarker
-                      key={terminal.id}
-                      terminal={terminal}
-                      position={pos}
-                      isEditMode={isEditMode}
-                      onDragEnd={handleDragEnd}
-                      onClick={setSelectedTerminal}
-                      isSelected={isSelected}
-                      iconOverride={iconOverrides[terminal.id]}
-                      iconSize={iconSize}
-                    />
-                  );
-                })}
-
-                {/* Smart tooltip — rendered at map level, not inside marker */}
-                <AnimatePresence>
-                  {selectedTerminal && !isEditMode && (() => {
-                    const pos = positions[selectedTerminal.id] || { x: 50, y: 50 };
-                    return (
-                      <MapTooltip
-                        key={selectedTerminal.id}
-                        terminal={selectedTerminal}
-                        posX={pos.x}
-                        posY={pos.y}
-                        onClose={() => setSelectedTerminal(null)}
-                      />
-                    );
-                  })()}
-                </AnimatePresence>
-
-                {loadingTerminals && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/50">
-                    <div className="w-7 h-7 border-4 border-slate-200 border-t-rose-500 rounded-full animate-spin" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <MapCanvas
+            zoom={zoom}
+            mapHeight={mapHeight}
+            selectedPlanta={selectedPlanta}
+            selectedPlantaId={selectedPlantaId}
+            loadingPlantas={loadingPlantas}
+            loadingTerminals={loadingTerminals}
+            imageFit={imageFit}
+            isEditMode={isEditMode}
+            visibleTerminals={visibleTerminals}
+            positions={positions}
+            selectedTerminal={selectedTerminal}
+            setSelectedTerminal={setSelectedTerminal}
+            iconOverrides={iconOverrides}
+            iconSize={iconSize}
+            handleDragEnd={handleDragEnd}
+            setShowNewPlantaForm={setShowNewPlantaForm}
+            GRID_SIZE={GRID_SIZE}
+          />
         </Card>
 
         {/* ── Legend ────────────────────────────────── */}
