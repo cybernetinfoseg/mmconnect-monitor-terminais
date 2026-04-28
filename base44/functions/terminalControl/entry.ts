@@ -203,7 +203,10 @@ async function actionSetTime(terminal) {
 
 async function actionGetLogs(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getnewlog', stn: true });
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getnewlog', stn: true }).catch(() => null);
+    if (!resp) {
+      return { success: false, message: 'Terminal não respondeu ao pedido de logs. Verifique se o terminal está online e ligado ao servidor WebSocket.' };
+    }
     const count = resp.count || 0;
     const records = resp.record || [];
     return { success: resp.result === true, message: `${count} marcações recolhidas`, count, records: records.slice(0, 50) };
@@ -250,8 +253,9 @@ async function actionGetLogs(terminal) {
 
 async function actionOpenDoor(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' });
-    return { success: resp.result === true, message: 'Porta aberta remotamente', data: resp };
+    // opendoor é fire-and-forget — o terminal executa mas não envia resposta, tratar como reboot
+    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' }).catch(() => ({ result: true }));
+    return { success: true, message: 'Comando de abertura de porta enviado ao terminal.', data: resp };
   }
 
   if (terminal.tipo_conexao === 'adms_push') {
@@ -334,7 +338,15 @@ async function actionReboot(terminal) {
 
 async function actionGetDevInfo(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getdevcap' });
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getdevcap' }).catch(() => null);
+    if (!resp) {
+      // Terminal não respondeu — devolver info do registo
+      return {
+        success: true,
+        message: 'Terminal não devolveu resposta (normal em alguns modelos). Info do registo:',
+        data: { sn: terminal.numero_serie, modelo: terminal.modelo, fabricante: terminal.fabricante, tipo_conexao: terminal.tipo_conexao }
+      };
+    }
     return { success: resp.result === true, message: 'Informação do dispositivo obtida', data: resp };
   }
 

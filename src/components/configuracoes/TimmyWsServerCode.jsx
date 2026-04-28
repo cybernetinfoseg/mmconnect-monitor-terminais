@@ -317,7 +317,7 @@ class CtrlHandler(BaseHTTPRequestHandler):
             self._respond(500, {"success": False, "error": str(e)})
 
     # Comandos que o terminal executa mas não envia resposta (fire-and-forget)
-    FIRE_AND_FORGET_CMDS = {"settime", "reboot"}
+    FIRE_AND_FORGET_CMDS = {"settime", "reboot", "opendoor", "lockctrl"}
 
     async def _send_and_wait(self, ws, sn, command):
         """
