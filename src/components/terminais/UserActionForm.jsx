@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, UserX, X, Loader2 } from 'lucide-react';
+import { UserPlus, UserX, X, Loader2, LockOpen, Lock, DoorOpen } from 'lucide-react';
 
 /**
  * Formulário inline para ações que requerem dados do utilizador:
@@ -17,10 +17,9 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading }) 
     name: '',
     password: '',
     card: '',
-    privilege: '0',       // 0=user, 14=admin
-    accgroup: '1',
-    timezone: '1',
+    privilege: '0',
     block: false,
+    fuc: '1',             // lockctrl: 1=forçar aberta, 2=forçar fechada, 3=abrir momentâneo
   });
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -146,6 +145,59 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading }) 
             onClick={() => onSubmit({ enrollid: Number(form.enrollid) || form.enrollid, block: form.block })}
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : form.block ? 'Bloquear' : 'Desbloquear'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (action === 'lockctrl') {
+    const options = [
+      { value: '1', label: 'Forçar Porta Aberta', desc: 'Mantém a porta permanentemente aberta', icon: LockOpen, color: 'violet' },
+      { value: '2', label: 'Forçar Porta Fechada', desc: 'Cancela o estado forçado / fecha a porta', icon: Lock, color: 'slate' },
+      { value: '3', label: 'Abrir Momentaneamente', desc: 'Abre e fecha automaticamente (1 pulso)', icon: DoorOpen, color: 'amber' },
+    ];
+    return (
+      <div className="bg-white border border-violet-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-violet-700">
+            <LockOpen className="h-4 w-4" />
+            <span className="font-semibold text-sm">Estado da Porta</span>
+          </div>
+          <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="space-y-2">
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => set('fuc', opt.value)}
+              className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all ${
+                form.fuc === opt.value
+                  ? opt.color === 'violet' ? 'bg-violet-100 border-violet-400 text-violet-800'
+                  : opt.color === 'amber' ? 'bg-amber-100 border-amber-400 text-amber-800'
+                  : 'bg-slate-100 border-slate-400 text-slate-800'
+                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <opt.icon className="h-4 w-4 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold">{opt.label}</p>
+                <p className="text-xs opacity-70">{opt.desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onCancel}>Cancelar</Button>
+          <Button
+            size="sm"
+            className="flex-1"
+            disabled={loading}
+            onClick={() => onSubmit({ fuc: Number(form.fuc) })}
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Executar'}
           </Button>
         </div>
       </div>

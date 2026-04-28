@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Info,
   LockOpen,
+  Lock,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -40,7 +41,7 @@ function getSupportedActions(terminal) {
     opendoor:   { label: 'Abrir Porta',            icon: DoorOpen,     color: 'amber',   desc: 'Acionar abertura de porta remotamente', confirm: true },
     reboot:     { label: 'Reiniciar Terminal',     icon: RefreshCw,    color: 'orange',  desc: 'Reiniciar o terminal imediatamente', confirm: true, danger: true },
     getdevinfo: { label: 'Info do Dispositivo',    icon: Info,         color: 'slate',   desc: 'Obter capacidades e estado do hardware' },
-    lockctrl:   { label: 'Forçar Porta Aberta',    icon: LockOpen,     color: 'violet',  desc: 'Manter porta em estado aberto forçado', confirm: true },
+    lockctrl:   { label: 'Estado da Porta',          icon: LockOpen,     color: 'violet',  desc: 'Forçar porta aberta, fechada ou abrir momentaneamente', form: true },
     adduser:    { label: 'Adicionar Utilizador',   icon: UserPlus,     color: 'teal',    desc: 'Registar novo utilizador no terminal', form: true },
     blockuser:  { label: 'Bloquear Utilizador',    icon: UserX,        color: 'rose',    desc: 'Bloquear ou desbloquear acesso de utilizador', form: true },
   };
@@ -153,7 +154,8 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
       });
       setResults(r => ({ ...r, [actionKey]: resp.data }));
     } catch (err) {
-      setResults(r => ({ ...r, [actionKey]: { success: false, error: err.message } }));
+      const errorMsg = err?.response?.data?.error || err.message || 'Erro desconhecido';
+      setResults(r => ({ ...r, [actionKey]: { success: false, error: errorMsg } }));
     } finally {
       setLoading(null);
     }
