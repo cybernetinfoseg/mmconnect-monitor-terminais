@@ -37,11 +37,24 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
   const [saving, setSaving] = useState(false);
   const [diasSelecionados, setDiasSelecionados] = useState([1, 2, 3, 4, 5]);
 
-  const { data: terminals = [] } = useQuery({
+  const isAdmin = currentUser?.role === 'admin';
+  const [filterUser, setFilterUser] = useState('');
+
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users-sched-modal'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: open && isAdmin,
+  });
+
+  const { data: allTerminals = [] } = useQuery({
     queryKey: ['terminals-sched'],
     queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
     enabled: open,
   });
+
+  const terminals = isAdmin && filterUser
+    ? allTerminals.filter(t => t.usuario_email === filterUser || t.created_by === filterUser)
+    : allTerminals;
 
   useEffect(() => {
     if (!open) return;
@@ -121,6 +134,23 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
             <Label>Nome do Agendamento *</Label>
             <Input placeholder="Ex: Reinício noturno BIO-001" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
           </div>
+
+          {/* Filtro por utilizador (admin only) */}
+          {isAdmin && (
+            <div className="space-y-1">
+              <Label>Filtrar por utilizador</Label>
+              <select
+                value={filterUser}
+                onChange={e => { setFilterUser(e.target.value); setForm(f => ({ ...f, terminal_id: '', terminal_nome: '' })); }}
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">Todos os utilizadores</option>
+                {allUsers.map(u => (
+                  <option key={u.email} value={u.email}>{u.full_name ? `${u.full_name} (${u.email})` : u.email}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Terminal */}
           <div className="space-y-1">

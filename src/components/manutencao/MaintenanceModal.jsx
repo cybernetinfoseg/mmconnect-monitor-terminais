@@ -21,11 +21,24 @@ export default function MaintenanceModal({ open, onClose, onSaved, editItem, cur
     const [form, setForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
 
-    const { data: terminals = [] } = useQuery({
+    const isAdmin = currentUser?.role === 'admin';
+    const [filterUser, setFilterUser] = useState('');
+
+    const { data: allUsers = [] } = useQuery({
+        queryKey: ['users-maint-modal'],
+        queryFn: () => base44.entities.User.list(),
+        enabled: open && isAdmin,
+    });
+
+    const { data: allTerminals = [] } = useQuery({
         queryKey: ['terminals-list'],
         queryFn: () => base44.entities.Terminal.filter({ ativo: true }),
         enabled: open,
     });
+
+    const terminals = isAdmin && filterUser
+        ? allTerminals.filter(t => t.usuario_email === filterUser || t.created_by === filterUser)
+        : allTerminals;
 
     useEffect(() => {
         if (editItem) {
@@ -78,6 +91,23 @@ export default function MaintenanceModal({ open, onClose, onSaved, editItem, cur
                     <DialogTitle>{editItem ? 'Editar Manutenção' : 'Nova Janela de Manutenção'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-2">
+                    {/* Filtro por utilizador (admin only) */}
+                    {isAdmin && (
+                        <div className="space-y-1">
+                            <Label>Filtrar por utilizador</Label>
+                            <select
+                                value={filterUser}
+                                onChange={e => { setFilterUser(e.target.value); setForm(f => ({ ...f, terminal_id: '', terminal_nome: '' })); }}
+                                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                                <option value="">Todos os utilizadores</option>
+                                {allUsers.map(u => (
+                                    <option key={u.email} value={u.email}>{u.full_name ? `${u.full_name} (${u.email})` : u.email}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     <div className="space-y-1">
                         <Label>Terminal</Label>
                         <Select value={form.terminal_id} onValueChange={handleTerminalChange}>
