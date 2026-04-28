@@ -181,9 +181,11 @@ export default function Marcacoes() {
             <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5 text-xs">
               <RefreshCw className="h-3.5 w-3.5" /><span className="hidden sm:inline">Atualizar</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={filtered.length === 0} className="gap-1.5 text-xs">
-              <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">CSV</span>
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={filtered.length === 0} className="gap-1.5 text-xs">
+                <Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">CSV</span>
+              </Button>
+            )}
           </div>
         </div>
 

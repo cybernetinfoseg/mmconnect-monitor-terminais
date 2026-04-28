@@ -19,26 +19,54 @@ import { cn } from '@/lib/utils';
 import moment from 'moment';
 
 const ACAO_LABELS = {
-  terminal_criado:     { label: 'Terminal Criado',     color: 'bg-emerald-100 text-emerald-700' },
-  terminal_editado:    { label: 'Terminal Editado',     color: 'bg-blue-100 text-blue-700' },
-  terminal_excluido:   { label: 'Terminal Excluído',    color: 'bg-red-100 text-red-700' },
-  terminal_verificado: { label: 'Terminal Verificado',  color: 'bg-slate-100 text-slate-600' },
-  incidente_resolvido: { label: 'Incidente Resolvido',  color: 'bg-emerald-100 text-emerald-700' },
-  incidente_excluido:  { label: 'Incidente Excluído',   color: 'bg-red-100 text-red-700' },
-  cliente_criado:      { label: 'Cliente Criado',       color: 'bg-purple-100 text-purple-700' },
-  cliente_editado:     { label: 'Cliente Editado',      color: 'bg-blue-100 text-blue-700' },
-  cliente_excluido:    { label: 'Cliente Excluído',     color: 'bg-red-100 text-red-700' },
-  manutencao_criada:   { label: 'Manutenção Criada',    color: 'bg-orange-100 text-orange-700' },
-  manutencao_editada:  { label: 'Manutenção Editada',   color: 'bg-blue-100 text-blue-700' },
-  manutencao_cancelada:{ label: 'Manutenção Cancelada', color: 'bg-red-100 text-red-700' },
-  alerta_criado:       { label: 'Alerta Criado',        color: 'bg-yellow-100 text-yellow-700' },
-  alerta_editado:      { label: 'Alerta Editado',       color: 'bg-blue-100 text-blue-700' },
-  alerta_excluido:     { label: 'Alerta Excluído',      color: 'bg-red-100 text-red-700' },
-  alerta_ativado:      { label: 'Alerta Ativado',       color: 'bg-emerald-100 text-emerald-700' },
-  alerta_desativado:   { label: 'Alerta Desativado',    color: 'bg-slate-100 text-slate-600' },
-  api_key_gerada:      { label: 'API Key Gerada',       color: 'bg-indigo-100 text-indigo-700' },
-  usuario_convidado:   { label: 'Utilizador Convidado', color: 'bg-purple-100 text-purple-700' },
-  permissao_atualizada:{ label: 'Permissão Atualizada', color: 'bg-indigo-100 text-indigo-700' },
+  // Terminais
+  terminal_criado:       { label: 'Terminal Criado',        color: 'bg-emerald-100 text-emerald-700',  grupo: 'Terminais' },
+  terminal_editado:      { label: 'Terminal Editado',        color: 'bg-blue-100 text-blue-700',        grupo: 'Terminais' },
+  terminal_excluido:     { label: 'Terminal Excluído',       color: 'bg-red-100 text-red-700',          grupo: 'Terminais' },
+  terminal_verificado:   { label: 'Terminal Verificado',     color: 'bg-slate-100 text-slate-600',      grupo: 'Terminais' },
+  // Incidentes
+  incidente_resolvido:   { label: 'Incidente Resolvido',    color: 'bg-emerald-100 text-emerald-700',  grupo: 'Incidentes' },
+  incidente_excluido:    { label: 'Incidente Excluído',     color: 'bg-red-100 text-red-700',          grupo: 'Incidentes' },
+  // Clientes
+  cliente_criado:        { label: 'Cliente Criado',         color: 'bg-purple-100 text-purple-700',    grupo: 'Clientes' },
+  cliente_editado:       { label: 'Cliente Editado',        color: 'bg-blue-100 text-blue-700',        grupo: 'Clientes' },
+  cliente_excluido:      { label: 'Cliente Excluído',       color: 'bg-red-100 text-red-700',          grupo: 'Clientes' },
+  // Manutenção
+  manutencao_criada:     { label: 'Manutenção Criada',      color: 'bg-orange-100 text-orange-700',    grupo: 'Manutenção' },
+  manutencao_editada:    { label: 'Manutenção Editada',     color: 'bg-blue-100 text-blue-700',        grupo: 'Manutenção' },
+  manutencao_cancelada:  { label: 'Manutenção Cancelada',   color: 'bg-red-100 text-red-700',          grupo: 'Manutenção' },
+  // Alertas
+  alerta_criado:         { label: 'Alerta Criado',          color: 'bg-yellow-100 text-yellow-700',    grupo: 'Alertas' },
+  alerta_editado:        { label: 'Alerta Editado',         color: 'bg-blue-100 text-blue-700',        grupo: 'Alertas' },
+  alerta_excluido:       { label: 'Alerta Excluído',        color: 'bg-red-100 text-red-700',          grupo: 'Alertas' },
+  alerta_ativado:        { label: 'Alerta Ativado',         color: 'bg-emerald-100 text-emerald-700',  grupo: 'Alertas' },
+  alerta_desativado:     { label: 'Alerta Desativado',      color: 'bg-slate-100 text-slate-600',      grupo: 'Alertas' },
+  // Utilizadores / Acesso
+  api_key_gerada:        { label: 'API Key Gerada',         color: 'bg-indigo-100 text-indigo-700',    grupo: 'Acesso' },
+  usuario_convidado:     { label: 'Utilizador Convidado',   color: 'bg-purple-100 text-purple-700',    grupo: 'Acesso' },
+  permissao_atualizada:  { label: 'Permissão Atualizada',   color: 'bg-indigo-100 text-indigo-700',    grupo: 'Acesso' },
+  // Agendamentos
+  agendamento_criado:    { label: 'Agendamento Criado',     color: 'bg-teal-100 text-teal-700',        grupo: 'Agendamentos' },
+  agendamento_editado:   { label: 'Agendamento Editado',    color: 'bg-blue-100 text-blue-700',        grupo: 'Agendamentos' },
+  agendamento_excluido:  { label: 'Agendamento Excluído',   color: 'bg-red-100 text-red-700',          grupo: 'Agendamentos' },
+  agendamento_executado: { label: 'Agendamento Executado',  color: 'bg-teal-100 text-teal-700',        grupo: 'Agendamentos' },
+  // Marcações
+  marcacoes_recolhidas:  { label: 'Marcações Recolhidas',   color: 'bg-blue-100 text-blue-700',        grupo: 'Marcações' },
+  marcacoes_exportadas:  { label: 'Marcações Exportadas',   color: 'bg-violet-100 text-violet-700',    grupo: 'Marcações' },
+  // Utilizadores de terminais
+  utilizador_terminal_criado:  { label: 'Utilizador Terminal Criado',  color: 'bg-emerald-100 text-emerald-700', grupo: 'Ut. Terminais' },
+  utilizador_terminal_editado: { label: 'Utilizador Terminal Editado',  color: 'bg-blue-100 text-blue-700',      grupo: 'Ut. Terminais' },
+  utilizador_terminal_excluido:{ label: 'Utilizador Terminal Excluído', color: 'bg-red-100 text-red-700',        grupo: 'Ut. Terminais' },
+  utilizador_sincronizado:     { label: 'Utilizador Sincronizado',      color: 'bg-teal-100 text-teal-700',      grupo: 'Ut. Terminais' },
+  // Exportação
+  exportacao_criada:    { label: 'Exportação Criada',       color: 'bg-violet-100 text-violet-700',   grupo: 'Exportação' },
+  exportacao_editada:   { label: 'Exportação Editada',      color: 'bg-blue-100 text-blue-700',       grupo: 'Exportação' },
+  exportacao_excluida:  { label: 'Exportação Excluída',     color: 'bg-red-100 text-red-700',         grupo: 'Exportação' },
+  exportacao_executada: { label: 'Exportação Executada',    color: 'bg-violet-100 text-violet-700',   grupo: 'Exportação' },
+  // Mapa / Planta
+  planta_criada:        { label: 'Planta Criada',           color: 'bg-rose-100 text-rose-700',       grupo: 'Mapa' },
+  planta_editada:       { label: 'Planta Editada',          color: 'bg-blue-100 text-blue-700',       grupo: 'Mapa' },
+  planta_excluida:      { label: 'Planta Excluída',         color: 'bg-red-100 text-red-700',         grupo: 'Mapa' },
 };
 
 export default function Auditoria() {
@@ -184,14 +212,25 @@ export default function Auditoria() {
               </div>
 
               <Select value={acaoFilter} onValueChange={setAcaoFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectTrigger className="w-full sm:w-[200px]">
                   <Filter className="h-4 w-4 mr-2 text-slate-400 shrink-0" />
                   <SelectValue placeholder="Tipo de ação" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-80">
                   <SelectItem value="all">Todas as ações</SelectItem>
-                  {Object.entries(ACAO_LABELS).map(([key, val]) => (
-                    <SelectItem key={key} value={key}>{val.label}</SelectItem>
+                  {Object.entries(
+                    Object.entries(ACAO_LABELS).reduce((acc, [key, val]) => {
+                      if (!acc[val.grupo]) acc[val.grupo] = [];
+                      acc[val.grupo].push([key, val]);
+                      return acc;
+                    }, {})
+                  ).map(([grupo, items]) => (
+                    <React.Fragment key={grupo}>
+                      <div className="px-2 py-1 text-[10px] font-bold uppercase text-slate-400 tracking-wider">{grupo}</div>
+                      {items.map(([key, val]) => (
+                        <SelectItem key={key} value={key}>{val.label}</SelectItem>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </SelectContent>
               </Select>

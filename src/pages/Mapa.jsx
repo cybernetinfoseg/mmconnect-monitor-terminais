@@ -113,6 +113,7 @@ export default function Mapa() {
   const [selectedTerminal, setSelectedTerminal] = useState(null);
   const [zoom, setZoom] = useState(100);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [imageFit, setImageFit] = useState('contain'); // 'contain' | 'cover' | 'fill' | 'none'
   const [positions, setPositions] = useState({});
   const [filterUser, setFilterUser] = useState(''); // admin-only filter
   const [selectedPlantaId, setSelectedPlantaId] = useState(null);
@@ -470,9 +471,25 @@ export default function Mapa() {
                 <SlidersHorizontal className="h-3.5 w-3.5" />
               </Button>
               <div className="w-px h-4 bg-slate-200 mx-0.5" />
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setZoom(z => Math.max(50, z - 10))}><ZoomOut className="h-3.5 w-3.5" /></Button>
+              {selectedPlanta?.planta_url && (
+                <>
+                  <select
+                    value={imageFit}
+                    onChange={e => setImageFit(e.target.value)}
+                    className="h-7 rounded border border-slate-200 bg-white text-xs px-1.5 focus:outline-none focus:ring-1 focus:ring-ring"
+                    title="Ajuste da imagem"
+                  >
+                    <option value="contain">Ajustar (contain)</option>
+                    <option value="cover">Preencher (cover)</option>
+                    <option value="fill">Esticar (fill)</option>
+                    <option value="none">Tamanho real</option>
+                  </select>
+                  <div className="w-px h-4 bg-slate-200" />
+                </>
+              )}
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setZoom(z => Math.max(25, z - 10))}><ZoomOut className="h-3.5 w-3.5" /></Button>
               <span className="text-xs text-slate-500 w-10 text-center font-mono">{zoom}%</span>
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setZoom(z => Math.min(200, z + 10))}><ZoomIn className="h-3.5 w-3.5" /></Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setZoom(z => Math.min(300, z + 10))}><ZoomIn className="h-3.5 w-3.5" /></Button>
               <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsFullscreen(f => !f)}>
                 {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
               </Button>
@@ -495,7 +512,13 @@ export default function Mapa() {
 
           {/* Canvas */}
           <div className="relative overflow-auto bg-slate-100" style={{ height: mapHeight }}>
-            <div style={{ width: `${zoom}%`, minWidth: '100%', height: '100%', minHeight: 420, position: 'relative' }}>
+            <div style={{
+              width: zoom <= 100 ? '100%' : `${zoom}%`,
+              minWidth: '100%',
+              height: zoom <= 100 ? '100%' : `${zoom}%`,
+              minHeight: 420,
+              position: 'relative',
+            }}>
               <div
                 data-map-container
                 className="relative w-full h-full"
@@ -503,8 +526,11 @@ export default function Mapa() {
                   backgroundImage: selectedPlanta?.planta_url
                     ? `url(${selectedPlanta.planta_url})`
                     : `linear-gradient(to right,#dde3ed 1px,transparent 1px),linear-gradient(to bottom,#dde3ed 1px,transparent 1px)`,
-                  backgroundSize: selectedPlanta?.planta_url ? 'cover' : `${GRID_SIZE}px ${GRID_SIZE}px`,
-                  backgroundPosition: 'top left',
+                  backgroundSize: selectedPlanta?.planta_url
+                    ? (imageFit === 'none' ? 'auto' : imageFit)
+                    : `${GRID_SIZE}px ${GRID_SIZE}px`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'center',
                   backgroundColor: '#f8fafc',
                   minHeight: 420,
                 }}
