@@ -517,6 +517,39 @@ async function actionBlockUser(terminal, params) {
   return { success: false, error: `blockuser não suportado para ${terminal.tipo_conexao}/${terminal.fabricante}` };
 }
 
+async function actionDeleteUser(terminal, params) {
+  const { enrollid } = params || {};
+  if (!enrollid) return { success: false, error: 'enrollid é obrigatório' };
+
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // Protocolo v3.0: cmd:"deleteuserinfo" com enrollid
+    const resp = await sendTimmyCommand(terminal, {
+      cmd: 'deleteuserinfo',
+      enrollid: Number(enrollid),
+    });
+    return { success: resp.result === true, message: `Utilizador ID:${enrollid} removido`, data: resp };
+  }
+
+  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
+    return await sendAdmsCommand(terminal, 'blockuser', { enrollid, block: true });
+  }
+
+  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
+    if (terminal.fabricante === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/UserInfo/Delete?format=json', {
+        UserInfoDelCond: { EmployeeNoList: [{ employeeNo: String(enrollid) }] }
+      });
+      return { success: true, message: `Utilizador ID:${enrollid} removido (Hikvision)`, data: resp };
+    }
+    if (terminal.fabricante === 'dahua') {
+      const resp = await dahuaRequest(terminal, `/cgi-bin/recordUpdater.cgi?action=remove&name=AccessControlCard&UserID=${enrollid}`);
+      return { success: resp.status === 200, message: `Utilizador ID:${enrollid} removido (Dahua)`, data: resp };
+    }
+  }
+
+  return { success: false, error: `deleteuser não suportado para ${terminal.tipo_conexao}/${terminal.fabricante}` };
+}
+
 // ─── Main Handler ────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -555,6 +588,7 @@ Deno.serve(async (req) => {
       case 'lockctrl':   result = await actionSetDoorStatus(terminal, params); break;
       case 'adduser':    result = await actionAddUser(terminal, params); break;
       case 'blockuser':  result = await actionBlockUser(terminal, params); break;
+      case 'deleteuser': result = await actionDeleteUser(terminal, params); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }

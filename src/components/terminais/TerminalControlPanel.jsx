@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
 import OperationLogsList from './OperationLogsList';
 import {
   Dialog,
@@ -26,6 +27,7 @@ import {
   Zap,
   UserPlus,
   UserX,
+  UserMinus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UserActionForm from './UserActionForm';
@@ -44,26 +46,24 @@ function getSupportedActions(terminal) {
     lockctrl:   { label: 'Estado da Porta',          icon: LockOpen,     color: 'violet',  desc: 'Forçar porta aberta, fechada ou abrir momentaneamente', form: true },
     adduser:    { label: 'Adicionar Utilizador',   icon: UserPlus,     color: 'teal',    desc: 'Registar novo utilizador no terminal', form: true },
     blockuser:  { label: 'Bloquear Utilizador',    icon: UserX,        color: 'rose',    desc: 'Bloquear ou desbloquear acesso de utilizador', form: true },
+    deleteuser: { label: 'Remover Utilizador',     icon: UserMinus,    color: 'red',     desc: 'Eliminar utilizador do terminal', form: true },
   };
 
   if (tipo === 'websocket_cloud') {
-    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'lockctrl', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
+    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'lockctrl', 'adduser', 'blockuser', 'deleteuser'].map(k => ({ key: k, ...all[k] }));
   }
   if (tipo === 'adms_push') {
-    // ZKTeco ADMS: todas as ações exceto lockctrl. getlogs é automático mas mostramos como info.
-    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
+    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser', 'deleteuser'].map(k => ({ key: k, ...all[k] }));
   }
   if (tipo === 'sdk_tcp') {
-    // ZKTeco SDK-TCP: todas exceto lockctrl
-    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser'].map(k => ({ key: k, ...all[k] }));
+    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser', 'deleteuser'].map(k => ({ key: k, ...all[k] }));
   }
   if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
     if (fab === 'hikvision') {
-      return ['settime', 'getlogs', 'opendoor', 'reboot', 'adduser', 'blockuser', 'getdevinfo'].map(k => ({ key: k, ...all[k] }));
+      return ['settime', 'getlogs', 'opendoor', 'reboot', 'adduser', 'blockuser', 'deleteuser', 'getdevinfo'].map(k => ({ key: k, ...all[k] }));
     }
     if (fab === 'dahua') {
-      // Dahua: blockuser não suportado (⚠️ no-op no backend)
-      return ['settime', 'getlogs', 'opendoor', 'reboot', 'adduser', 'getdevinfo'].map(k => ({ key: k, ...all[k] }));
+      return ['settime', 'getlogs', 'opendoor', 'reboot', 'adduser', 'deleteuser', 'getdevinfo'].map(k => ({ key: k, ...all[k] }));
     }
   }
 
@@ -71,6 +71,7 @@ function getSupportedActions(terminal) {
 }
 
 const COLOR_MAP = {
+  red:     'bg-red-50 border-red-200 text-red-700 hover:bg-red-100',
   blue:    'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100',
   emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100',
   amber:   'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100',
@@ -138,7 +139,19 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
   const [loading, setLoading] = useState(null);
   const [results, setResults] = useState({});
   const [confirmAction, setConfirmAction] = useState(null);
-  const [activeForm, setActiveForm] = useState(null); // 'adduser' | 'blockuser'
+  const [activeForm, setActiveForm] = useState(null);
+
+  // Fetch terminal users associated with this terminal
+  const { data: terminalUsers = [] } = useQuery({
+    queryKey: ['terminal-users-ctrl', terminal.id],
+    queryFn: async () => {
+      const all = await base44.entities.TerminalUser.list('-created_date', 500);
+      return all.filter(u => {
+        try { return JSON.parse(u.terminais_ids || '[]').includes(terminal.id); } catch { return false; }
+      });
+    },
+    enabled: open,
+  });
 
   const actions = getSupportedActions(terminal);
   const hasSupport = actions.length > 0;
@@ -269,6 +282,7 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
                       <UserActionForm
                         action={action.key}
                         loading={loading === action.key}
+                        terminalUsers={terminalUsers}
                         onSubmit={(formData) => handleFormSubmit(action.key, formData)}
                         onCancel={() => setActiveForm(null)}
                       />

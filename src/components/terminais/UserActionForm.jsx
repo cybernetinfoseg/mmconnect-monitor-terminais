@@ -4,14 +4,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, UserX, X, Loader2, LockOpen, Lock, DoorOpen } from 'lucide-react';
+import { UserPlus, UserX, UserMinus, X, Loader2, LockOpen, Lock, DoorOpen } from 'lucide-react';
 
 /**
  * Formulário inline para ações que requerem dados do utilizador:
  * - adduser: nome, ID, tipo de acesso (FP/Card/Face/Password)
  * - blockuser: ID do utilizador a bloquear/desbloquear
  */
-export default function UserActionForm({ action, onSubmit, onCancel, loading }) {
+export default function UserActionForm({ action, onSubmit, onCancel, loading, terminalUsers = [] }) {
   const [form, setForm] = useState({
     enrollid: '',
     name: '',
@@ -19,10 +19,22 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading }) 
     card: '',
     privilege: '0',
     block: false,
-    fuc: '1',             // lockctrl: 1=forçar aberta, 2=forçar fechada, 3=abrir momentâneo
+    fuc: '1',
   });
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+
+  const fillFromUser = (u) => {
+    if (!u) return;
+    setForm(f => ({
+      ...f,
+      enrollid: String(u.enrollid || ''),
+      name: u.nome || '',
+      password: u.password || '',
+      card: u.card || '',
+      privilege: String(u.privilege ?? 0),
+    }));
+  };
 
   if (action === 'adduser') {
     return (
@@ -34,6 +46,25 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading }) 
           </div>
           <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
         </div>
+
+        {terminalUsers.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">Preencher a partir de utilizador existente</Label>
+            <select
+              className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              defaultValue=""
+              onChange={e => {
+                const u = terminalUsers.find(u => String(u.id) === e.target.value);
+                fillFromUser(u);
+              }}
+            >
+              <option value="">— Selecionar utilizador —</option>
+              {terminalUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.enrollid} — {u.nome}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
@@ -114,6 +145,25 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading }) 
           </div>
           <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
         </div>
+
+        {terminalUsers.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">Selecionar utilizador</Label>
+            <select
+              className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              defaultValue=""
+              onChange={e => {
+                const u = terminalUsers.find(u => String(u.id) === e.target.value);
+                if (u) set('enrollid', String(u.enrollid));
+              }}
+            >
+              <option value="">— Selecionar utilizador —</option>
+              {terminalUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.enrollid} — {u.nome}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="space-y-1">
           <Label className="text-xs">ID / Número do Utilizador *</Label>
@@ -198,6 +248,62 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading }) 
             onClick={() => onSubmit({ fuc: Number(form.fuc) })}
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Executar'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (action === 'deleteuser') {
+    return (
+      <div className="bg-white border border-red-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-red-700">
+            <UserMinus className="h-4 w-4" />
+            <span className="font-semibold text-sm">Remover Utilizador do Terminal</span>
+          </div>
+          <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+        </div>
+
+        {terminalUsers.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">Selecionar utilizador</Label>
+            <select
+              className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              defaultValue=""
+              onChange={e => {
+                const u = terminalUsers.find(u => String(u.id) === e.target.value);
+                if (u) set('enrollid', String(u.enrollid));
+              }}
+            >
+              <option value="">— Selecionar utilizador —</option>
+              {terminalUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.enrollid} — {u.nome}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <Label className="text-xs">ID / Número do Utilizador *</Label>
+          <Input
+            placeholder="Ex: 1001"
+            value={form.enrollid}
+            onChange={e => set('enrollid', e.target.value)}
+            className="h-8 text-sm"
+          />
+          <p className="text-xs text-slate-400">O utilizador será removido permanentemente do terminal.</p>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onCancel}>Cancelar</Button>
+          <Button
+            size="sm"
+            className="flex-1 bg-red-600 hover:bg-red-700"
+            disabled={loading || !form.enrollid}
+            onClick={() => onSubmit({ enrollid: Number(form.enrollid) || form.enrollid })}
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Remover'}
           </Button>
         </div>
       </div>
