@@ -539,7 +539,7 @@ export default function Utilizadores() {
                                   <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
                                   {isAdmin &&
                                   <div className="flex items-center gap-1.5">
-                                      <label className="text-xs text-slate-400 whitespace-nowrap hidden">Filtrar Por:</label>
+                                      
                                       <select
                                       value={ownerFilter}
                                       onChange={(e) => setExpandedTerminalOwner((prev) => ({ ...prev, [u.id]: e.target.value }))}
