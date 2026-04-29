@@ -185,9 +185,8 @@ export default function Utilizadores() {
 
   // Exportar CSV
   const handleExportCSV = () => {
-    const headers = ['enrollid', 'nome', 'email', 'departamento', 'cargo', 'card', 'privilege', 'ativo', 'observacoes'];
+    const headers = ['enrollid', 'nome', 'email', 'departamento', 'cargo', 'card', 'privilege', 'ativo', 'observacoes', 'owner_email'];
     const rows = filtered.map(u => headers.map(h => u[h] ?? ''));
-    // Use semicolon as separator for better Excel/LibreOffice column detection
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -227,7 +226,7 @@ export default function Utilizadores() {
           privilege: Number(row.privilege) || 0,
           ativo: row.ativo === 'false' ? false : true,
           observacoes: row.observacoes || '',
-          owner_email: currentUser?.email,
+          owner_email: row.owner_email || currentUser?.email,
           terminais_ids: '[]',
         });
         ok++;
@@ -374,11 +373,14 @@ export default function Utilizadores() {
             <Input placeholder="Pesquisar por nome, ID, departamento..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-white" />
           </div>
           {isAdmin && allOwners.length > 0 && (
-            <select value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}
-              className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full sm:w-auto">
-              <option value="all">Todos os utilizadores</option>
-              {allOwners.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <label className="text-xs text-slate-500 whitespace-nowrap font-medium">Filtrar Por:</label>
+              <select value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 flex-1 sm:w-auto">
+                <option value="all">Todos</option>
+                {appUsers.map(u => <option key={u.email} value={u.email}>{u.email}</option>)}
+              </select>
+            </div>
           )}
         </div>
 
@@ -536,14 +538,17 @@ export default function Utilizadores() {
                                 <div className="flex items-center gap-3 flex-wrap">
                                   <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
                                   {isAdmin && (
-                                    <select
-                                      value={ownerFilter}
-                                      onChange={e => setExpandedTerminalOwner(prev => ({ ...prev, [u.id]: e.target.value }))}
-                                      className="h-7 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                    >
-                                      <option value="">Todos os donos</option>
-                                      {appUsers.map(au => <option key={au.email} value={au.email}>{au.full_name || au.email}</option>)}
-                                    </select>
+                                    <div className="flex items-center gap-1.5">
+                                      <label className="text-xs text-slate-400 whitespace-nowrap">Filtrar Por:</label>
+                                      <select
+                                        value={ownerFilter}
+                                        onChange={e => setExpandedTerminalOwner(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                        className="h-7 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                      >
+                                        <option value="">Todos</option>
+                                        {appUsers.map(au => <option key={au.email} value={au.email}>{au.email}</option>)}
+                                      </select>
+                                    </div>
                                   )}
                                 </div>
                                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-2">
@@ -635,14 +640,17 @@ export default function Utilizadores() {
                             return (
                             <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
                               {isAdmin && (
-                                <select
-                                  value={ownerFilter}
-                                  onChange={e => setExpandedTerminalOwner(prev => ({ ...prev, [u.id]: e.target.value }))}
-                                  className="h-8 w-full px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
-                                >
-                                  <option value="">Todos os donos</option>
-                                  {appUsers.map(au => <option key={au.email} value={au.email}>{au.full_name || au.email}</option>)}
-                                </select>
+                                <div className="flex items-center gap-1.5">
+                                  <label className="text-xs text-slate-400 whitespace-nowrap">Filtrar Por:</label>
+                                  <select
+                                    value={ownerFilter}
+                                    onChange={e => setExpandedTerminalOwner(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                    className="h-8 flex-1 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                  >
+                                    <option value="">Todos</option>
+                                    {appUsers.map(au => <option key={au.email} value={au.email}>{au.email}</option>)}
+                                  </select>
+                                </div>
                               )}
                               <div className="grid grid-cols-1 gap-2">
                                 {visibleTerminals.map(t => {
