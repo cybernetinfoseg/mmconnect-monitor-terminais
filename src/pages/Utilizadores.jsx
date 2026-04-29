@@ -36,6 +36,7 @@ export default function Utilizadores() {
   const [currentUser, setCurrentUser] = useState(null);
   const [expandedUser, setExpandedUser] = useState(null);
   const [importProgress, setImportProgress] = useState(null);
+  const [filterTerminalUser, setFilterTerminalUser] = useState('');
   const importRef = useRef();
 
   const queryClient = useQueryClient();
@@ -45,6 +46,12 @@ export default function Utilizadores() {
   }, []);
 
   const isAdmin = currentUser?.role === 'admin';
+
+  const { data: appUsers = [] } = useQuery({
+    queryKey: ['app-users-list'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: !!currentUser && isAdmin,
+  });
 
   const { data: allUsers = [], isLoading } = useQuery({
     queryKey: ['terminal-users', currentUser?.email, isAdmin],
@@ -236,8 +243,12 @@ export default function Utilizadores() {
     return list;
   }, [allUsers, search, ownerFilter, isAdmin]);
 
-  const handleNew = () => { setEditingUser(null); setFormData({ privilege: 0, ativo: true }); setSelectedTerminals([]); setDialogOpen(true); };
-  const handleEdit = (u) => { setEditingUser(u); setFormData(u); try { setSelectedTerminals(JSON.parse(u.terminais_ids || '[]')); } catch { setSelectedTerminals([]); } setDialogOpen(true); };
+  const filteredDialogTerminals = isAdmin && filterTerminalUser
+    ? terminals.filter(t => t.usuario_email === filterTerminalUser || t.created_by === filterTerminalUser)
+    : terminals;
+
+  const handleNew = () => { setEditingUser(null); setFormData({ privilege: 0, ativo: true }); setSelectedTerminals([]); setFilterTerminalUser(''); setDialogOpen(true); };
+  const handleEdit = (u) => { setEditingUser(u); setFormData(u); setFilterTerminalUser(''); try { setSelectedTerminals(JSON.parse(u.terminais_ids || '[]')); } catch { setSelectedTerminals([]); } setDialogOpen(true); };
   const toggleTerminal = (tid) => setSelectedTerminals(prev => prev.includes(tid) ? prev.filter(id => id !== tid) : [...prev, tid]);
 
   return (
@@ -541,10 +552,22 @@ export default function Utilizadores() {
               <div className="space-y-1"><Label>Senha Numérica</Label><Input type="password" placeholder="Opcional" value={formData.password || ''} onChange={e => setFormData(f => ({ ...f, password: e.target.value }))} /></div>
             </div>
             {terminals.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <Label>Terminais Associados</Label>
+                {isAdmin && (
+                  <select
+                    value={filterTerminalUser}
+                    onChange={e => { setFilterTerminalUser(e.target.value); setSelectedTerminals([]); }}
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Todos os utilizadores</option>
+                    {appUsers.map(u => (
+                      <option key={u.email} value={u.email}>{u.full_name ? `${u.full_name} (${u.email})` : u.email}</option>
+                    ))}
+                  </select>
+                )}
                 <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-                  {terminals.map(t => (
+                  {filteredDialogTerminals.map(t => (
                     <label key={t.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-3 py-2">
                       <input type="checkbox" checked={selectedTerminals.includes(t.id)} onChange={() => toggleTerminal(t.id)} className="rounded" />
                       <span className="text-sm flex-1">{t.nome}</span>
