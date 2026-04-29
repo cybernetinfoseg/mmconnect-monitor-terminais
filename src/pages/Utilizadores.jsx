@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Plus, Pencil, Trash2, Search, Upload, Download,
   CheckCircle2, XCircle, Loader2, Send, ChevronDown, ChevronUp,
-  FileDown, FileUp
+  FileDown, FileUp, Zap, UserCheck, UserX
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,10 @@ export default function Utilizadores() {
   const [expandedUser, setExpandedUser] = useState(null);
   const [importProgress, setImportProgress] = useState(null);
   const [filterTerminalUser, setFilterTerminalUser] = useState('');
+  const [bulkOwner, setBulkOwner] = useState('');
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkRemoving, setBulkRemoving] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(null); // { done, total, label }
   const importRef = useRef();
 
   const queryClient = useQueryClient();
@@ -243,6 +247,65 @@ export default function Utilizadores() {
     return list;
   }, [allUsers, search, ownerFilter, isAdmin]);
 
+  // Terminais do dono selecionado para bulk
+  const bulkOwnerTerminals = useMemo(() => {
+    if (!bulkOwner) return [];
+    return terminals.filter(t => t.usuario_email === bulkOwner || t.created_by === bulkOwner);
+  }, [terminals, bulkOwner]);
+
+  const bulkOwnerUsers = useMemo(() => {
+    if (!bulkOwner) return [];
+    return allUsers.filter(u => u.owner_email === bulkOwner);
+  }, [allUsers, bulkOwner]);
+
+  const handleBulkSendByOwner = async () => {
+    if (!bulkOwner || !bulkOwnerUsers.length || !bulkOwnerTerminals.length) return;
+    const terminalIds = bulkOwnerTerminals.map(t => t.id);
+    const total = bulkOwnerUsers.length * terminalIds.length;
+    setBulkSending(true);
+    setBulkProgress({ done: 0, total, label: 'A enviar' });
+    let ok = 0, fail = 0;
+    for (const user of bulkOwnerUsers) {
+      for (const tid of terminalIds) {
+        try {
+          const resp = await base44.functions.invoke('terminalControl', {
+            terminal_id: tid, action: 'adduser',
+            params: { enrollid: user.enrollid, name: user.nome, password: user.password || '', card: user.card || '', privilege: user.privilege || 0 },
+          });
+          resp.data?.success ? ok++ : fail++;
+        } catch { fail++; }
+        setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
+      }
+    }
+    setBulkSending(false);
+    setBulkProgress(null);
+    fail === 0 ? toast.success(`${ok} operações concluídas com sucesso!`) : toast.error(`${ok} OK / ${fail} erros`);
+  };
+
+  const handleBulkRemoveByOwner = async () => {
+    if (!bulkOwner || !bulkOwnerUsers.length || !bulkOwnerTerminals.length) return;
+    const terminalIds = bulkOwnerTerminals.map(t => t.id);
+    const total = bulkOwnerUsers.length * terminalIds.length;
+    setBulkRemoving(true);
+    setBulkProgress({ done: 0, total, label: 'A remover' });
+    let ok = 0, fail = 0;
+    for (const user of bulkOwnerUsers) {
+      for (const tid of terminalIds) {
+        try {
+          const resp = await base44.functions.invoke('terminalControl', {
+            terminal_id: tid, action: 'deleteuser',
+            params: { enrollid: user.enrollid },
+          });
+          resp.data?.success ? ok++ : fail++;
+        } catch { fail++; }
+        setBulkProgress(prev => ({ ...prev, done: prev.done + 1 }));
+      }
+    }
+    setBulkRemoving(false);
+    setBulkProgress(null);
+    fail === 0 ? toast.success(`${ok} remoções concluídas!`) : toast.error(`${ok} OK / ${fail} erros`);
+  };
+
   const filteredDialogTerminals = isAdmin && filterTerminalUser
     ? terminals.filter(t => t.usuario_email === filterTerminalUser || t.created_by === filterTerminalUser)
     : terminals;
@@ -314,6 +377,79 @@ export default function Utilizadores() {
             </select>
           )}
         </div>
+
+        {/* Bulk Operations by Owner (admin only) */}
+        {isAdmin && allOwners.length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-amber-500" />
+              <span className="text-sm font-semibold text-slate-700">Operações em Massa por Dono</span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
+              <div className="flex-1 min-w-0">
+                <label className="text-xs text-slate-500 mb-1 block">Selecionar Dono</label>
+                <select
+                  value={bulkOwner}
+                  onChange={e => setBulkOwner(e.target.value)}
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white text-sm text-slate-700 px-3 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                  disabled={bulkSending || bulkRemoving}
+                >
+                  <option value="">— Escolher dono —</option>
+                  {appUsers.map(u => {
+                    const uTerminals = terminals.filter(t => t.usuario_email === u.email || t.created_by === u.email);
+                    const uUsers = allUsers.filter(x => x.owner_email === u.email);
+                    return (
+                      <option key={u.email} value={u.email}>
+                        {u.full_name || u.email} ({uUsers.length} utilizadores, {uTerminals.length} terminais)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              {bulkOwner && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 shrink-0">
+                  <span className="bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-1">{bulkOwnerUsers.length} utilizadores</span>
+                  <span className="bg-slate-50 text-slate-600 border border-slate-200 rounded px-2 py-1">{bulkOwnerTerminals.length} terminais</span>
+                </div>
+              )}
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-xs"
+                  disabled={!bulkOwner || !bulkOwnerUsers.length || !bulkOwnerTerminals.length || bulkSending || bulkRemoving}
+                  onClick={handleBulkSendByOwner}
+                >
+                  {bulkSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
+                  Enviar Todos
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 border-red-300 hover:bg-red-50 gap-1.5 text-xs"
+                  disabled={!bulkOwner || !bulkOwnerUsers.length || !bulkOwnerTerminals.length || bulkSending || bulkRemoving}
+                  onClick={handleBulkRemoveByOwner}
+                >
+                  {bulkRemoving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+                  Remover Todos
+                </Button>
+              </div>
+            </div>
+            {bulkProgress && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>{bulkProgress.label}... {bulkProgress.done}/{bulkProgress.total}</span>
+                  <span>{Math.round((bulkProgress.done / bulkProgress.total) * 100)}%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5">
+                  <div
+                    className={cn('h-1.5 rounded-full transition-all', bulkSending ? 'bg-teal-500' : 'bg-red-400')}
+                    style={{ width: `${(bulkProgress.done / bulkProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Users Table (desktop) + Cards (mobile) */}
         {isLoading ? (
