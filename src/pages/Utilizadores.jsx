@@ -35,6 +35,7 @@ export default function Utilizadores() {
   const [selectedTerminals, setSelectedTerminals] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [expandedUser, setExpandedUser] = useState(null);
+  const [expandedTerminalOwner, setExpandedTerminalOwner] = useState({}); // { [userId]: ownerEmail }
   const [importProgress, setImportProgress] = useState(null);
   const [filterTerminalUser, setFilterTerminalUser] = useState('');
   const [bulkOwner, setBulkOwner] = useState('');
@@ -137,10 +138,11 @@ export default function Utilizadores() {
     setDeletingFromTerminal(null);
   };
 
-  const handleDeleteFromAll = async (user) => {
+  const handleDeleteFromAll = async (user, terminalList) => {
+    const list = terminalList || terminals;
     setDeletingFromAll(user.id);
     let ok = 0, fail = 0;
-    for (const t of terminals) {
+    for (const t of list) {
       try {
         const resp = await base44.functions.invoke('terminalControl', {
           terminal_id: t.id, action: 'deleteuser',
@@ -522,13 +524,30 @@ export default function Utilizadores() {
                             </div>
                           </td>
                         </tr>
-                        {isExpanded && (
+                        {isExpanded && (() => {
+                          const ownerFilter = expandedTerminalOwner[u.id] || '';
+                          const visibleTerminals = ownerFilter
+                            ? terminals.filter(t => t.usuario_email === ownerFilter || t.created_by === ownerFilter)
+                            : terminals;
+                          return (
                           <tr key={`exp-${u.id}`}>
                             <td colSpan={isAdmin ? 7 : 6} className="px-4 pb-4 bg-slate-50 border-b border-slate-200">
                               <div className="pt-3 space-y-2">
-                                <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
+                                  {isAdmin && (
+                                    <select
+                                      value={ownerFilter}
+                                      onChange={e => setExpandedTerminalOwner(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                      className="h-7 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                    >
+                                      <option value="">Todos os donos</option>
+                                      {appUsers.map(au => <option key={au.email} value={au.email}>{au.full_name || au.email}</option>)}
+                                    </select>
+                                  )}
+                                </div>
                                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-2">
-                                  {terminals.map(t => {
+                                  {visibleTerminals.map(t => {
                                    const res = sendResult?.[t.id];
                                    const isDeletingThis = deletingFromTerminal?.userId === u.id && deletingFromTerminal?.terminalId === t.id;
                                    return (
@@ -551,11 +570,11 @@ export default function Utilizadores() {
                                   })}
                                   </div>
                                   <div className="flex gap-2">
-                                  <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, terminals.map(t => t.id))}>
+                                  <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, visibleTerminals.map(t => t.id))}>
                                    {sendingTo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                                    Enviar para Todos
                                   </Button>
-                                  <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300 hover:bg-red-50 gap-2 text-xs" disabled={deletingFromAll === u.id} onClick={() => handleDeleteFromAll(u)}>
+                                  <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300 hover:bg-red-50 gap-2 text-xs" disabled={deletingFromAll === u.id} onClick={() => handleDeleteFromAll(u, visibleTerminals)}>
                                    {deletingFromAll === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                                    Eliminar de Todos
                                   </Button>
@@ -563,7 +582,8 @@ export default function Utilizadores() {
                               </div>
                             </td>
                           </tr>
-                        )}
+                          );
+                        })()}
                       </React.Fragment>
                     );
                   })}
@@ -607,10 +627,25 @@ export default function Utilizadores() {
                               <Button size="sm" variant="outline" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3 w-3" /></Button>
                             </div>
                           </div>
-                          {isExpanded && (
+                          {isExpanded && (() => {
+                            const ownerFilter = expandedTerminalOwner[u.id] || '';
+                            const visibleTerminals = ownerFilter
+                              ? terminals.filter(t => t.usuario_email === ownerFilter || t.created_by === ownerFilter)
+                              : terminals;
+                            return (
                             <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                              {isAdmin && (
+                                <select
+                                  value={ownerFilter}
+                                  onChange={e => setExpandedTerminalOwner(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                  className="h-8 w-full px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                                >
+                                  <option value="">Todos os donos</option>
+                                  {appUsers.map(au => <option key={au.email} value={au.email}>{au.full_name || au.email}</option>)}
+                                </select>
+                              )}
                               <div className="grid grid-cols-1 gap-2">
-                                {terminals.map(t => {
+                                {visibleTerminals.map(t => {
                                   const res = sendResult?.[t.id];
                                   const isDeletingThis = deletingFromTerminal?.userId === u.id && deletingFromTerminal?.terminalId === t.id;
                                   return (
@@ -633,17 +668,18 @@ export default function Utilizadores() {
                                 })}
                               </div>
                               <div className="flex gap-2">
-                                <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, terminals.map(t => t.id))}>
+                                <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, visibleTerminals.map(t => t.id))}>
                                   {sendingTo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                                   Enviar para Todos
                                 </Button>
-                                <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300 hover:bg-red-50 gap-2 text-xs" disabled={deletingFromAll === u.id} onClick={() => handleDeleteFromAll(u)}>
+                                <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300 hover:bg-red-50 gap-2 text-xs" disabled={deletingFromAll === u.id} onClick={() => handleDeleteFromAll(u, visibleTerminals)}>
                                   {deletingFromAll === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                                   Eliminar de Todos
                                 </Button>
                               </div>
                             </div>
-                          )}
+                            );
+                          })()}
                         </CardContent>
                       </Card>
                     </motion.div>
