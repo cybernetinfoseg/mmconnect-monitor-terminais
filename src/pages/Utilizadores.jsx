@@ -536,7 +536,7 @@ export default function Utilizadores() {
                             <td colSpan={isAdmin ? 7 : 6} className="px-4 pb-4 bg-slate-50 border-b border-slate-200">
                               <div className="pt-3 space-y-2">
                                 <div className="flex items-center gap-3 flex-wrap">
-                                  <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
+                                  <p className="text-xs font-semibold text-slate-600">Filtro Terminais:</p>
                                   {isAdmin &&
                                   <div className="flex items-center gap-1.5">
                                       
