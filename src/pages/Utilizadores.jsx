@@ -30,6 +30,8 @@ export default function Utilizadores() {
   const [sendingTo, setSendingTo] = useState(null);
   const [sendingAll, setSendingAll] = useState(false);
   const [sendResults, setSendResults] = useState({});
+  const [deletingFromTerminal, setDeletingFromTerminal] = useState(null); // { userId, terminalId }
+  const [deletingFromAll, setDeletingFromAll] = useState(null); // userId
   const [selectedTerminals, setSelectedTerminals] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [expandedUser, setExpandedUser] = useState(null);
@@ -107,6 +109,37 @@ export default function Utilizadores() {
       }
     }
     return results;
+  };
+
+  const deleteUserFromTerminal = async (user, terminalId) => {
+    setDeletingFromTerminal({ userId: user.id, terminalId });
+    try {
+      const resp = await base44.functions.invoke('terminalControl', {
+        terminal_id: terminalId, action: 'deleteuser',
+        params: { enrollid: user.enrollid },
+      });
+      const ok = resp.data?.success;
+      ok ? toast.success(`Utilizador removido do terminal`) : toast.error(resp.data?.error || 'Erro ao remover');
+    } catch (e) {
+      toast.error(e?.response?.data?.error || e.message);
+    }
+    setDeletingFromTerminal(null);
+  };
+
+  const handleDeleteFromAll = async (user) => {
+    setDeletingFromAll(user.id);
+    let ok = 0, fail = 0;
+    for (const t of terminals) {
+      try {
+        const resp = await base44.functions.invoke('terminalControl', {
+          terminal_id: t.id, action: 'deleteuser',
+          params: { enrollid: user.enrollid },
+        });
+        resp.data?.success ? ok++ : fail++;
+      } catch { fail++; }
+    }
+    setDeletingFromAll(null);
+    fail === 0 ? toast.success(`Utilizador removido de ${ok} terminal(is)`) : toast.error(`${ok} OK / ${fail} erros`);
   };
 
   const handleSendOne = async (user, terminalIds) => {
@@ -347,27 +380,37 @@ export default function Utilizadores() {
                                 <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
                                 <div className="grid grid-cols-3 xl:grid-cols-4 gap-2">
                                   {terminals.map(t => {
-                                    const res = sendResult?.[t.id];
-                                    return (
-                                      <div key={t.id} className="flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white">
-                                        <div className="min-w-0 flex-1">
-                                          <p className="text-xs font-medium truncate">{t.nome}</p>
-                                          <p className="text-xs text-slate-400 truncate">{t.local}</p>
-                                        </div>
-                                        <div className="flex items-center gap-1 ml-2 shrink-0">
-                                          {res && (res.success ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-red-400" title={res.message} />)}
-                                          <Button size="sm" className="h-6 px-1.5 bg-teal-600 hover:bg-teal-700" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, [t.id])}>
-                                            {sendingTo === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    );
+                                   const res = sendResult?.[t.id];
+                                   const isDeletingThis = deletingFromTerminal?.userId === u.id && deletingFromTerminal?.terminalId === t.id;
+                                   return (
+                                     <div key={t.id} className="flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-white">
+                                       <div className="min-w-0 flex-1">
+                                         <p className="text-xs font-medium truncate">{t.nome}</p>
+                                         <p className="text-xs text-slate-400 truncate">{t.local}</p>
+                                       </div>
+                                       <div className="flex items-center gap-1 ml-2 shrink-0">
+                                         {res && (res.success ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-red-400" title={res.message} />)}
+                                         <Button size="sm" className="h-6 px-1.5 bg-teal-600 hover:bg-teal-700" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, [t.id])}>
+                                           {sendingTo === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                                         </Button>
+                                         <Button size="sm" variant="outline" className="h-6 px-1.5 text-red-500 hover:bg-red-50 border-red-200" disabled={!!deletingFromTerminal} onClick={() => deleteUserFromTerminal(u, t.id)}>
+                                           {isDeletingThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                         </Button>
+                                       </div>
+                                     </div>
+                                   );
                                   })}
-                                </div>
-                                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, terminals.map(t => t.id))}>
-                                  {sendingTo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                                  Enviar para Todos
-                                </Button>
+                                  </div>
+                                  <div className="flex gap-2">
+                                  <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, terminals.map(t => t.id))}>
+                                   {sendingTo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                                   Enviar para Todos
+                                  </Button>
+                                  <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300 hover:bg-red-50 gap-2 text-xs" disabled={deletingFromAll === u.id} onClick={() => handleDeleteFromAll(u)}>
+                                   {deletingFromAll === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                                   Eliminar de Todos
+                                  </Button>
+                                  </div>
                               </div>
                             </td>
                           </tr>
@@ -420,6 +463,7 @@ export default function Utilizadores() {
                               <div className="grid grid-cols-1 gap-2">
                                 {terminals.map(t => {
                                   const res = sendResult?.[t.id];
+                                  const isDeletingThis = deletingFromTerminal?.userId === u.id && deletingFromTerminal?.terminalId === t.id;
                                   return (
                                     <div key={t.id} className="flex items-center justify-between p-2 rounded-lg border border-slate-200 bg-slate-50">
                                       <div className="min-w-0 flex-1">
@@ -431,15 +475,24 @@ export default function Utilizadores() {
                                         <Button size="sm" className="h-7 px-2 bg-teal-600 hover:bg-teal-700 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, [t.id])}>
                                           {sendingTo === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                                         </Button>
+                                        <Button size="sm" variant="outline" className="h-7 px-2 text-red-500 hover:bg-red-50 border-red-200" disabled={!!deletingFromTerminal} onClick={() => deleteUserFromTerminal(u, t.id)}>
+                                          {isDeletingThis ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                                        </Button>
                                       </div>
                                     </div>
                                   );
                                 })}
                               </div>
-                              <Button size="sm" className="w-full bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, terminals.map(t => t.id))}>
-                                {sendingTo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                                Enviar para Todos
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, terminals.map(t => t.id))}>
+                                  {sendingTo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                                  Enviar para Todos
+                                </Button>
+                                <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300 hover:bg-red-50 gap-2 text-xs" disabled={deletingFromAll === u.id} onClick={() => handleDeleteFromAll(u)}>
+                                  {deletingFromAll === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                                  Eliminar de Todos
+                                </Button>
+                              </div>
                             </div>
                           )}
                         </CardContent>
