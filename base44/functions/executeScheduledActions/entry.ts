@@ -8,18 +8,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 function buildTimmyWsUrl(terminal) {
   const host = terminal.ip_publico || terminal.dns || '51.91.219.145';
-  
-  // Lógica de Porta:
-  // 1. Usa a porta específica do terminal se existir
-  // 2. Se não existir, mas o terminal for do novo range, você pode definir uma lógica
-  // 3. Fallback para 7100 (início do novo range) ou manter 7788 para legado
-  let port = terminal.porta;
-  
-  if (!port) {
-    // Se o terminal é novo e não tem porta, assume a 7100 ou a porta padrão antiga
-    port = (terminal.tipo_conexao === 'websocket_cloud') ? 7100 : 7788;
-  }
-
+  const port = terminal.porta || 7788;
   return `ws://${host}:${port}`;
 }
 
