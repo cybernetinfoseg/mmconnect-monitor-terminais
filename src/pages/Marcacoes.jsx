@@ -219,12 +219,6 @@ export default function Marcacoes() {
                   Recolher Todos os Terminais
                 </Button>
               </div>
-                <Input
-                  placeholder="Nome, local, SN, IP, DNS, modelo..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
               <div className="flex flex-wrap gap-2">
                 {terminals.map(t => (
                   <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
