@@ -7,9 +7,7 @@ import {
   Wifi, 
   WifiOff, 
   MapPin, 
-  Activity,
   AlertTriangle,
-  ArrowUpDown,
   User,
   LayoutList,
   X
@@ -30,7 +28,7 @@ export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [userFilter, setUserFilter] = useState(null);
-  const [sortBy, setSortBy] = useState('status');
+
   const [showExtrasModal, setShowExtrasModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(5000);
@@ -104,22 +102,13 @@ export default function Dashboard() {
 
   // Apply filters
   const filteredTerminals = useMemo(() => {
-    let list = terminals.filter(t => {
+    return terminals.filter(t => {
       if (localFilter && t.local !== localFilter) return false;
-
       if (statusFilter && t.status !== statusFilter) return false;
       if (userFilter && (t.usuario_email || t.created_by) !== userFilter) return false;
       return true;
     });
-    if (sortBy === 'status') {
-      list = [...list].sort((a, b) => a.status === 'offline' ? -1 : 1);
-    } else if (sortBy === 'nome') {
-      list = [...list].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-    } else if (sortBy === 'ping') {
-      list = [...list].sort((a, b) => (b.segundos_sem_ping || 0) - (a.segundos_sem_ping || 0));
-    }
-    return list;
-  }, [terminals, localFilter, statusFilter, userFilter, sortBy]);
+  }, [terminals, localFilter, statusFilter, userFilter]);
 
   // Calculate KPIs
   const stats = useMemo(() => {
@@ -137,9 +126,9 @@ export default function Dashboard() {
 
   // Sync filters to localStorage so TV Mode mirrors them in real-time
   useEffect(() => {
-    const filters = { local: localFilter, status: statusFilter, sort: sortBy, user: userFilter };
+    const filters = { local: localFilter, status: statusFilter, user: userFilter };
     localStorage.setItem('dashboard-filters', JSON.stringify(filters));
-  }, [localFilter, statusFilter, sortBy]);
+  }, [localFilter, statusFilter, userFilter]);
 
   const handlePullRefresh = async () => {
     await refetch();
@@ -167,7 +156,7 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className={`grid grid-cols-2 ${canSeeAll ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2`}>
+          <div className={`grid grid-cols-1 ${canSeeAll ? 'sm:grid-cols-2' : ''} gap-2`}>
             {/* Local */}
             <div>
               <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
@@ -199,38 +188,6 @@ export default function Dashboard() {
                 </select>
               </div>
             )}
-
-            {/* Status */}
-            <div>
-              <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                <Activity className="h-3 w-3" /> Status
-              </label>
-              <select
-                value={statusFilter || ''}
-                onChange={e => setStatusFilter(e.target.value || null)}
-                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
-              >
-                <option value="">Todos</option>
-                <option value="online">Online</option>
-                <option value="offline">Offline</option>
-              </select>
-            </div>
-
-            {/* Ordenar */}
-            <div>
-              <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                <ArrowUpDown className="h-3 w-3" /> Ordenar
-              </label>
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
-              >
-                <option value="status">Status</option>
-                <option value="nome">Nome</option>
-                <option value="ping">Sem ping</option>
-              </select>
-            </div>
           </div>
 
 
