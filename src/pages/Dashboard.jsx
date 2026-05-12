@@ -200,8 +200,8 @@ export default function Dashboard() {
             value={stats.total}
             icon={Monitor}
             color="blue"
-            onClick={() => setStatusFilter(null)}
-            active={!statusFilter}
+            onClick={() => { setStatusFilter(null); setLocalFilter(null); setUserFilter(null); }}
+            active={!statusFilter && !localFilter && !userFilter}
           />
           <KPICard
             title="Online"
