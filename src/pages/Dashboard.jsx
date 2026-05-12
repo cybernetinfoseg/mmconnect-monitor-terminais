@@ -7,17 +7,15 @@ import {
   Wifi, 
   WifiOff, 
   MapPin, 
-  RefreshCw,
   Activity,
   AlertTriangle,
   ArrowUpDown,
-  LayoutDashboard,
-  Settings2,
-  User
+  User,
+  LayoutList,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import KPICard from '../components/dashboard/KPICard';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
@@ -25,31 +23,17 @@ import TerminalsTable from '../components/dashboard/TerminalsTable';
 import StatusPieChart from '../components/dashboard/StatusPieChart';
 import AlertsList from '../components/dashboard/AlertsList';
 import PullToRefresh from '../components/dashboard/PullToRefresh';
-import TerminalStatusWidget from '../components/dashboard/TerminalStatusWidget';
 import AlertRulesWidget from '../components/dashboard/AlertRulesWidget';
 import RecentAuditWidget from '../components/dashboard/RecentAuditWidget';
-const DEFAULT_WIDGETS = {
-  terminalStatus: true,
-  alertRules: true,
-  recentAudit: true,
-};
 
 export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [userFilter, setUserFilter] = useState(null);
   const [sortBy, setSortBy] = useState('status');
-  const [lastRefresh, setLastRefresh] = useState(new Date());
-  const [isMonitoring, setIsMonitoring] = useState(false);
-  const [showWidgetConfig, setShowWidgetConfig] = useState(false);
+  const [showExtrasModal, setShowExtrasModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(5000);
-  const [widgets, setWidgets] = useState(() => {
-    try {
-      const saved = localStorage.getItem('dashboard-widgets');
-      return saved ? { ...DEFAULT_WIDGETS, ...JSON.parse(saved) } : DEFAULT_WIDGETS;
-    } catch { return DEFAULT_WIDGETS; }
-  });
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -66,14 +50,6 @@ export default function Dashboard() {
       })
       .catch(() => setRefreshInterval(30000));
   }, []);
-
-  const toggleWidget = (key) => {
-    setWidgets(prev => {
-      const next = { ...prev, [key]: !prev[key] };
-      localStorage.setItem('dashboard-widgets', JSON.stringify(next));
-      return next;
-    });
-  };
 
   const perms = resolvePermissions(currentUser);
   const canSeeAll = currentUser?.role === 'admin';
@@ -93,20 +69,6 @@ export default function Dashboard() {
     refetchInterval: refreshInterval,
     enabled: !!currentUser,
   });
-
-  // Monitorar todos os terminais
-  const handleMonitorAll = async () => {
-    setIsMonitoring(true);
-    try {
-      await base44.functions.invoke('monitorAllTerminals', {});
-      setLastRefresh(new Date());
-      setTimeout(() => refetch(), 2000);
-    } catch (error) {
-      console.error('Erro ao monitorar:', error);
-    } finally {
-      setIsMonitoring(false);
-    }
-  };
 
   // Fetch alerts with server-side filtering for security
   const { data: alerts = [] } = useQuery({
@@ -181,7 +143,6 @@ export default function Dashboard() {
 
   const handlePullRefresh = async () => {
     await refetch();
-    setLastRefresh(new Date());
   };
 
   return (
@@ -199,21 +160,11 @@ export default function Dashboard() {
         >
           <div className="flex flex-wrap gap-2 items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtros</span>
-            <div className="flex gap-2">
-              {(localFilter || statusFilter || userFilter) && (
-                <Button variant="ghost" size="sm" onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }} className="text-slate-500 hover:text-slate-700 h-7 px-2 text-xs">
-                  Limpar
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={handleMonitorAll} disabled={isMonitoring} className="gap-1.5 h-7 px-3 text-xs">
-                <RefreshCw className={cn("h-3.5 w-3.5", isMonitoring && "animate-spin")} />
-                Atualizar
+            {(localFilter || statusFilter || userFilter) && (
+              <Button variant="ghost" size="sm" onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }} className="text-slate-500 hover:text-slate-700 h-7 px-2 text-xs">
+                Limpar
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowWidgetConfig(v => !v)} className={cn("gap-1.5 h-7 px-3 text-xs", showWidgetConfig && "bg-slate-100")}>
-                <Settings2 className="h-3.5 w-3.5" />
-                Widgets
-              </Button>
-            </div>
+            )}
           </div>
 
           <div className={`grid grid-cols-2 ${canSeeAll ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2`}>
@@ -282,23 +233,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {showWidgetConfig && (
-            <div className="border-t border-slate-100 pt-3 flex flex-wrap items-center gap-4">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                <LayoutDashboard className="h-3 w-3" /> Widgets
-              </span>
-              {[
-                { key: 'terminalStatus', label: 'Status' },
-                { key: 'alertRules', label: 'Alertas' },
-                { key: 'recentAudit', label: 'Auditoria' },
-              ].map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-2 cursor-pointer">
-                  <Switch checked={widgets[key]} onCheckedChange={() => toggleWidget(key)} className="data-[state=checked]:bg-emerald-500 scale-90" />
-                  <span className="text-xs text-slate-600">{label}</span>
-                </label>
-              ))}
-            </div>
-          )}
+
         </motion.div>
 
         {/* KPIs */}
@@ -327,7 +262,7 @@ export default function Dashboard() {
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-          {/* Chart */}
+          {/* Chart + Status Widget */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -340,11 +275,46 @@ export default function Dashboard() {
                   Distribuição de Status
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <StatusPieChart 
                   online={stats.online} 
                   offline={stats.offline}
+                  compact
                 />
+                {/* Status bar */}
+                <div className="space-y-2 border-t border-slate-100 pt-3">
+                  {(() => {
+                    const pct = stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0;
+                    const color = pct >= 80 ? 'emerald' : pct >= 50 ? 'amber' : 'red';
+                    const barClass = color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-red-500';
+                    const textClass = color === 'emerald' ? 'text-emerald-600' : color === 'amber' ? 'text-amber-600' : 'text-red-600';
+                    return (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">Disponibilidade</span>
+                          <span className={cn("text-sm font-bold", textClass)}>{pct}%</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={cn("h-full rounded-full transition-all duration-500", barClass)} style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-center pt-1">
+                          <div>
+                            <p className="text-base font-bold text-slate-700">{stats.total}</p>
+                            <p className="text-[10px] text-slate-400">Total</p>
+                          </div>
+                          <div>
+                            <p className="text-base font-bold text-emerald-600">{stats.online}</p>
+                            <p className="text-[10px] text-slate-400 flex items-center justify-center gap-0.5"><Wifi className="h-2.5 w-2.5" /> Online</p>
+                          </div>
+                          <div>
+                            <p className="text-base font-bold text-red-500">{stats.offline}</p>
+                            <p className="text-[10px] text-slate-400 flex items-center justify-center gap-0.5"><WifiOff className="h-2.5 w-2.5" /> Offline</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -385,9 +355,20 @@ export default function Dashboard() {
           >
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                  Incidentes
+                <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                    Incidentes
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowExtrasModal(true)}
+                    className="h-6 px-2 text-[10px] text-slate-400 hover:text-slate-600 gap-1"
+                  >
+                    <LayoutList className="h-3 w-3" />
+                    Ver mais
+                  </Button>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -397,24 +378,27 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
-        {/* Custom Widgets Row */}
-        {(widgets.terminalStatus || widgets.alertRules || widgets.recentAudit) && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {widgets.terminalStatus && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <TerminalStatusWidget total={stats.total} online={stats.online} offline={stats.offline} />
-              </motion.div>
-            )}
-            {widgets.alertRules && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-                <AlertRulesWidget />
-              </motion.div>
-            )}
-            {widgets.recentAudit && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <RecentAuditWidget currentUser={currentUser} />
-              </motion.div>
-            )}
+        {/* Extras Modal */}
+        {showExtrasModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                <h2 className="text-base font-semibold text-slate-800">Auditoria &amp; Alertas</h2>
+                <button onClick={() => setShowExtrasModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
+                  <X className="h-5 w-5 text-slate-500" />
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <RecentAuditWidget currentUser={currentUser} />
+                  <AlertRulesWidget />
+                </div>
+              </div>
+            </motion.div>
           </div>
         )}
         </div>
