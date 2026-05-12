@@ -243,6 +243,8 @@ export default function Dashboard() {
             value={stats.total}
             icon={Monitor}
             color="blue"
+            onClick={() => setStatusFilter(null)}
+            active={!statusFilter}
           />
           <KPICard
             title="Online"
@@ -251,12 +253,16 @@ export default function Dashboard() {
             color="green"
             trend="up"
             trendValue={`${stats.onlinePercentage}% disponível`}
+            onClick={() => setStatusFilter(statusFilter === 'online' ? null : 'online')}
+            active={statusFilter === 'online'}
           />
           <KPICard
             title="Offline"
             value={stats.offline}
             icon={WifiOff}
             color="red"
+            onClick={() => setStatusFilter(statusFilter === 'offline' ? null : 'offline')}
+            active={statusFilter === 'offline'}
           />
         </div>
 
