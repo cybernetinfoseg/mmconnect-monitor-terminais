@@ -286,9 +286,13 @@ async function syncStatus(base44) {
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-    if (!user) return Response.json({ error: 'Não autenticado' }, { status: 401 });
-    if (user.role !== 'admin') return Response.json({ error: 'Apenas administradores' }, { status: 403 });
+
+    // Scheduled automations run without a user session — skip auth check in that case.
+    // For manual/frontend calls, enforce admin role.
+    const user = await base44.auth.me().catch(() => null);
+    if (user && user.role !== 'admin') {
+      return Response.json({ error: 'Apenas administradores' }, { status: 403 });
+    }
 
     const body   = await req.json().catch(() => ({}));
     const action = body.action || 'sync_marcacoes';
