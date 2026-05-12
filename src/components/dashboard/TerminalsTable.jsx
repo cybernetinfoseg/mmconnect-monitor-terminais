@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Monitor, MapPin, Clock, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Monitor, MapPin, Clock, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { cn } from '@/lib/utils';
 import { formatDateTimePT } from '@/lib/localization';
 
-export default function TerminalsTable({ terminals, maxRows = 15, compact = false }) {
+export default function TerminalsTable({ terminals, maxRows = 12, compact = false }) {
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
+  const [page, setPage] = useState(1);
 
   const handleSort = (col) => {
     if (sortCol === col) {
@@ -16,6 +17,7 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
       setSortCol(col);
       setSortDir('asc');
     }
+    setPage(1);
   };
 
   const sortedTerminals = [...terminals].sort((a, b) => {
@@ -32,7 +34,11 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
     return (b.segundos_sem_ping || 0) - (a.segundos_sem_ping || 0);
   });
 
-  const displayTerminals = maxRows ? sortedTerminals.slice(0, maxRows) : sortedTerminals;
+  const totalPages = maxRows ? Math.ceil(sortedTerminals.length / maxRows) : 1;
+  const currentPage = Math.min(page, totalPages || 1);
+  const displayTerminals = maxRows
+    ? sortedTerminals.slice((currentPage - 1) * maxRows, currentPage * maxRows)
+    : sortedTerminals;
 
   const SortIcon = ({ col }) => {
     if (sortCol !== col) return <ChevronsUpDown className="h-3 w-3 text-slate-400" />;
@@ -145,9 +151,28 @@ export default function TerminalsTable({ terminals, maxRows = 15, compact = fals
         </table>
       </div>
       
-      {terminals.length > maxRows && (
-        <div className="px-4 py-3 text-center text-sm text-slate-500 bg-slate-50/50 border-t border-slate-100">
-          Exibindo {maxRows} de {terminals.length} terminais
+      {totalPages > 1 && (
+        <div className="px-4 py-3 flex items-center justify-between bg-slate-50/50 border-t border-slate-100">
+          <span className="text-xs text-slate-500">
+            {(currentPage - 1) * maxRows + 1}–{Math.min(currentPage * maxRows, sortedTerminals.length)} de {sortedTerminals.length} terminais
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4 text-slate-600" />
+            </button>
+            <span className="text-xs text-slate-600 px-1">{currentPage} / {totalPages}</span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1 rounded hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="h-4 w-4 text-slate-600" />
+            </button>
+          </div>
         </div>
       )}
     </div>
