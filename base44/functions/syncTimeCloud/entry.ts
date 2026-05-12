@@ -239,11 +239,9 @@ async function syncStatus(base44) {
   const { pool } = await getSqlPool();
 
   try {
-    // Buscar terminais com campos de conectividade
+    // Buscar terminais com campos disponíveis (sem UltimoAcesso/UltimaLigacao/Activo)
     const result = await pool.request().query(`
-      SELECT
-        IDTerminal, Nome, NumeroSerie, Modelo, Comunicacao,
-        UltimoAcesso, UltimaLigacao, Activo
+      SELECT IDTerminal, Nome, NumeroSerie, Modelo, Comunicacao, Grupo, Endereco
       FROM Terminais
     `);
 
@@ -264,20 +262,10 @@ async function syncStatus(base44) {
       const terminal = (sn && bySN[sn]) || (nome && byNome[nome]);
       if (!terminal) continue;
 
-      // Determinar último ping (UltimaLigacao ou UltimoAcesso)
-      const ultimoPing = row.UltimaLigacao || row.UltimoAcesso;
-      const secondsAgo = ultimoPing
-        ? Math.floor((Date.now() - new Date(ultimoPing).getTime()) / 1000)
-        : 9999;
-
-      // Online se último ping < 5 minutos
-      const status = secondsAgo < 300 ? 'online' : 'offline';
-
+      // TimeCloud não tem colunas de ping — só garantir que o terminal existe no NOC
+      // Atualizar apenas último_check para confirmar que a BD o reconhece
       await base44.asServiceRole.entities.Terminal.update(terminal.id, {
-        status,
-        ultimo_ping:       ultimoPing ? new Date(ultimoPing).toISOString() : terminal.ultimo_ping,
-        segundos_sem_ping: secondsAgo,
-        ultimo_check:      now,
+        ultimo_check: now,
       });
       updated++;
     }
