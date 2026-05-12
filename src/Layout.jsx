@@ -32,6 +32,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 import PendingApproval from './components/auth/PendingApproval';
 import { useRequireAuth } from './components/auth/useRequireAuth';
+import SidebarClock from './components/dashboard/SidebarClock';
 
 const ALL_NAV_ITEMS = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
@@ -173,6 +174,7 @@ export default function Layout({ children, currentPageName }) {
       </nav>
       <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
 
+        <SidebarClock />
         {currentUser && (
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
             <User className="h-4 w-4 text-slate-400 shrink-0" />

@@ -19,13 +19,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
-import { Tv } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import TerminalsTable from '../components/dashboard/TerminalsTable';
 import StatusPieChart from '../components/dashboard/StatusPieChart';
-import FilterDropdown from '../components/dashboard/FilterDropdown';
 import AlertsList from '../components/dashboard/AlertsList';
 import PullToRefresh from '../components/dashboard/PullToRefresh';
 import TerminalStatusWidget from '../components/dashboard/TerminalStatusWidget';
@@ -195,56 +192,88 @@ export default function Dashboard() {
       {/* Main Content */}
       <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-[1920px]">
         {/* Filters */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-3 sm:gap-4"
+          className="bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-xl p-3 sm:p-4 space-y-3"
         >
-          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canSeeAll ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2 sm:gap-3`}>
-            <FilterDropdown
-              label="Filtrar por Local"
-              icon={MapPin}
-              value={localFilter}
-              onChange={setLocalFilter}
-              options={locais}
-              placeholder="Todos os locais"
-            />
+          <div className="flex flex-wrap gap-2 items-center justify-between">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtros</span>
+            <div className="flex gap-2">
+              {(localFilter || statusFilter || userFilter) && (
+                <Button variant="ghost" size="sm" onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }} className="text-slate-500 hover:text-slate-700 h-7 px-2 text-xs">
+                  Limpar
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={handleMonitorAll} disabled={isMonitoring} className="gap-1.5 h-7 px-3 text-xs">
+                <RefreshCw className={cn("h-3.5 w-3.5", isMonitoring && "animate-spin")} />
+                Atualizar
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowWidgetConfig(v => !v)} className={cn("gap-1.5 h-7 px-3 text-xs", showWidgetConfig && "bg-slate-100")}>
+                <Settings2 className="h-3.5 w-3.5" />
+                Widgets
+              </Button>
+            </div>
+          </div>
 
+          <div className={`grid grid-cols-2 ${canSeeAll ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2`}>
+            {/* Local */}
+            <div>
+              <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <MapPin className="h-3 w-3" /> Local
+              </label>
+              <select
+                value={localFilter || ''}
+                onChange={e => setLocalFilter(e.target.value || null)}
+                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
+              >
+                <option value="">Todos</option>
+                {locais.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+
+            {/* Utilizador (admin only) */}
             {canSeeAll && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <User className="h-3.5 w-3.5" />
-                  Filtrar por Utilizador
+              <div>
+                <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                  <User className="h-3 w-3" /> Utilizador
                 </label>
                 <select
                   value={userFilter || ''}
                   onChange={e => setUserFilter(e.target.value || null)}
-                  className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 w-full"
+                  className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
                 >
-                  <option value="">Todos os utilizadores</option>
-                  {usuarios.map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
+                  <option value="">Todos</option>
+                  {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
             )}
-            <FilterDropdown
-              label="Status"
-              icon={Activity}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={['online', 'offline']}
-              placeholder="Todos os status"
-            />
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <ArrowUpDown className="h-3.5 w-3.5" />
-                Ordenar por
+
+            {/* Status */}
+            <div>
+              <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <Activity className="h-3 w-3" /> Status
+              </label>
+              <select
+                value={statusFilter || ''}
+                onChange={e => setStatusFilter(e.target.value || null)}
+                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
+              >
+                <option value="">Todos</option>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
+              </select>
+            </div>
+
+            {/* Ordenar */}
+            <div>
+              <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <ArrowUpDown className="h-3 w-3" /> Ordenar
               </label>
               <select
                 value={sortBy}
                 onChange={e => setSortBy(e.target.value)}
-                className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 w-full"
+                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
               >
                 <option value="status">Status</option>
                 <option value="nome">Nome</option>
@@ -252,64 +281,20 @@ export default function Dashboard() {
               </select>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 items-center justify-between">
-            <div className="flex flex-wrap gap-2 items-center">
-              {(localFilter || statusFilter || userFilter) && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }}
-                  className="text-slate-500 hover:text-slate-700"
-                >
-                  Limpar filtros
-                </Button>
-              )}
-              <Link to={`/TVMode${localFilter ? `?local=${encodeURIComponent(localFilter)}` : ''}`}>
-                <Button variant="outline" size="sm" className="gap-1.5 text-slate-600">
-                  <Tv className="h-4 w-4" />
-                  Modo TV
-                </Button>
-              </Link>
-            </div>
-            <div className="flex gap-2 items-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleMonitorAll}
-                disabled={isMonitoring}
-                className="gap-1.5"
-              >
-                <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
-                Atualizar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowWidgetConfig(v => !v)}
-                className={cn("gap-1.5", showWidgetConfig && "bg-slate-100")}
-              >
-                <Settings2 className="h-4 w-4" />
-                Widgets
-              </Button>
-            </div>
-          </div>
+
           {showWidgetConfig && (
-            <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-4">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                <LayoutDashboard className="h-3.5 w-3.5" /> Widgets visíveis
+            <div className="border-t border-slate-100 pt-3 flex flex-wrap items-center gap-4">
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <LayoutDashboard className="h-3 w-3" /> Widgets
               </span>
               {[
-                { key: 'terminalStatus', label: 'Status de Terminais' },
-                { key: 'alertRules', label: 'Regras de Alerta' },
-                { key: 'recentAudit', label: 'Auditoria Recente' },
+                { key: 'terminalStatus', label: 'Status' },
+                { key: 'alertRules', label: 'Alertas' },
+                { key: 'recentAudit', label: 'Auditoria' },
               ].map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
-                  <Switch
-                    checked={widgets[key]}
-                    onCheckedChange={() => toggleWidget(key)}
-                    className="data-[state=checked]:bg-emerald-500"
-                  />
-                  <span className="text-sm text-slate-600">{label}</span>
+                  <Switch checked={widgets[key]} onCheckedChange={() => toggleWidget(key)} className="data-[state=checked]:bg-emerald-500 scale-90" />
+                  <span className="text-xs text-slate-600">{label}</span>
                 </label>
               ))}
             </div>
