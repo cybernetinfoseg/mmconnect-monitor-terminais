@@ -58,6 +58,7 @@ const bottomNavItems = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
+  { name: 'Alertas', page: 'Alertas', icon: Bell },
 ];
 
 // Root pages (no back button)
@@ -200,42 +201,29 @@ export default function Layout({ children, currentPageName }) {
         <Sidebar />
       </aside>
 
-      {/* Mobile Header */}
+      {/* Mobile Header — minimal */}
       <header
         className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 px-4"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <div className="flex items-center justify-between h-14">
-           <div className="flex items-center gap-2">
-             {!isRoot && (
-               <Button
-                 variant="ghost"
-                 size="icon"
-                 onClick={() => window.history.back()}
-                 className="select-none h-12 w-12"
-               >
-                 <ChevronLeft className="h-5 w-5" />
-               </Button>
-             )}
-             <div className="flex items-center gap-2">
-               <div className="p-1.5 bg-slate-900 dark:bg-emerald-600 rounded-lg">
-                 <Monitor className="h-4 w-4 text-emerald-400 dark:text-white" />
-               </div>
-               <h1 className="font-bold text-slate-900 dark:text-white text-sm">NOC Monitor</h1>
-             </div>
-           </div>
-
-           <Sheet>
-             <SheetTrigger asChild>
-               <Button variant="ghost" size="icon" className="select-none h-12 w-12">
-                 <Menu className="h-6 w-6" />
-               </Button>
-             </SheetTrigger>
-             <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
-               <Sidebar />
-             </SheetContent>
-           </Sheet>
-         </div>
+        <div className="flex items-center justify-between h-12">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-slate-900 dark:bg-emerald-600 rounded-lg">
+              <Monitor className="h-4 w-4 text-emerald-400 dark:text-white" />
+            </div>
+            <h1 className="font-bold text-slate-900 dark:text-white text-sm">NOC Monitor</h1>
+          </div>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="select-none h-10 w-10">
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
+              <Sidebar />
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -245,7 +233,7 @@ export default function Layout({ children, currentPageName }) {
           {children}
         </div>
         {/* Mobile: slide animation */}
-        <div className="lg:hidden pt-14 pb-20">
+        <div className="lg:hidden pt-12 pb-20">
           <AnimatePresence mode="wait" initial={false} custom={direction}>
             <motion.div
               key={currentPageName}
@@ -268,30 +256,42 @@ export default function Layout({ children, currentPageName }) {
       >
         <div className="flex items-stretch">
           {bottomNavItems.map((item) => {
-                const isActive = currentPageName === item.page;
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.page}
-                    onClick={() => {
-                      if (isActive) {
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      } else {
-                        navigate(createPageUrl(item.page));
-                      }
-                    }}
-                    className={cn(
-                      "flex-1 flex flex-col items-center justify-center py-2 gap-1 select-none transition-colors",
-                      isActive
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                    )}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-[10px] font-medium">{item.name}</span>
-                  </button>
-                );
-              })}
+            const isActive = currentPageName === item.page;
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.page}
+                onClick={() => {
+                  if (isActive) {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  } else {
+                    navigate(createPageUrl(item.page));
+                  }
+                }}
+                className={cn(
+                  "flex-1 flex flex-col items-center justify-center py-2 gap-0.5 select-none transition-colors",
+                  isActive
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-[10px] font-medium">{item.name}</span>
+              </button>
+            );
+          })}
+          {/* Menu button opens sidebar sheet */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <button className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 select-none transition-colors text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
+                <Menu className="h-5 w-5" />
+                <span className="text-[10px] font-medium">Menu</span>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
+              <Sidebar />
+            </SheetContent>
+          </Sheet>
         </div>
       </nav>
     </div>

@@ -37,9 +37,36 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
         colorClasses[color] || colorClasses.blue
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1 sm:space-y-2 min-w-0">
-          <p className="text-[10px] sm:text-sm font-medium text-slate-500 uppercase tracking-wider leading-tight">
+      {/* Mobile: number top-left, icon top-right */}
+      <div className="flex items-start justify-between gap-2 sm:hidden">
+        <div className="min-w-0">
+          <motion.p
+            key={value}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className={cn(
+              'text-3xl font-bold tracking-tight',
+              valueColorClasses[color] || 'text-slate-900'
+            )}
+          >
+            {value}
+          </motion.p>
+          <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider leading-tight mt-1">
+            {title}
+          </p>
+        </div>
+        <div className={cn(
+          'rounded-xl p-2 shrink-0',
+          iconColorClasses[color] || iconColorClasses.blue
+        )}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+
+      {/* Desktop: original layout */}
+      <div className="hidden sm:flex items-start justify-between gap-2">
+        <div className="space-y-2 min-w-0">
+          <p className="text-sm font-medium text-slate-500 uppercase tracking-wider leading-tight">
             {title}
           </p>
           <motion.p
@@ -47,7 +74,7 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             className={cn(
-              'text-2xl sm:text-4xl font-bold tracking-tight',
+              'text-4xl font-bold tracking-tight',
               valueColorClasses[color] || 'text-slate-900'
             )}
           >
@@ -55,7 +82,7 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
           </motion.p>
           {trend && (
             <p className={cn(
-              'text-[10px] sm:text-xs font-medium hidden sm:block',
+              'text-xs font-medium',
               trend === 'up' ? 'text-emerald-500' : 'text-red-500'
             )}>
               {trend === 'up' ? '↑' : '↓'} {trendValue}
@@ -63,13 +90,13 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
           )}
         </div>
         <div className={cn(
-          'rounded-xl p-2 sm:p-3 shrink-0',
+          'rounded-xl p-3 shrink-0',
           iconColorClasses[color] || iconColorClasses.blue
         )}>
-          <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
+          <Icon className="h-6 w-6" />
         </div>
       </div>
-      
+
       {/* Decorative element */}
       <div className="absolute -right-4 -bottom-4 h-24 w-24 rounded-full bg-current opacity-5" />
     </motion.div>
