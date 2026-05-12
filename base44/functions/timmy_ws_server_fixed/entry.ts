@@ -1,18 +1,22 @@
-# timmy_ws_server.py — NOC Monitor: Servidor WebSocket Cloud (Protocolo Timmy/THbio)
-# ✅ VERSÃO CORRIGIDA: Sistema de Futures para correlacionar respostas com comandos
-# Compatível com: Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros modelos THbio
-# Protocolo: WebSocket + JSON (RFC 6455) — porta padrão 7788 (configurável)
+# timmy_ws_server_v2.py — NOC Monitor: Servidor WebSocket Cloud (Protocolo Timmy/THbio)
+# ✅ VERSÃO V2: Marcações automáticas em tempo real + Auto-sync utilizadores + LiveTimeSync
 #
-# O terminal conecta-se ao servidor WebSocket e envia:
-#   1. cmd:"reg"     — registo inicial com SN, modelo, firmware
-#   2. cmd:"sendlog" — logs de presença em tempo real (heartbeat implícito)
-#   3. Heartbeat a cada 3s (configurável no terminal)
+# Novas funcionalidades (inspiradas no MbioFace WebSocket Manager):
+#   - sendlog: processa marcações e envia automaticamente para o NOC Monitor (Base44)
+#   - Auto-sync utilizadores: a cada 60s sincroniza utilizadores do Base44 para os terminais
+#   - LiveTimeSync: acerta o relógio de cada terminal a cada 30s
+#   - UseCartaoAsEnrollId: se card disponível, usa como enrollid
 #
 # Config: C:\ProgramData\TimmyWSServer\config.json
 # {
 #   "API_KEY": "a_sua_api_key_pessoal",
 #   "APP_ID":  "697aa46c9998c30665e2e19a",
-#   "WS_PORT": 7788
+#   "WS_PORT": 7788,
+#   "AUTO_SYNC_USERS": true,
+#   "AUTO_SYNC_INTERVAL": 60,
+#   "LIVE_TIME_SYNC": true,
+#   "LIVE_TIME_SYNC_INTERVAL": 30,
+#   "INSERT_MARCACOES": true
 # }
 #
 # Instalação (Windows):
@@ -48,27 +52,37 @@ CONFIG_FILE  = os.path.join(APP_DIR, "config.json")
 LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
 
 DEFAULT_WS_PORT   = 7788
-DEFAULT_CTRL_PORT = 7789  # porta HTTP de controlo (NOC Monitor → servidor → terminal)
+DEFAULT_CTRL_PORT = 7789
 OFFLINE_TIMEOUT   = 15    # segundos sem mensagem → offline
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
+# Modos de verificação do terminal → tipo de marcação
+MODE_MAP = {
+    1: "fp", 3: "fp", 4: "fp",          # impressão digital
+    2: "face", 200: "face", 201: "face", # facial
+    10: "card", 11: "card",              # cartão
+    6: "pw",                             # senha
+}
+
 logger = logging.getLogger("timmy_ws")
 
-# Estado em memória: SN → { terminal_id, nome, last_seen, latencia_ms, connected }
-ws_state = {}
-ws_lock  = threading.Lock()
-
-# Mapa SN → terminal_id (carregado da API)
+# Estado em memória
+ws_state    = {}
+ws_lock     = threading.Lock()
 sn_to_terminal = {}
 sn_to_nome     = {}
+sn_to_local    = {}
+sn_to_info     = {}  # SN → dados completos do terminal
 
-# Mapa SN → (websocket_object, loop_asyncio)
 ws_connections = {}
 ws_conn_lock   = threading.Lock()
 
-# Mapa: (SN, cmd_id) → asyncio.Future (para correlacionar respostas com comandos)
 pending_commands = {}
 pending_lock     = threading.Lock()
+
+# Cache de utilizadores sincronizados: sn → set(enrollid)
+synced_users = {}
+synced_users_lock = threading.Lock()
 
 
 # ──────────────────────────────────────────────────────────────
@@ -93,16 +107,13 @@ def _headers(api_key):
     return {"X-Api-Key": api_key, "Content-Type": "application/json"}
 
 def listar_terminais_ws(app_id, api_key):
-    """Busca terminais do tipo websocket_cloud."""
     url = f"{BASE_URL.format(app_id=app_id)}/nocServerGetTerminals"
     r = requests.post(url, headers=_headers(api_key), json={}, timeout=10)
     r.raise_for_status()
     data = r.json()
     if not data.get("success"):
         raise ValueError(f"nocServerGetTerminals erro: {data}")
-    # Filtrar apenas websocket_cloud
-    terminais = [t for t in data.get("terminals", []) if t.get("tipo_conexao") == "websocket_cloud"]
-    return terminais
+    return [t for t in data.get("terminals", []) if t.get("tipo_conexao") == "websocket_cloud"]
 
 def reportar_status_ws(app_id, api_key, terminal_id, status, latencia_ms=None, segundos_sem_ping=0):
     url = f"{BASE_URL.format(app_id=app_id)}/nocServerReport"
@@ -115,6 +126,43 @@ def reportar_status_ws(app_id, api_key, terminal_id, status, latencia_ms=None, s
     r = requests.post(url, headers=_headers(api_key), json=payload, timeout=10)
     r.raise_for_status()
     return r.json()
+
+def inserir_marcacao(app_id, api_key, terminal_id, terminal_nome, local, enrollid, timestamp_str, raw_mode):
+    """Envia uma marcação para o NOC Monitor via agentReport."""
+    modo = MODE_MAP.get(raw_mode, "desconhecido")
+    url = f"{BASE_URL.format(app_id=app_id)}/agentReport"
+    payload = {
+        "terminal_id":    terminal_id,
+        "terminal_nome":  terminal_nome,
+        "local":          local or "",
+        "enrollid":       enrollid,
+        "timestamp":      timestamp_str,
+        "modo":           modo,
+        "raw_mode":       raw_mode,
+        "tipo":           "desconhecido",  # o agentReport determina entrada/saida
+    }
+    try:
+        r = requests.post(url, headers=_headers(api_key), json=payload, timeout=8)
+        r.raise_for_status()
+        logger.debug(f"[MARCACAO] enrollid={enrollid} ts={timestamp_str} modo={modo} → guardado")
+        return True
+    except Exception as e:
+        logger.error(f"[MARCACAO] Erro ao guardar enrollid={enrollid}: {e}")
+        return False
+
+def listar_utilizadores_noc(app_id, api_key):
+    """Busca utilizadores do NOC Monitor (TerminalUser) para sync."""
+    url = f"{BASE_URL.format(app_id=app_id)}/agentGetTerminals"
+    # Reutiliza o agentGetTerminals que retorna utilizadores por terminal
+    # Alternativa: chamar endpoint dedicado se existir
+    try:
+        r = requests.post(url, headers=_headers(api_key), json={}, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        return data.get("users", [])
+    except Exception as e:
+        logger.error(f"[SYNC-USERS] Erro ao listar utilizadores: {e}")
+        return []
 
 
 # ──────────────────────────────────────────────────────────────
@@ -134,34 +182,29 @@ async def handle_terminal(websocket, path=None):
                 logger.warning(f"[WS] Mensagem inválida de {peer[0]}: {raw_msg[:100]}")
                 continue
 
-            cmd = msg.get("cmd", "")
+            cmd    = msg.get("cmd", "")
             msg_sn = msg.get("sn", "")
-            ret = msg.get("ret", "")
+            ret    = msg.get("ret", "")
 
+            # ── REG ──────────────────────────────────────────
             if cmd == "reg":
-                # Terminal registou-se: { cmd:"reg", sn:"ZX...", cpusn:"...", devinfo:{...} }
-                sn    = msg_sn
+                sn      = msg_sn
                 devinfo = msg.get("devinfo", {})
-                nome  = sn_to_nome.get(sn, f"Terminal-{sn}")
-                tid   = sn_to_terminal.get(sn)
+                nome    = sn_to_nome.get(sn, f"Terminal-{sn}")
+                tid     = sn_to_terminal.get(sn)
 
-                logger.info(f"[WS] REG: SN={sn} modelo={devinfo.get('modelname','?')} firmware={devinfo.get('firmware','?')}")
+                logger.info(f"[WS] REG: SN={sn} modelo={devinfo.get('modelname','?')} fw={devinfo.get('firmware','?')}")
+
+                # Guardar devinfo para referência
+                with ws_lock:
+                    sn_to_info[sn] = devinfo
 
                 if not tid:
                     logger.warning(f"[WS] SN={sn} não mapeado — adicione o número de série no painel NOC Monitor")
-                    await websocket.send(json.dumps({
-                        "ret": "reg",
-                        "result": True,
-                        "cloudtime": time.strftime("%Y-%m-%d %H:%M:%S"),
-                        "nosenduser": True
-                    }))
-                    continue
 
-                # Guardar referência da sessão WS activa para controlo remoto
                 with ws_conn_lock:
                     ws_connections[sn] = (websocket, asyncio.get_event_loop())
 
-                # Marcar online
                 with ws_lock:
                     ws_state[sn] = {
                         "terminal_id": tid,
@@ -171,69 +214,110 @@ async def handle_terminal(websocket, path=None):
                         "latencia_ms": None,
                     }
 
-                # Responder ao terminal com a hora actual do servidor
+                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
                 await websocket.send(json.dumps({
-                    "ret": "reg",
-                    "result": True,
-                    "cloudtime": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "nosenduser": True
+                    "ret":       "reg",
+                    "result":    True,
+                    "cloudtime": now_str,
+                    "nosenduser": True   # não enviar lista de utilizadores no reg
                 }))
-                logger.info(f"[WS] ✅ '{nome}' (SN={sn}) registado e ONLINE")
 
+                if tid:
+                    logger.info(f"[WS] ✅ '{nome}' (SN={sn}) registado e ONLINE")
+                    # Reportar imediatamente como online
+                    _config = _get_config()
+                    if _config:
+                        try:
+                            reportar_status_ws(_config["APP_ID"], _config["API_KEY"], tid, "online")
+                        except Exception:
+                            pass
+
+            # ── SENDLOG (marcações em tempo real) ────────────
             elif cmd == "sendlog":
-                # Terminal enviou logs de presença: heartbeat implícito
                 if not sn:
                     sn = msg_sn
-                count   = msg.get("count", 0)
-                records = msg.get("record", [])
+                count    = msg.get("count", 0)
+                records  = msg.get("record", [])
                 logindex = msg.get("logindex", 0)
 
-                if sn and sn in sn_to_terminal:
-                    with ws_lock:
-                        if sn in ws_state:
-                            ws_state[sn]["last_seen"] = time.time()
-                            ws_state[sn]["connected"] = True
+                tid   = sn_to_terminal.get(sn)
+                nome  = sn_to_nome.get(sn, sn)
+                local = sn_to_local.get(sn, "")
+
+                with ws_lock:
+                    if sn in ws_state:
+                        ws_state[sn]["last_seen"] = time.time()
+                        ws_state[sn]["connected"] = True
 
                 logger.info(f"[WS] SENDLOG SN={sn} count={count} logindex={logindex}")
 
+                # ✅ NOVO: Processar e guardar marcações em tempo real
+                _config = _get_config()
+                if tid and records and _config and _config.get("INSERT_MARCACOES", True):
+                    for rec in records:
+                        enrollid   = rec.get("enrollid")
+                        ts         = rec.get("time", "")      # "YYYY-MM-DD HH:MM:SS"
+                        raw_mode   = rec.get("mode", 0)
+                        if enrollid is not None and ts:
+                            threading.Thread(
+                                target=inserir_marcacao,
+                                args=(_config["APP_ID"], _config["API_KEY"],
+                                      tid, nome, local, enrollid, ts, raw_mode),
+                                daemon=True
+                            ).start()
+
                 await websocket.send(json.dumps({
-                    "ret": "sendlog",
-                    "result": True,
-                    "count": count,
-                    "logindex": logindex,
+                    "ret":       "sendlog",
+                    "result":    True,
+                    "count":     count,
+                    "logindex":  logindex,
                     "cloudtime": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "access": 1
+                    "access":    1
                 }))
 
+            # ── SENDUSER ─────────────────────────────────────
             elif cmd == "senduser":
                 if not sn: sn = msg_sn
-                logger.debug(f"[WS] SENDUSER SN={sn} enrollid={msg.get('enrollid')}")
+                enrollid = msg.get("enrollid")
+                logger.debug(f"[WS] SENDUSER SN={sn} enrollid={enrollid}")
+
+                # Registar utilizador como sincronizado neste terminal
+                if sn and enrollid is not None:
+                    with synced_users_lock:
+                        if sn not in synced_users:
+                            synced_users[sn] = set()
+                        synced_users[sn].add(str(enrollid))
+
                 await websocket.send(json.dumps({
-                    "ret": "senduser",
-                    "result": True,
+                    "ret":       "senduser",
+                    "result":    True,
                     "cloudtime": time.strftime("%Y-%m-%d %H:%M:%S")
                 }))
 
+            # ── HEARTBEAT / KEEPALIVE ─────────────────────────
+            elif cmd in ("heartbeat", "keepalive", "ping"):
+                if not sn: sn = msg_sn
+                with ws_lock:
+                    if sn in ws_state:
+                        ws_state[sn]["last_seen"] = time.time()
+                        ws_state[sn]["connected"] = True
+                await websocket.send(json.dumps({"ret": cmd, "result": True}))
+
+            # ── RESPOSTAS A COMANDOS ──────────────────────────
             elif ret:
-                # Resposta a um comando enviado pelo NOC Monitor
-                # Procurar no mapa de comandos pendentes
                 with pending_lock:
                     for (cmd_sn, cmd_id), future in list(pending_commands.items()):
                         if cmd_sn == (sn or msg_sn) and (msg.get("cmd") == cmd_id or msg.get("ret") == cmd_id):
                             if not future.done():
                                 future.set_result(msg)
                             del pending_commands[(cmd_sn, cmd_id)]
-                            logger.debug(f"[WS] Resposta ao comando '{cmd_id}' recebida de SN={sn or msg_sn}: {msg}")
+                            logger.debug(f"[WS] Resposta ao comando '{cmd_id}' de SN={sn or msg_sn}: {msg}")
                             break
 
             else:
-                logger.debug(f"[WS] CMD/RET desconhecido: {msg}")
-                # Enviar ACK genérico
+                logger.debug(f"[WS] MSG desconhecida: {msg}")
                 if "ret" not in msg and "cmd" in msg:
-                    await websocket.send(json.dumps({
-                        "ret": cmd,
-                        "result": True
-                    }))
+                    await websocket.send(json.dumps({"ret": cmd, "result": True}))
 
     except Exception as e:
         if "ConnectionClosed" not in type(e).__name__:
@@ -247,20 +331,25 @@ async def handle_terminal(websocket, path=None):
                 if sn in ws_state:
                     ws_state[sn]["connected"] = False
             logger.info(f"[WS] Ligação encerrada: SN={sn} ({peer[0]})")
+            # Reportar offline imediatamente
+            tid = sn_to_terminal.get(sn)
+            _config = _get_config()
+            if tid and _config:
+                try:
+                    reportar_status_ws(_config["APP_ID"], _config["API_KEY"], tid, "offline")
+                except Exception:
+                    pass
         else:
             logger.info(f"[WS] Ligação encerrada: {peer[0]} (sem registo)")
 
 
 # ──────────────────────────────────────────────────────────────
 # Servidor HTTP de Controlo (porta 7789)
-# NOC Monitor → POST /cmd { sn, command } → WS → Terminal → resposta
 # ──────────────────────────────────────────────────────────────
 
 class CtrlHandler(BaseHTTPRequestHandler):
-    """Recebe comandos do NOC Monitor e faz relay via WebSocket ao terminal."""
-
     def log_message(self, fmt, *args):
-        pass  # silenciar logs HTTP
+        pass
 
     def do_POST(self):
         if self.path != "/cmd":
@@ -287,49 +376,32 @@ class CtrlHandler(BaseHTTPRequestHandler):
             conn_data = ws_connections.get(sn)
 
         if not conn_data:
-            self._respond(503, {"success": False, "error": f"Terminal SN={sn} não está conectado ao servidor WebSocket"})
+            self._respond(503, {"success": False, "error": f"Terminal SN={sn} não está conectado"})
             return
 
         ws, loop = conn_data
-
-        # Enviar comando ao terminal via WS e aguardar resposta
         try:
             future = asyncio.run_coroutine_threadsafe(
-                self._send_and_wait(ws, sn, command),
-                loop
+                self._send_and_wait(ws, sn, command), loop
             )
-            result = future.result(timeout=12)
+            result = future.result(timeout=22)
             self._respond(200, {"success": True, "result": result})
         except asyncio.TimeoutError:
-            self._respond(504, {"success": False, "error": f"Terminal não respondeu em 12s"})
+            self._respond(504, {"success": False, "error": "Terminal não respondeu em 22s"})
         except Exception as e:
             self._respond(500, {"success": False, "error": str(e)})
 
     async def _send_and_wait(self, ws, sn, command):
-        """
-        Envia comando e aguarda a resposta do terminal.
-        Usa o sistema de futures (pending_commands) para correlacionar respostas.
-        """
-        cmd_id = str(uuid.uuid4())[:8]  # ID único para este comando
-        
-        # Criar future para aguardar resposta
-        loop = asyncio.get_event_loop()
+        cmd_id = str(uuid.uuid4())[:8]
+        loop   = asyncio.get_event_loop()
         future = loop.create_future()
-        
         with pending_lock:
             pending_commands[(sn, cmd_id)] = future
-        
         try:
-            # Adicionar cmd_id à mensagem de comando (para correlação)
             msg_to_send = dict(command)
             msg_to_send["cmd_id"] = cmd_id
-            
-            # Enviar comando ao terminal
             await ws.send(json.dumps(msg_to_send))
-            
-            # Aguardar resposta (timeout 11 segundos)
-            result = await asyncio.wait_for(future, timeout=11)
-            return result
+            return await asyncio.wait_for(future, timeout=20)
         finally:
             with pending_lock:
                 pending_commands.pop((sn, cmd_id), None)
@@ -338,7 +410,11 @@ class CtrlHandler(BaseHTTPRequestHandler):
         if self.path == "/status":
             with ws_conn_lock:
                 connected_sns = list(ws_connections.keys())
-            self._respond(200, {"connected_terminals": connected_sns, "count": len(connected_sns)})
+            self._respond(200, {
+                "connected_terminals": connected_sns,
+                "count": len(connected_sns),
+                "details": {sn: ws_state.get(sn, {}) for sn in connected_sns}
+            })
         else:
             self.send_response(404)
             self.end_headers()
@@ -353,24 +429,145 @@ class CtrlHandler(BaseHTTPRequestHandler):
 
 
 def start_ctrl_server(port, stop_event):
-    """Inicia o servidor HTTP de controlo numa thread dedicada."""
     try:
         server = HTTPServer(("0.0.0.0", port), CtrlHandler)
         server.timeout = 1
-        logger.info(f"[CTRL] Servidor HTTP de controlo activo em http://0.0.0.0:{port}/cmd")
-        logger.info(f"[CTRL] O NOC Monitor envia comandos via POST /cmd {{sn, command}}")
+        logger.info(f"[CTRL] HTTP de controlo activo em http://0.0.0.0:{port}/cmd")
         while not stop_event.is_set():
             server.handle_request()
         server.server_close()
     except Exception as e:
-        logger.error(f"[CTRL] Erro no servidor HTTP de controlo: {e}")
+        logger.error(f"[CTRL] Erro: {e}")
+
+
+# ──────────────────────────────────────────────────────────────
+# ✅ NOVO: Auto-Sync de Utilizadores → Terminais (AutoSyncEmployees)
+# ──────────────────────────────────────────────────────────────
+def ciclo_sync_utilizadores(app_id, api_key, intervalo=60, max_por_tick=25, stop_event=None):
+    """
+    A cada `intervalo` segundos, busca utilizadores do NOC Monitor e envia
+    'setuserinfo' a cada terminal WebSocket conectado que ainda não tem o utilizador.
+    """
+    logger.info(f"[SYNC-USERS] Auto-sync activo — intervalo={intervalo}s max_por_tick={max_por_tick}")
+    time.sleep(15)  # aguardar estabilização inicial
+
+    while not (stop_event and stop_event.is_set()):
+        try:
+            # Buscar utilizadores do NOC Monitor
+            url = f"{BASE_URL.format(app_id=app_id)}/agentGetTerminals"
+            r = requests.post(url, headers=_headers(api_key), json={}, timeout=15)
+            r.raise_for_status()
+            data = r.json()
+            users = data.get("users", [])
+
+            if not users:
+                logger.debug("[SYNC-USERS] Nenhum utilizador encontrado no NOC Monitor")
+            else:
+                logger.info(f"[SYNC-USERS] {len(users)} utilizadores encontrados — sincronizando...")
+
+                with ws_conn_lock:
+                    connected_sns = list(ws_connections.keys())
+
+                for sn in connected_sns:
+                    ws, loop = ws_connections.get(sn, (None, None))
+                    if not ws or not loop:
+                        continue
+
+                    tid = sn_to_terminal.get(sn)
+                    sent = 0
+
+                    # Filtrar utilizadores ainda não sincronizados neste terminal
+                    with synced_users_lock:
+                        already = synced_users.get(sn, set())
+
+                    to_sync = [u for u in users if str(u.get("enrollid", "")) not in already]
+                    to_sync = to_sync[:max_por_tick]  # limitar por tick
+
+                    for user in to_sync:
+                        enrollid = user.get("enrollid")
+                        name     = user.get("nome", f"User{enrollid}")
+                        card     = str(user.get("card", "")) if user.get("card") else ""
+                        password = str(user.get("password", "")) if user.get("password") else ""
+                        privilege = user.get("privilege", 0)
+
+                        # Usar cartão como enrollid se disponível (UseCartaoAsEnrollId)
+                        backupnum = 10  # senha por defeito
+                        record    = int(password) if password.isdigit() else 0
+                        if card and card.isdigit():
+                            backupnum = 11
+                            record    = int(card)
+
+                        msg = {
+                            "cmd":      "setuserinfo",
+                            "enrollid": int(enrollid),
+                            "name":     name,
+                            "backupnum": backupnum,
+                            "admin":    int(privilege),
+                            "record":   record,
+                        }
+
+                        try:
+                            asyncio.run_coroutine_threadsafe(
+                                ws.send(json.dumps(msg)), loop
+                            ).result(timeout=5)
+                            sent += 1
+                            with synced_users_lock:
+                                if sn not in synced_users:
+                                    synced_users[sn] = set()
+                                synced_users[sn].add(str(enrollid))
+                        except Exception as e:
+                            logger.warning(f"[SYNC-USERS] Erro ao enviar enrollid={enrollid} para SN={sn}: {e}")
+
+                    if sent > 0:
+                        logger.info(f"[SYNC-USERS] SN={sn}: {sent} utilizadores sincronizados")
+
+        except Exception as e:
+            logger.error(f"[SYNC-USERS] Erro no ciclo: {e}")
+
+        time.sleep(intervalo)
+
+
+# ──────────────────────────────────────────────────────────────
+# ✅ NOVO: LiveTimeSync — Acerto automático do relógio dos terminais
+# ──────────────────────────────────────────────────────────────
+def ciclo_live_time_sync(intervalo=30, stop_event=None):
+    """
+    A cada `intervalo` segundos, envia 'settime' a todos os terminais conectados.
+    Equivalente ao LiveTimeSync do MbioFace Manager.
+    """
+    logger.info(f"[TIMESYNC] LiveTimeSync activo — intervalo={intervalo}s")
+    time.sleep(20)  # aguardar estabilização inicial
+
+    while not (stop_event and stop_event.is_set()):
+        try:
+            with ws_conn_lock:
+                connected_sns = list(ws_connections.keys())
+
+            now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+
+            for sn in connected_sns:
+                ws, loop = ws_connections.get(sn, (None, None))
+                if not ws or not loop:
+                    continue
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        ws.send(json.dumps({"cmd": "settime", "cloudtime": now_str})),
+                        loop
+                    ).result(timeout=5)
+                    logger.debug(f"[TIMESYNC] SN={sn} → hora acertada para {now_str}")
+                except Exception as e:
+                    logger.warning(f"[TIMESYNC] Erro ao acertar hora SN={sn}: {e}")
+
+        except Exception as e:
+            logger.error(f"[TIMESYNC] Erro no ciclo: {e}")
+
+        time.sleep(intervalo)
 
 
 # ──────────────────────────────────────────────────────────────
 # Ciclo de Reporte → NOC Monitor
 # ──────────────────────────────────────────────────────────────
 def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
-    """Thread de reporte periódico para o NOC Monitor."""
     logger.info(f"[REPORT-WS] Ciclo de reporte activo — intervalo={intervalo}s")
     while not (stop_event and stop_event.is_set()):
         time.sleep(intervalo)
@@ -387,7 +584,6 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
             if not tid:
                 continue
 
-            # Verificar timeout de heartbeat
             if connected and last_seen > 0 and (time.time() - last_seen) > OFFLINE_TIMEOUT:
                 with ws_lock:
                     if sn in ws_state:
@@ -406,22 +602,37 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
 
 
 # ──────────────────────────────────────────────────────────────
+# Config helper (para acesso dentro de coroutines)
+# ──────────────────────────────────────────────────────────────
+_global_config = {}
+
+def _get_config():
+    return _global_config if _global_config.get("APP_ID") else None
+
+
+# ──────────────────────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────────────────────
 async def main_async(app_id, api_key, ws_port, stop_event):
     async with serve(handle_terminal, "0.0.0.0", ws_port) as server:
         logger.info("=" * 65)
-        logger.info(f"  Timmy WebSocket Server — NOC Monitor")
-        logger.info(f"  Porta WebSocket (terminais): {ws_port}")
-        logger.info(f"  Porta HTTP controlo (NOC Monitor): {ws_port + 1}")
-        logger.info(f"  Terminais mapeados: {len(sn_to_terminal)}")
+        logger.info(f"  Timmy WebSocket Server V2 — NOC Monitor")
+        logger.info(f"  Porta WebSocket (terminais):  {ws_port}")
+        logger.info(f"  Porta HTTP controlo:          {ws_port + 1}")
+        logger.info(f"  Terminais mapeados:           {len(sn_to_terminal)}")
+        logger.info(f"  Insert Marcações:             {_global_config.get('INSERT_MARCACOES', True)}")
+        logger.info(f"  Auto-Sync Utilizadores:       {_global_config.get('AUTO_SYNC_USERS', True)}")
+        logger.info(f"  LiveTimeSync:                 {_global_config.get('LIVE_TIME_SYNC', True)}")
         logger.info("=" * 65)
         await asyncio.get_event_loop().run_in_executor(None, stop_event.wait)
         server.close()
 
 def run(config, stop_event=None):
+    global _global_config
     if stop_event is None:
         stop_event = threading.Event()
+
+    _global_config = config
 
     app_id    = config["APP_ID"]
     api_key   = config["API_KEY"]
@@ -429,8 +640,14 @@ def run(config, stop_event=None):
     ctrl_port = config.get("CTRL_PORT", DEFAULT_CTRL_PORT)
     intervalo = config.get("INTERVALO_REPORT", 30)
 
+    auto_sync_users     = config.get("AUTO_SYNC_USERS", True)
+    auto_sync_interval  = config.get("AUTO_SYNC_INTERVAL", 60)
+    max_per_tick        = config.get("MAX_AUTO_SYNC_PER_TICK", 25)
+    live_time_sync      = config.get("LIVE_TIME_SYNC", True)
+    live_time_interval  = config.get("LIVE_TIME_SYNC_INTERVAL", 30)
+
     # Carregar terminais websocket_cloud
-    global sn_to_terminal, sn_to_nome
+    global sn_to_terminal, sn_to_nome, sn_to_local
     try:
         terminais = listar_terminais_ws(app_id, api_key)
         for t in terminais:
@@ -438,28 +655,43 @@ def run(config, stop_event=None):
             if sn:
                 sn_to_terminal[sn] = t["id"]
                 sn_to_nome[sn]     = t.get("nome", sn)
-                logger.info(f"  Mapeado: SN={sn} → '{t['nome']}'")
+                sn_to_local[sn]    = t.get("local", "")
+                logger.info(f"  Mapeado: SN={sn} → '{t['nome']}' ({t.get('local','')})")
             else:
                 logger.warning(f"  Terminal '{t['nome']}' sem número de série — ignorado")
         logger.info(f"Total: {len(sn_to_terminal)} terminal(is) WebSocket Cloud mapeado(s)")
     except Exception as e:
         logger.error(f"Não foi possível carregar terminais: {e}")
 
-    # Thread de reporte
-    t_report = threading.Thread(
+    # Thread de reporte de status
+    threading.Thread(
         target=ciclo_reporte_ws,
         args=(app_id, api_key, intervalo, stop_event),
         name="ws-report", daemon=True
-    )
-    t_report.start()
+    ).start()
 
-    # Thread do servidor HTTP de controlo (NOC Monitor → terminal)
-    t_ctrl = threading.Thread(
+    # Thread do servidor HTTP de controlo
+    threading.Thread(
         target=start_ctrl_server,
         args=(ctrl_port, stop_event),
         name="ctrl-http", daemon=True
-    )
-    t_ctrl.start()
+    ).start()
+
+    # ✅ NOVO: Thread de auto-sync de utilizadores
+    if auto_sync_users:
+        threading.Thread(
+            target=ciclo_sync_utilizadores,
+            args=(app_id, api_key, auto_sync_interval, max_per_tick, stop_event),
+            name="sync-users", daemon=True
+        ).start()
+
+    # ✅ NOVO: Thread de LiveTimeSync
+    if live_time_sync:
+        threading.Thread(
+            target=ciclo_live_time_sync,
+            args=(live_time_interval, stop_event),
+            name="timesync", daemon=True
+        ).start()
 
     # Servidor WebSocket (asyncio — bloqueia aqui)
     try:
@@ -483,7 +715,7 @@ def load_config():
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Timmy WebSocket Server — NOC Monitor")
+    parser = argparse.ArgumentParser(description="Timmy WebSocket Server V2 — NOC Monitor")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--port",  type=int, default=DEFAULT_WS_PORT)
     args = parser.parse_args()
@@ -491,7 +723,9 @@ if __name__ == "__main__":
 
     cfg = load_config()
     if not cfg:
-        logger.error("config.json ausente ou inválido. Verifique C:\ProgramData\TimmyWSServer\config.json")
+        logger.error("config.json ausente ou inválido.")
+        logger.error(f"Verifique: {CONFIG_FILE}")
+        logger.error('Conteúdo esperado: {"API_KEY":"...","APP_ID":"697aa46c9998c30665e2e19a","WS_PORT":7788}')
         sys.exit(1)
 
     if args.port:
