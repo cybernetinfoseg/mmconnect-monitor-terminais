@@ -51,9 +51,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // WebSocket Cloud: consultar servidor Timmy em tempo real via GET /status/<sn>
+    // WebSocket Cloud: contactar terminal Timmy directamente via HTTP API /api
     if (terminal.tipo_conexao === 'websocket_cloud') {
-      const result = await checkTimmyWsServer(terminal);
+      const result = await checkTimmyTerminal(terminal);
       const agora = new Date();
       const novoStatus = result.online ? 'online' : 'offline';
 
@@ -164,24 +164,28 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Consulta o servidor Timmy WS (porta 7789) para obter o estado real do terminal.
- * GET http://<host>:7789/status/<sn>
+ * Consulta terminal Timmy directamente via HTTP API.
+ * O terminal Timmy é um servidor HTTP (porta 80 ou custom).
+ * Envia comando "reg" para verificar conexão.
  */
-async function checkTimmyWsServer(terminal) {
-   const sn = (terminal.numero_serie || '').trim();
-   if (!sn) return { online: false };
-
-   const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
+async function checkTimmyTerminal(terminal) {
+   const host = terminal.ip_publico || terminal.dns || null;
    if (!host) return { online: false };
 
-   const port = terminal.porta || 7788;
-   const url = `http://${host}:${port}/status/${sn}`;
+   const porta = terminal.porta || 80;
+   const url = `http://${host}:${porta}/api`;
 
    try {
-     const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+     const resp = await fetch(url, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ cmd: 'getlang' }),
+       signal: AbortSignal.timeout(5000)
+     });
+     
      if (!resp.ok) return { online: false };
      const data = await resp.json();
-     return { online: data.connected === true, devinfo: data.devinfo };
+     return { online: data.result === true };
    } catch {
      return { online: false };
    }
