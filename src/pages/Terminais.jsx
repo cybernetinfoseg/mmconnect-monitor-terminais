@@ -214,17 +214,19 @@ export default function Terminais() {
       return response.data;
     },
     onMutate: async (terminal) => {
-      // Optimistically show a "checking" state by clearing latency to indicate pending
+      // Save previous data for rollback
+      const previousData = queryClient.getQueryData(['terminals-manage']) || [];
       queryClient.setQueryData(['terminals-manage'], (old = []) =>
         old.map(t => t.id === terminal.id ? { ...t, ultimo_check: new Date().toISOString() } : t)
       );
+      return { previousData };
     },
-    onSuccess: (data, terminal) => {
+    onSuccess: (data, terminal, context) => {
       setRefreshingTerminalId(null);
       if (data?.status) {
-        // Apply result optimistically before refetch
+        // Update cache with backend response (not temporary data)
         queryClient.setQueryData(['terminals-manage'], (old = []) =>
-          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia_ms ?? data.latencia ?? t.latencia_ms } : t)
+          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia_ms ?? data.latencia ?? t.latencia_ms, ultimo_check: new Date().toISOString() } : t)
         );
         if (data.status === 'online') {
           toast.success(`${terminal.nome}: ✅ ONLINE`);
@@ -234,7 +236,7 @@ export default function Terminais() {
       } else if (data?.error) {
         toast.info(`${terminal.nome}: ${data.error}`);
       }
-      queryClient.invalidateQueries(['terminals-manage']);
+      // Don't invalidate — just use the response data
     },
     onError: (error) => { setRefreshingTerminalId(null); toast.error(`Erro: ${error.message}`); },
   });
