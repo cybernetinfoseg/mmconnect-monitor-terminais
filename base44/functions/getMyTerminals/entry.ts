@@ -20,20 +20,20 @@ Deno.serve(async (req) => {
             return Response.json({ terminals: all, total: all.length });
         }
 
-        // Utilizadores normais: terminais onde são dono (usuario_email) OU criador (created_by)
-        const [byOwner, byCreated] = await Promise.all([
-            base44.asServiceRole.entities.Terminal.filter({ usuario_email: user.email }, '-created_date'),
+        // Utilizadores normais: terminais onde são o dono real (created_by ou usuario_email como fallback)
+        const [byCreated, byOwner] = await Promise.all([
             base44.asServiceRole.entities.Terminal.filter({ created_by: user.email }, '-created_date'),
+            base44.asServiceRole.entities.Terminal.filter({ usuario_email: user.email }, '-created_date'),
         ]);
 
         const seen = new Set();
-        const terminals = [...byOwner, ...byCreated].filter(t => {
+        const terminals = [...byCreated, ...byOwner].filter(t => {
             if (seen.has(t.id)) return false;
             seen.add(t.id);
             return true;
         });
 
-        console.log(`getMyTerminals: ${user.email} → ${terminals.length} terminais (byOwner: ${byOwner.length}, byCreated: ${byCreated.length})`);
+        console.log(`getMyTerminals: ${user.email} → ${terminals.length} terminais`);
         return Response.json({ terminals, total: terminals.length });
 
     } catch (error) {

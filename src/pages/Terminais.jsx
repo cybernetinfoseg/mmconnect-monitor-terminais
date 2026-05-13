@@ -122,12 +122,29 @@ export default function Terminais() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (editingTerminal) {
-        // Non-admins cannot change usuario_email — preserve existing ownership
-        const updateData = isAdmin ? data : { ...data, usuario_email: editingTerminal.usuario_email || editingTerminal.created_by };
-        return base44.entities.Terminal.update(editingTerminal.id, updateData);
+        if (isAdmin) {
+          // Check if admin is changing ownership (usuario_email changed)
+          const previousOwner = editingTerminal.usuario_email || editingTerminal.created_by;
+          const newOwner = data.usuario_email;
+          if (newOwner && newOwner !== previousOwner) {
+            // Full ownership transfer: update all fields then reassign via backend
+            await base44.entities.Terminal.update(editingTerminal.id, data);
+            await base44.functions.invoke('assignTerminal', { terminalId: editingTerminal.id, targetEmail: newOwner });
+            return;
+          }
+          return base44.entities.Terminal.update(editingTerminal.id, data);
+        }
+        // Non-admins: preserve ownership, update everything else
+        const { usuario_email: _ignored, ...rest } = data;
+        return base44.entities.Terminal.update(editingTerminal.id, rest);
       }
-      // On create: always set usuario_email to current user (or admin-selected user)
-      return base44.entities.Terminal.create({ ...data, usuario_email: data.usuario_email || currentUser?.email });
+      // On create: admin sets usuario_email, then transfer ownership via backend
+      const targetEmail = data.usuario_email || currentUser?.email;
+      const result = await base44.entities.Terminal.create({ ...data, usuario_email: targetEmail });
+      if (isAdmin && targetEmail !== currentUser?.email && result?.id) {
+        await base44.functions.invoke('assignTerminal', { terminalId: result.id, targetEmail });
+      }
+      return result;
     },
     onMutate: async (data) => {
       await queryClient.cancelQueries(['terminals-manage']);
