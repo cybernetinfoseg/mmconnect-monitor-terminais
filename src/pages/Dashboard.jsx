@@ -52,24 +52,12 @@ export default function Dashboard() {
   const perms = resolvePermissions(currentUser);
   const canSeeAll = currentUser?.role === 'admin';
 
-  // Fetch terminals with server-side filtering for security
+  // Fetch terminals via backend function to bypass RLS limitations on custom fields
   const { data: terminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals', currentUser?.email, canSeeAll],
     queryFn: async () => {
-      if (canSeeAll) {
-        return await base44.entities.Terminal.list();
-      }
-      // Non-admins: terminais onde são o dono (usuario_email) OU criador (created_by)
-      const [byOwner, byCreated] = await Promise.all([
-        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }, '-created_date'),
-        base44.entities.Terminal.filter({ created_by: currentUser?.email }, '-created_date'),
-      ]);
-      const seen = new Set();
-      return [...byOwner, ...byCreated].filter(t => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return true;
-      });
+      const res = await base44.functions.invoke('getMyTerminals', {});
+      return res.data?.terminals || [];
     },
     refetchInterval: refreshInterval,
     enabled: !!currentUser,
@@ -82,17 +70,9 @@ export default function Dashboard() {
       if (canSeeAll) {
         return await base44.entities.AlertIncident.list('-created_date', 50);
       }
-      // Non-admins: fetch alerts from their own terminals only (usuario_email OR created_by)
-      const [byOwner, byCreated] = await Promise.all([
-        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }),
-        base44.entities.Terminal.filter({ created_by: currentUser?.email }),
-      ]);
-      const seen = new Set();
-      const myTerminals = [...byOwner, ...byCreated].filter(t => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return true;
-      });
+      // Non-admins: buscar terminais via backend function para garantir visibilidade correcta
+      const res = await base44.functions.invoke('getMyTerminals', {});
+      const myTerminals = res.data?.terminals || [];
       const myTerminalIds = myTerminals.map(t => t.id);
       if (myTerminalIds.length === 0) return [];
       // Fetch alerts and filter by owned terminals
