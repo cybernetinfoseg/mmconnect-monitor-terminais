@@ -221,15 +221,15 @@ export default function Terminais() {
     },
     onSuccess: (data, terminal) => {
       setRefreshingTerminalId(null);
-      if (data?.success && data.status) {
+      if (data?.status) {
         // Apply result optimistically before refetch
         queryClient.setQueryData(['terminals-manage'], (old = []) =>
-          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia ?? t.latencia_ms } : t)
+          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia_ms ?? data.latencia ?? t.latencia_ms } : t)
         );
         if (data.status === 'online') {
-          toast.success(`${terminal.nome}: ✅ ONLINE${data.latencia ? ' (' + data.latencia + 'ms)' : ''}`);
+          toast.success(`${terminal.nome}: ✅ ONLINE`);
         } else {
-          toast.error(`${terminal.nome}: ❌ OFFLINE${data.error ? ' - ' + data.error : ''}`);
+          toast.error(`${terminal.nome}: ❌ OFFLINE`);
         }
       } else if (data?.error) {
         toast.info(`${terminal.nome}: ${data.error}`);
@@ -259,10 +259,20 @@ export default function Terminais() {
   const [verificandoTodos, setVerificandoTodos] = useState(false);
   const verificarTodos = async () => {
     setVerificandoTodos(true);
-    const terminaisAtivos = terminals.filter(t => t.ativo);
-    for (const terminal of terminaisAtivos) {
-      await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id }).catch(() => {});
-    }
+    const terminaisAtivos = terminals.filter(t => t.ativo && t.tipo_conexao !== 'ip_local');
+    await Promise.all(
+      terminaisAtivos.map(async (terminal) => {
+        try {
+          const res = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
+          const data = res.data;
+          if (data?.status) {
+            queryClient.setQueryData(['terminals-manage'], (old = []) =>
+              old.map(t => t.id === terminal.id ? { ...t, status: data.status } : t)
+            );
+          }
+        } catch {}
+      })
+    );
     queryClient.invalidateQueries(['terminals-manage']);
     setVerificandoTodos(false);
     toast.success('Verificação concluída!');
