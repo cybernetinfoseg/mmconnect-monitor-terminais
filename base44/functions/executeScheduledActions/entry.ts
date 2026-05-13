@@ -6,23 +6,27 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // ─── Helpers de conexão (espelhados de terminalControl) ─────────────────────
 
-function buildTimmyWsUrl(terminal) {
-  const host = terminal.ip_publico || terminal.dns || '51.91.219.145';
-  const port = terminal.porta || 7788;
-  return `ws://${host}:${port}`;
+function getNocServerHost() {
+  const host = Deno.env.get('NOC_SERVER_HOST');
+  if (!host) throw new Error('NOC_SERVER_HOST não configurado. Defina esta variável de ambiente no painel de Secrets.');
+  return host;
 }
 
 async function sendTimmyCommand(terminal, command) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(buildTimmyWsUrl(terminal));
-    const timeout = setTimeout(() => { ws.close(); reject(new Error('Timeout')); }, 8000);
-    ws.onopen = () => ws.send(JSON.stringify(command));
-    ws.onmessage = (event) => {
-      clearTimeout(timeout); ws.close();
-      try { resolve(JSON.parse(event.data)); } catch { resolve({ result: true, raw: event.data }); }
-    };
-    ws.onerror = () => { clearTimeout(timeout); reject(new Error('WS connection failed')); };
-  });
+  const host = getNocServerHost();
+  const ctrlPort = 7789;
+  const sn = terminal.numero_serie || '';
+  if (!sn) throw new Error(`SN não configurado no terminal "${terminal.nome}"`);
+  const resp = await fetch(`http://${host}:${ctrlPort}/cmd`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sn, command }),
+    signal: AbortSignal.timeout(12000),
+  }).catch(e => { throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível — ${e.message}`); });
+  if (!resp.ok) throw new Error(`Servidor Timmy respondeu ${resp.status}`);
+  const data = await resp.json();
+  if (!data.success) throw new Error(data.error || 'Servidor Timmy falhou');
+  return data.result || { result: true };
 }
 
 function buildBaseUrl(terminal) {

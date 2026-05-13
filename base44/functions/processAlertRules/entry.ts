@@ -8,7 +8,7 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        // Scheduler chama sem auth; utilizador autenticado deve ser admin
+        // Aceita chamada do scheduler (sem auth) ou de admin autenticado
         const isAuthenticated = await base44.auth.isAuthenticated();
         if (isAuthenticated) {
             const user = await base44.auth.me();
