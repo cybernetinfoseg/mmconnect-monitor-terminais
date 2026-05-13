@@ -37,30 +37,26 @@ Deno.serve(async (req) => {
         const tipo = terminal.tipo_conexao;
 
         if (tipo === 'websocket_cloud') {
-          // Pedir status ao servidor Timmy WS via HTTP (não precisa de user autenticado)
-          // O terminalControl requer auth de admin — para chamadas da automação usamos
-          // o admsReport que processa logs via push. O websocket_cloud envia logs
-          // automaticamente via sendlog; aqui apenas actualizamos o status.
+          // Consultar servidor Timmy WS via HTTP — usa ip_publico/dns do terminal ou NOC_SERVER_HOST global
           const sn = terminal.numero_serie;
           let timmyOnline = false;
           if (sn) {
-            try {
-              const timmyPort = (globalThis.Deno?.env?.get?.('TIMMY_WS_PORT')) || '8765';
-              const timmyHost = (globalThis.Deno?.env?.get?.('TIMMY_WS_HOST')) || 'localhost';
-              const r = await fetch(`http://${timmyHost}:${timmyPort}/status/${sn}`, { signal: AbortSignal.timeout(3000) });
-              if (r.ok) { const d = await r.json(); timmyOnline = d.connected === true; }
-            } catch (_) { /* servidor Timmy não acessível daqui */ }
+            const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
+            if (host) {
+              try {
+                const r = await fetch(`http://${host}:7789/status/${sn}`, { signal: AbortSignal.timeout(4000) });
+                if (r.ok) { const d = await r.json(); timmyOnline = d.connected === true; }
+              } catch (_) { /* servidor Timmy não acessível */ }
+            }
           }
 
-          // Actualizar status do terminal com base no que sabemos
           const agora = new Date().toISOString();
-          const novoStatus = timmyOnline ? 'online' : terminal.status || 'offline';
           await base44.asServiceRole.entities.Terminal.update(terminal.id, {
             ultimo_check: agora,
-            ...(timmyOnline ? { status: 'online', ultimo_ping: agora, segundos_sem_ping: 0 } : {})
+            ...(timmyOnline ? { status: 'online', ultimo_ping: agora, segundos_sem_ping: 0 } : { status: 'offline' })
           }).catch(() => {});
 
-          const resp = { data: { success: true, message: timmyOnline ? 'Online via Timmy WS' : 'Status verificado (logs por push)' } };
+          const resp = { data: { success: true, message: timmyOnline ? 'Online via Timmy WS' : 'Offline (servidor Timmy não reporta ligação)' } };
 
           const ok = resp?.data?.success === true;
           results.details.push({ id: terminal.id, nome: terminal.nome, tipo, ok, msg: resp?.data?.message || resp?.data?.error });

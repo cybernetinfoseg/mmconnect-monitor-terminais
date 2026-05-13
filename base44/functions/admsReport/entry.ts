@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
             ultimo_check: agora,
             segundos_sem_ping: 0,
         };
-        if (ip_terminal) updateData.observacoes = `Último ADMS push de: ${ip_terminal} em ${agora}`;
+        if (ip_terminal) updateData.ip_local = ip_terminal; // registar IP do terminal sem sobrescrever observacoes
         await base44.asServiceRole.entities.Terminal.update(terminal.id, updateData);
 
         // Verificar cache de status
