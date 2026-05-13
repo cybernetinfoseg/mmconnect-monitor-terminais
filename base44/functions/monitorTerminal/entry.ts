@@ -50,11 +50,25 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Terminais passivos: informar o motivo
+    // WebSocket Cloud: consultar servidor Timmy em tempo real via GET /status/<sn>
+    if (terminal.tipo_conexao === 'websocket_cloud') {
+      const result = await checkTimmyWsServer(terminal);
+      const agora = new Date();
+      const novoStatus = result.online ? 'online' : 'offline';
+
+      await base44.asServiceRole.entities.Terminal.update(terminal.id, {
+        status: novoStatus,
+        ultimo_check: agora.toISOString(),
+        ...(result.online ? { ultimo_ping: agora.toISOString(), segundos_sem_ping: 0 } : {}),
+      });
+
+      return Response.json({ success: true, terminal_id, status: novoStatus, source: 'timmy_ws_server', devinfo: result.devinfo });
+    }
+
+    // Outros terminais passivos: informar o motivo
     if (PASSIVE_TYPES.has(terminal.tipo_conexao)) {
       const agente = terminal.tipo_conexao === 'ip_local' ? 'Agente Local' :
-                     terminal.tipo_conexao === 'p2s' ? 'P2S Server' :
-                     terminal.tipo_conexao === 'websocket_cloud' ? 'Timmy WS Server' : 'NOC Server';
+                     terminal.tipo_conexao === 'p2s' ? 'P2S Server' : 'NOC Server';
       return Response.json({
         success: false,
         error: `Terminais "${terminal.tipo_conexao}" são monitorizados pelo ${agente} (push) — sondagem direta não disponível.`,
@@ -147,6 +161,30 @@ Deno.serve(async (req) => {
     return Response.json({ success: false, error: error.message }, { status: 500 });
   }
 });
+
+/**
+ * Consulta o servidor Timmy WS (porta 7789) para obter o estado real do terminal.
+ * GET http://<host>:7789/status/<sn>
+ */
+async function checkTimmyWsServer(terminal) {
+  const sn = (terminal.numero_serie || '').trim();
+  if (!sn) return { online: false };
+
+  const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
+  if (!host) return { online: false };
+
+  const ctrlPort = 7789;
+  const url = `http://${host}:${ctrlPort}/status/${sn}`;
+
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) return { online: false };
+    const data = await resp.json();
+    return { online: data.connected === true, devinfo: data.devinfo };
+  } catch {
+    return { online: false };
+  }
+}
 
 async function checkTerminalActive(terminal) {
   const porta = terminal.porta || 5005;
