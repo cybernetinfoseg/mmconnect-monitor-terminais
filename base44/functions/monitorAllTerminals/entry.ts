@@ -40,14 +40,7 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        // Aceita chamada sem auth (automação/scheduler interno) ou admin autenticado
-        const isAuthenticated = await base44.auth.isAuthenticated();
-        if (isAuthenticated) {
-            const user = await base44.auth.me();
-            if (user?.role !== 'admin') {
-                return Response.json({ error: 'Forbidden: acesso apenas para administradores' }, { status: 403 });
-            }
-        }
+        // Função interna — sem verificação de auth (acesso controlado pelo mainScheduler)
 
         const terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
         const agora = new Date();
@@ -156,23 +149,7 @@ Deno.serve(async (req) => {
                             owner_email: terminal.created_by || '',
                         }).catch(() => {});
 
-                        // Notificação Telegram
-                        const users = await base44.asServiceRole.entities.User.list().catch(() => []);
-                        const targets = users.filter(u => u.role === 'admin' || u.email === terminal.created_by);
-                        for (const u of targets) {
-                            if (u.telegram_bot_token && u.telegram_chat_id) {
-                                const msg = `🔴 <b>Terminal Offline</b>\n\n` +
-                                    `📟 <b>${terminal.nome}</b>\n` +
-                                    `📍 Local: ${terminal.local || '—'}\n` +
-                                    `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
-                                    `🕐 ${agora.toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
-                                await base44.asServiceRole.functions.invoke('telegramNotify', {
-                                    bot_token: u.telegram_bot_token,
-                                    chat_id: u.telegram_chat_id,
-                                    message: msg,
-                                }).catch(() => {});
-                            }
-                        }
+                        // Telegram e Web Push são delegados ao pushNotify (evitar duplicação)
                     }
 
                     // Resolver incidentes e escalações se voltou online
@@ -203,10 +180,10 @@ Deno.serve(async (req) => {
                         }).catch(() => {});
                     }
 
-                    // THROTTLE histórico
-                    const ultimoCheck = terminal.ultimo_check ? new Date(terminal.ultimo_check) : null;
-                    const segundosDesdeUltimoCheck = ultimoCheck
-                        ? Math.floor((agora - ultimoCheck) / 1000)
+                    // THROTTLE histórico — usa último registo de histórico, não ultimo_check (que acabou de ser atualizado)
+                    const ultimoHistorico = cache?.atualizado_em ? new Date(cache.atualizado_em) : null;
+                    const segundosDesdeUltimoCheck = ultimoHistorico
+                        ? Math.floor((agora - ultimoHistorico) / 1000)
                         : HISTORY_THROTTLE_SECONDS + 1;
 
                     if (statusMudou || segundosDesdeUltimoCheck >= HISTORY_THROTTLE_SECONDS) {

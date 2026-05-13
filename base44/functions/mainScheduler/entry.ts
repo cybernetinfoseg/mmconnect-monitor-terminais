@@ -32,37 +32,35 @@ Deno.serve(async (req) => {
     const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes();
     const summary = { timestamp: now.toISOString() };
 
-    // Importar lógica inline para evitar problemas de auth em sub-invocações
-    // Usamos service role diretamente em vez de invocar funções filhas
-    // ── 1. Monitorizar todos os terminais ────────────────────────────────────
-    try {
-      const r = await base44.asServiceRole.functions.invoke('monitorAllTerminals', {});
-      const d = r?.data;
+    // ── Tarefas principais em paralelo (monitor + alertas + agendamentos) ────
+    const [monitorRes, alertsRes, scheduledRes] = await Promise.allSettled([
+      base44.asServiceRole.functions.invoke('monitorAllTerminals', {}),
+      base44.asServiceRole.functions.invoke('processAlertRules', {}),
+      base44.asServiceRole.functions.invoke('executeScheduledActions', {}),
+    ]);
+
+    if (monitorRes.status === 'fulfilled') {
+      const d = monitorRes.value?.data;
       summary.monitor = { total: d?.total, monitored: d?.monitored, statusChanged: d?.statusChanged };
-    } catch (e) {
-      // Se falha por auth, tentar diretamente
-      summary.monitor = { error: e.message };
-      console.error('[mainScheduler] monitorAllTerminals erro:', e.message);
+    } else {
+      summary.monitor = { error: monitorRes.reason?.message };
+      console.error('[mainScheduler] monitorAllTerminals erro:', monitorRes.reason?.message);
     }
 
-    // ── 2. Processar regras de alerta ────────────────────────────────────────
-    try {
-      const r = await base44.asServiceRole.functions.invoke('processAlertRules', {});
-      const d = r?.data;
+    if (alertsRes.status === 'fulfilled') {
+      const d = alertsRes.value?.data;
       summary.alerts = { processed: d?.processed, fired: Array.isArray(d?.fired) ? d.fired.length : 0 };
-    } catch (e) {
-      summary.alerts = { error: e.message };
-      console.error('[mainScheduler] processAlertRules erro:', e.message);
+    } else {
+      summary.alerts = { error: alertsRes.reason?.message };
+      console.error('[mainScheduler] processAlertRules erro:', alertsRes.reason?.message);
     }
 
-    // ── 3. Executar ações agendadas ──────────────────────────────────────────
-    try {
-      const r = await base44.asServiceRole.functions.invoke('executeScheduledActions', {});
-      const d = r?.data;
-      summary.scheduled = { executed: d?.executed ?? 0 };
-    } catch (e) {
-      summary.scheduled = { error: e.message };
-      console.error('[mainScheduler] executeScheduledActions erro:', e.message);
+    if (scheduledRes.status === 'fulfilled') {
+      const d = scheduledRes.value?.data;
+      summary.scheduled = { executed: d?.executed ?? d?.ok ? 1 : 0 };
+    } else {
+      summary.scheduled = { error: scheduledRes.reason?.message };
+      console.error('[mainScheduler] executeScheduledActions erro:', scheduledRes.reason?.message);
     }
 
     // ── 4. Escalações — apenas 1× por hora ──────────────────────────────────

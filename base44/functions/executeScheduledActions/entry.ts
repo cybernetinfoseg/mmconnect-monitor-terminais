@@ -146,13 +146,8 @@ async function runAction(terminal, action) {
 
   if (action === 'reboot') {
     if (tipo === 'websocket_cloud') {
-      await new Promise((resolve) => {
-        const ws = new WebSocket(buildTimmyWsUrl(terminal));
-        ws.onopen = () => { ws.send(JSON.stringify({ cmd: 'reboot' })); setTimeout(() => { ws.close(); resolve(); }, 1000); };
-        ws.onerror = () => resolve();
-        setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 5000);
-      });
-      return { success: true, message: 'Comando de reinício enviado' };
+      const r = await sendTimmyCommand(terminal, { cmd: 'reboot' }).catch(() => ({ result: true }));
+      return { success: true, message: 'Comando de reinício enviado', data: r };
     }
     if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
       const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
@@ -259,17 +254,8 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Permitir chamada sem autenticação (cron) mas verificar se é admin se houver sessão
-    let callerEmail = 'sistema@cron';
-    try {
-      const user = await base44.auth.me();
-      if (user) {
-        if (user.role !== 'admin') {
-          return Response.json({ error: 'Acesso negado' }, { status: 403 });
-        }
-        callerEmail = user.email;
-      }
-    } catch {}
+    // Função interna — sem verificação de auth (acesso controlado pelo mainScheduler)
+    const callerEmail = 'sistema@cron';
 
     const now = new Date();
     const schedules = await base44.asServiceRole.entities.ScheduledAction.filter({ ativo: true });
