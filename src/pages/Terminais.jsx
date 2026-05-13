@@ -882,6 +882,15 @@ export default function Terminais() {
                     <p className="text-xs text-slate-500">Porta configurada no timmy_ws_server.py (padrão: 7788)</p>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label>IP / Host do Servidor <span className="text-red-500">*</span></Label>
+                  <Input
+                    value={formData.ip_publico || ''}
+                    onChange={(e) => setFormData({...formData, ip_publico: e.target.value})}
+                    placeholder="192.168.1.10 ou meuservidor.ddns.net"
+                  />
+                  <p className="text-xs text-slate-500">IP ou hostname do servidor onde o <code className="bg-slate-100 px-1 rounded">timmy_ws_server.py</code> está a correr — usado para enviar comandos remotos via porta 7789</p>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>Modelo do Terminal</Label>
