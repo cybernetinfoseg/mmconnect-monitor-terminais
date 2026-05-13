@@ -26,6 +26,9 @@ export default function Marcacoes() {
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [currentUser, setCurrentUser] = useState(null);
   const [collecting, setCollecting] = useState(null); // terminalId or 'all'
+  const [collectSearch, setCollectSearch] = useState('');
+  const [collectStatus, setCollectStatus] = useState('all');
+  const [collectLocal, setCollectLocal] = useState('all');
 
   const queryClient = useQueryClient();
 
@@ -209,8 +212,8 @@ export default function Marcacoes() {
         {/* Recolher */}
         {terminals.length > 0 && (
           <Card className="bg-white border-slate-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                   <Upload className="h-4 w-4 text-teal-600" /> Recolher Marcações
                 </p>
@@ -219,15 +222,62 @@ export default function Marcacoes() {
                   Recolher Todos os Terminais
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {terminals.map(t => (
-                  <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
-                    className={cn('text-xs gap-1.5', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
-                    {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                    {t.nome}
-                    {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
+              {/* Filtros de terminal */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    placeholder="Nome, local..."
+                    value={collectSearch}
+                    onChange={e => setCollectSearch(e.target.value)}
+                    className="pl-8 h-8 text-xs w-[160px]"
+                  />
+                </div>
+                <Select value={collectStatus} onValueChange={setCollectStatus}>
+                  <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                    <SelectItem value="offline">Offline</SelectItem>
+                  </SelectContent>
+                </Select>
+                {[...new Set(terminals.map(t => t.local).filter(Boolean))].length > 0 && (
+                  <Select value={collectLocal} onValueChange={setCollectLocal}>
+                    <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Local" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os locais</SelectItem>
+                      {[...new Set(terminals.map(t => t.local).filter(Boolean))].sort().map(l => (
+                        <SelectItem key={l} value={l}>{l}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {(collectSearch || collectStatus !== 'all' || collectLocal !== 'all') && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-400 px-2"
+                    onClick={() => { setCollectSearch(''); setCollectStatus('all'); setCollectLocal('all'); }}>
+                    Limpar
                   </Button>
-                ))}
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {terminals
+                  .filter(t => {
+                    if (collectStatus !== 'all' && t.status !== collectStatus) return false;
+                    if (collectLocal !== 'all' && t.local !== collectLocal) return false;
+                    if (collectSearch) {
+                      const q = collectSearch.toLowerCase();
+                      return t.nome?.toLowerCase().includes(q) || t.local?.toLowerCase().includes(q);
+                    }
+                    return true;
+                  })
+                  .map(t => (
+                    <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
+                      className={cn('text-xs gap-1.5', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
+                      {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                      {t.nome}
+                      {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
+                    </Button>
+                  ))}
               </div>
             </CardContent>
           </Card>
