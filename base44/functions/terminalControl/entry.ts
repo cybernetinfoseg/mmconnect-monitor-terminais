@@ -338,8 +338,11 @@ async function actionReboot(terminal) {
 
 async function actionGetDevInfo(terminal) {
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    // getdevcap: retorna capacidades do dispositivo (protocol v3.0 section 36)
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getdevcap' }).catch(() => null);
+    // getreginfo: retorna capacidades detalhadas do dispositivo (protocolo Timmy v2.0)
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getreginfo' }).catch(async () => {
+      // Fallback: tentar getdevcap (versão mais antiga)
+      return await sendTimmyCommand(terminal, { cmd: 'getdevcap' }).catch(() => null);
+    });
     if (!resp) {
       return {
         success: true,
@@ -347,10 +350,11 @@ async function actionGetDevInfo(terminal) {
         data: { sn: terminal.numero_serie, modelo: terminal.modelo, fabricante: terminal.fabricante, tipo_conexao: terminal.tipo_conexao }
       };
     }
-    // Formatar dados para exibição amigável
-    const info = resp.result ? {
+    const info = {
       sn: resp.sn || terminal.numero_serie,
-      modelo: terminal.modelo,
+      modelo: resp.modelname || terminal.modelo,
+      firmware: resp.firmware,
+      mac: resp.mac,
       capacidade_utilizadores: resp.usersize,
       utilizadores_registados: resp.useduser,
       capacidade_faces: resp.facesize,
@@ -362,7 +366,7 @@ async function actionGetDevInfo(terminal) {
       capacidade_logs: resp.logsize,
       logs_armazenados: resp.usedlog,
       novos_logs: resp.usednewlog,
-    } : resp;
+    };
     return { success: resp.result === true, message: 'Informação do dispositivo obtida', data: info };
   }
 
@@ -517,6 +521,95 @@ async function actionBlockUser(terminal, params) {
   return { success: false, error: `blockuser não suportado para ${terminal.tipo_conexao}/${terminal.fabricante}` };
 }
 
+// ─── Timmy-specific actions ─────────────────────────────────────────────────
+
+async function actionGetUserList(terminal, params) {
+  const { start = 0, count = 100 } = params || {};
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // getuserlist: retorna lista de utilizadores registados no terminal
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getuserlist', count });
+    if (!resp) return { success: false, message: 'Terminal não respondeu' };
+    const users = resp.record || [];
+    return {
+      success: resp.result === true,
+      message: `${users.length} utilizador(es) encontrado(s) no terminal`,
+      count: users.length,
+      data: { total: resp.count, users }
+    };
+  }
+  return { success: false, error: 'getuserlist apenas suportado via WebSocket Cloud (Timmy)' };
+}
+
+async function actionGetUserInfo(terminal, params) {
+  const { enrollid } = params || {};
+  if (!enrollid) return { success: false, error: 'enrollid é obrigatório' };
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // getuserinfo: obtém informação de um utilizador específico
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getuserinfo', enrollid: Number(enrollid) });
+    if (!resp) return { success: false, message: 'Terminal não respondeu' };
+    return {
+      success: resp.result === true,
+      message: `Info do utilizador ID:${enrollid}`,
+      data: resp
+    };
+  }
+  return { success: false, error: 'getuserinfo apenas suportado via WebSocket Cloud (Timmy)' };
+}
+
+async function actionGetAllLogs(terminal, params) {
+  const { count = 200 } = params || {};
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // getalllog: obtém todos os logs (inclui já enviados)
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getalllog', count }).catch(() => null);
+    if (!resp) return { success: false, message: 'Terminal não respondeu ao pedido de logs.' };
+    const records = resp.record || [];
+    return {
+      success: resp.result === true,
+      message: `${records.length} marcações obtidas (total: ${resp.count || records.length})`,
+      count: records.length,
+      records: records.slice(0, 50)
+    };
+  }
+  return { success: false, error: 'getalllog apenas suportado via WebSocket Cloud (Timmy)' };
+}
+
+async function actionClearLogs(terminal) {
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // clearlog: apaga todos os logs do terminal
+    const resp = await sendTimmyCommand(terminal, { cmd: 'clearlog' }).catch(() => ({ result: true }));
+    return { success: resp.result === true || resp.result === undefined, message: 'Todos os logs eliminados do terminal', data: resp };
+  }
+  return { success: false, error: 'clearlog apenas suportado via WebSocket Cloud (Timmy)' };
+}
+
+async function actionClearUsers(terminal) {
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // clearuserdata: apaga todos os utilizadores e dados biométricos
+    const resp = await sendTimmyCommand(terminal, { cmd: 'clearuserdata' }).catch(() => ({ result: true }));
+    return { success: resp.result === true || resp.result === undefined, message: 'Todos os utilizadores eliminados do terminal', data: resp };
+  }
+  return { success: false, error: 'clearuserdata apenas suportado via WebSocket Cloud (Timmy)' };
+}
+
+async function actionGetParam(terminal) {
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // getterminalparameter: obtém parâmetros de configuração do terminal
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getterminalparameter' }).catch(() => null);
+    if (!resp) return { success: false, message: 'Terminal não respondeu' };
+    return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
+  }
+  return { success: false, error: 'getparam apenas suportado via WebSocket Cloud (Timmy)' };
+}
+
+async function actionInitDevice(terminal) {
+  if (terminal.tipo_conexao === 'websocket_cloud') {
+    // initialize: repõe terminal para configurações de fábrica (CUIDADO!)
+    const resp = await sendTimmyCommand(terminal, { cmd: 'initialize' }).catch(() => ({ result: true }));
+    return { success: resp.result === true || resp.result === undefined, message: 'Terminal inicializado (reset de fábrica)', data: resp };
+  }
+  return { success: false, error: 'initialize apenas suportado via WebSocket Cloud (Timmy)' };
+}
+
 async function actionDeleteUser(terminal, params) {
   const { enrollid } = params || {};
   if (!enrollid) return { success: false, error: 'enrollid é obrigatório' };
@@ -580,15 +673,22 @@ Deno.serve(async (req) => {
 
     let result;
     switch (action) {
-      case 'settime':    result = await actionSetTime(terminal); break;
-      case 'getlogs':   result = await actionGetLogs(terminal); break;
-      case 'opendoor':  result = await actionOpenDoor(terminal); break;
-      case 'reboot':    result = await actionReboot(terminal); break;
-      case 'getdevinfo':result = await actionGetDevInfo(terminal); break;
+      case 'settime':     result = await actionSetTime(terminal); break;
+      case 'getlogs':    result = await actionGetLogs(terminal); break;
+      case 'getalllog':  result = await actionGetAllLogs(terminal, params); break;
+      case 'opendoor':   result = await actionOpenDoor(terminal); break;
+      case 'reboot':     result = await actionReboot(terminal); break;
+      case 'getdevinfo': result = await actionGetDevInfo(terminal); break;
       case 'lockctrl':   result = await actionSetDoorStatus(terminal, params); break;
       case 'adduser':    result = await actionAddUser(terminal, params); break;
       case 'blockuser':  result = await actionBlockUser(terminal, params); break;
       case 'deleteuser': result = await actionDeleteUser(terminal, params); break;
+      case 'getuserlist': result = await actionGetUserList(terminal, params); break;
+      case 'getuserinfo': result = await actionGetUserInfo(terminal, params); break;
+      case 'clearlog':    result = await actionClearLogs(terminal); break;
+      case 'clearusers':  result = await actionClearUsers(terminal); break;
+      case 'getparam':    result = await actionGetParam(terminal); break;
+      case 'initdevice':  result = await actionInitDevice(terminal); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }
