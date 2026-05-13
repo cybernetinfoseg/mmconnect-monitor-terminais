@@ -17,6 +17,7 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
         }
 
+        const body = await req.json();
         const base44 = createClientFromRequest(req);
         const allApiKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
         const keyRecord = allApiKeys.find(k => k.key === apiKey);
@@ -26,7 +27,6 @@ Deno.serve(async (req) => {
         }
 
         const ownerEmail = keyRecord.user_email;
-        const body = await req.json();
         const { terminal_id, status, latencia_ms, segundos_sem_ping } = body;
 
         if (!terminal_id || !status) {
@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
         const isAdmin = allUsers[0]?.role === 'admin';
 
         // Buscar o terminal diretamente
-        const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id).catch(() => null);
+        const terminalResults = await base44.asServiceRole.entities.Terminal.filter({ id: terminal_id }).catch(() => []);
+        const terminal = terminalResults[0] || null;
 
         if (!terminal) {
             return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
