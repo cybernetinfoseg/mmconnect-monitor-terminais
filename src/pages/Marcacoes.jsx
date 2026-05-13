@@ -27,8 +27,11 @@ export default function Marcacoes() {
   const [currentUser, setCurrentUser] = useState(null);
   const [collecting, setCollecting] = useState(null); // terminalId or 'all'
   const [collectSearch, setCollectSearch] = useState('');
+  const [collectTipo, setCollectTipo] = useState('all');
   const [collectStatus, setCollectStatus] = useState('all');
   const [collectLocal, setCollectLocal] = useState('all');
+  const [collectFabricante, setCollectFabricante] = useState('all');
+  const [collectUser, setCollectUser] = useState('all');
 
   const queryClient = useQueryClient();
 
@@ -227,34 +230,69 @@ export default function Marcacoes() {
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                   <Input
-                    placeholder="Nome, local..."
+                    placeholder="Nome, SN, IP, porta..."
                     value={collectSearch}
                     onChange={e => setCollectSearch(e.target.value)}
-                    className="pl-8 h-8 text-xs w-[160px]"
+                    className="pl-8 h-8 text-xs w-[180px]"
                   />
                 </div>
-                <Select value={collectStatus} onValueChange={setCollectStatus}>
-                  <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                <Select value={collectTipo} onValueChange={setCollectTipo}>
+                  <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Todos os tipos" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="ip_local">IP Local</SelectItem>
+                    <SelectItem value="ip_publico">IP Público</SelectItem>
+                    <SelectItem value="dns">DNS/No-IP</SelectItem>
+                    <SelectItem value="p2s">P2S VPN</SelectItem>
+                    <SelectItem value="heartbeat">Heartbeat TCP</SelectItem>
+                    <SelectItem value="adms_push">ADMS / Push</SelectItem>
+                    <SelectItem value="sdk_tcp">SDK-TCP</SelectItem>
+                    <SelectItem value="websocket_cloud">WebSocket Cloud</SelectItem>
+                    <SelectItem value="api">API</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={collectStatus} onValueChange={setCollectStatus}>
+                  <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Todos os statu" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
                     <SelectItem value="online">Online</SelectItem>
                     <SelectItem value="offline">Offline</SelectItem>
                   </SelectContent>
                 </Select>
-                {[...new Set(terminals.map(t => t.local).filter(Boolean))].length > 0 && (
-                  <Select value={collectLocal} onValueChange={setCollectLocal}>
-                    <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Local" /></SelectTrigger>
+                <Select value={collectLocal} onValueChange={setCollectLocal}>
+                  <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Todos os locais" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os locais</SelectItem>
+                    {[...new Set(terminals.map(t => t.local).filter(Boolean))].sort().map(l => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {[...new Set(terminals.map(t => t.fabricante).filter(Boolean))].length > 0 && (
+                  <Select value={collectFabricante} onValueChange={setCollectFabricante}>
+                    <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Todos os fabrican" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos os locais</SelectItem>
-                      {[...new Set(terminals.map(t => t.local).filter(Boolean))].sort().map(l => (
-                        <SelectItem key={l} value={l}>{l}</SelectItem>
+                      <SelectItem value="all">Todos os fabricantes</SelectItem>
+                      {[...new Set(terminals.map(t => t.fabricante).filter(Boolean))].sort().map(f => (
+                        <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
-                {(collectSearch || collectStatus !== 'all' || collectLocal !== 'all') && (
+                {isAdmin && (
+                  <Select value={collectUser} onValueChange={setCollectUser}>
+                    <SelectTrigger className="h-8 text-xs w-[170px]"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os utilizadores</SelectItem>
+                      {[...new Set(terminals.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort().map(u => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {(collectSearch || collectTipo !== 'all' || collectStatus !== 'all' || collectLocal !== 'all' || collectFabricante !== 'all' || collectUser !== 'all') && (
                   <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-400 px-2"
-                    onClick={() => { setCollectSearch(''); setCollectStatus('all'); setCollectLocal('all'); }}>
+                    onClick={() => { setCollectSearch(''); setCollectTipo('all'); setCollectStatus('all'); setCollectLocal('all'); setCollectFabricante('all'); setCollectUser('all'); }}>
                     Limpar
                   </Button>
                 )}
@@ -262,11 +300,16 @@ export default function Marcacoes() {
               <div className="flex flex-wrap gap-2">
                 {terminals
                   .filter(t => {
+                    if (collectTipo !== 'all' && t.tipo_conexao !== collectTipo) return false;
                     if (collectStatus !== 'all' && t.status !== collectStatus) return false;
                     if (collectLocal !== 'all' && t.local !== collectLocal) return false;
+                    if (collectFabricante !== 'all' && t.fabricante !== collectFabricante) return false;
+                    if (collectUser !== 'all' && (t.usuario_email || t.created_by) !== collectUser) return false;
                     if (collectSearch) {
                       const q = collectSearch.toLowerCase();
-                      return t.nome?.toLowerCase().includes(q) || t.local?.toLowerCase().includes(q);
+                      return t.nome?.toLowerCase().includes(q) || t.local?.toLowerCase().includes(q) ||
+                        t.numero_serie?.toLowerCase().includes(q) || t.ip_local?.toLowerCase().includes(q) ||
+                        t.ip_publico?.toLowerCase().includes(q) || String(t.porta || '').includes(q);
                     }
                     return true;
                   })
