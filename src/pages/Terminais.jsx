@@ -61,8 +61,6 @@ export default function Terminais() {
   const [userFilter, setUserFilter] = useState('all');
   const [fabricanteFilter, setFabricanteFilter] = useState('all');
   const [localFilter, setLocalFilter] = useState('all');
-  const [showExtraFilters, setShowExtraFilters] = useState(false);
-
   // Limpar filtros ao montar a página (evita persistência ao navegar)
   useEffect(() => {
     setSearchTerm('');
@@ -421,10 +419,9 @@ export default function Terminais() {
 
         {/* Filters */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-          <CardContent className="p-3 sm:p-4 space-y-2">
-            {/* Row 1: search + primary filters */}
+          <CardContent className="p-3 sm:p-4">
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-              <div className="w-full sm:w-[220px] relative">
+              <div className="w-full sm:w-[200px] relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   placeholder="Nome, SN, IP, porta..."
@@ -434,7 +431,7 @@ export default function Terminais() {
                 />
               </div>
               <Select value={tipoFilter} onValueChange={setTipoFilter}>
-                <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="Tipo de conexão" />
                 </SelectTrigger>
                 <SelectContent>
@@ -460,67 +457,42 @@ export default function Terminais() {
                   <SelectItem value="offline">Offline</SelectItem>
                 </SelectContent>
               </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-xs shrink-0"
-                onClick={() => setShowExtraFilters(v => !v)}
-              >
-                <Search className="h-3.5 w-3.5" />
-                {showExtraFilters ? 'Menos filtros' : 'Mais filtros'}
-                {(fabricanteFilter !== 'all' || localFilter !== 'all' || userFilter !== 'all') && (
-                  <span className="w-2 h-2 bg-blue-500 rounded-full" />
-                )}
-              </Button>
-            </div>
-
-            {/* Row 2: extra filters */}
-            {showExtraFilters && (
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 pt-1 border-t border-slate-100">
-                {/* Local */}
-                <Select value={localFilter} onValueChange={setLocalFilter}>
-                  <SelectTrigger className="w-full sm:w-[160px]">
-                    <SelectValue placeholder="Local" />
+              <Select value={localFilter} onValueChange={setLocalFilter}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="Local" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os locais</SelectItem>
+                  {locaisDisponiveis.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {fabricantes.length > 0 && (
+                <Select value={fabricanteFilter} onValueChange={setFabricanteFilter}>
+                  <SelectTrigger className="w-full sm:w-[150px]">
+                    <SelectValue placeholder="Fabricante" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os locais</SelectItem>
-                    {locaisDisponiveis.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                    <SelectItem value="all">Todos os fabricantes</SelectItem>
+                    {fabricantes.map(f => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
                   </SelectContent>
                 </Select>
-
-                {/* Fabricante */}
-                {fabricantes.length > 0 && (
-                  <Select value={fabricanteFilter} onValueChange={setFabricanteFilter}>
-                    <SelectTrigger className="w-full sm:w-[160px]">
-                      <SelectValue placeholder="Fabricante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os fabricantes</SelectItem>
-                      {fabricantes.map(f => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {/* Utilizador (admin only) */}
-                {isAdmin && (
-                  <select
-                    value={userFilter}
-                    onChange={(e) => setUserFilter(e.target.value)}
-                    className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="all">Todos os utilizadores</option>
-                    {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                )}
-
-                {/* Clear extra filters */}
-                {(fabricanteFilter !== 'all' || localFilter !== 'all' || userFilter !== 'all') && (
-                  <Button variant="ghost" size="sm" className="h-9 text-xs text-slate-400" onClick={() => { setFabricanteFilter('all'); setLocalFilter('all'); setUserFilter('all'); }}>
-                    Limpar
-                  </Button>
-                )}
-              </div>
-            )}
+              )}
+              {isAdmin && (
+                <select
+                  value={userFilter}
+                  onChange={(e) => setUserFilter(e.target.value)}
+                  className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="all">Todos os utilizadores</option>
+                  {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              )}
+              {(searchTerm || tipoFilter !== 'all' || statusFilter !== 'all' || localFilter !== 'all' || fabricanteFilter !== 'all' || userFilter !== 'all') && (
+                <Button variant="ghost" size="sm" className="h-9 text-xs text-slate-400" onClick={() => { setSearchTerm(''); setTipoFilter('all'); setStatusFilter('all'); setLocalFilter('all'); setFabricanteFilter('all'); setUserFilter('all'); }}>
+                  Limpar
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
