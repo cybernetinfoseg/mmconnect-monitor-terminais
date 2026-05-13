@@ -222,13 +222,24 @@ export default function Terminais() {
     onSuccess: (data, terminal) => {
       setRefreshingTerminalId(null);
       if (data?.status) {
-        // Apply result optimistically before refetch
-        queryClient.setQueryData(['terminals-manage'], (old = []) =>
-          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia_ms ?? data.latencia ?? t.latencia_ms } : t)
-        );
+        // Only apply status change if it's online or if currently offline (to prevent flaky offline states from manual refresh)
+        const currentTerminal = terminals.find(t => t.id === terminal.id);
+        const shouldUpdateStatus = data.status === 'online' || (currentTerminal?.status === 'offline');
+        
+        if (shouldUpdateStatus) {
+          queryClient.setQueryData(['terminals-manage'], (old = []) =>
+            old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia_ms ?? data.latencia ?? t.latencia_ms } : t)
+          );
+        } else if (data.status === 'offline' && currentTerminal?.status === 'online') {
+          // Ignore single offline result if terminal is currently online (flaky network)
+          toast.info(`${terminal.nome}: Verificação pendente (aguardando confirmação)`);
+          queryClient.invalidateQueries(['terminals-manage']);
+          return;
+        }
+        
         if (data.status === 'online') {
           toast.success(`${terminal.nome}: ✅ ONLINE`);
-        } else {
+        } else if (shouldUpdateStatus) {
           toast.error(`${terminal.nome}: ❌ OFFLINE`);
         }
       } else if (data?.error) {
