@@ -48,7 +48,7 @@ import requests
 
 try:
     import websockets
-    from websockets.server import serve
+    from websockets import serve
 except ImportError:
     print("ERRO: instale 'websockets' com: pip install websockets")
     sys.exit(1)
