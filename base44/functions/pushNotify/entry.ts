@@ -1,22 +1,38 @@
 /**
- * pushNotify — Notificações Web Push + gestão de subscrições.
+ * pushNotify — Notificações Web Push (com VAPID) + gestão de subscrições.
  *
  * Acções:
  *   subscribe        — registar subscrição Web Push do utilizador
  *   unsubscribe      — desactivar subscrição
+ *   get_vapid_key    — devolve a chave pública VAPID para o frontend
  *   notify_offline   — notificar dono + admins que terminal ficou offline
- *
- * NOTA: Web Push real requer VAPID keys configuradas no servidor.
- * Esta implementação faz best-effort push para os endpoints registados.
- * Se o push falhar (endpoint expirado), a subscrição é desactivada automaticamente.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import webpush from 'npm:web-push@3.6.7';
+
+// Configurar VAPID uma vez
+const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') || '';
+const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') || '';
+let VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@nocmonitor.local';
+// Normalizar: se não começa com mailto: ou https://, adicionar mailto:
+if (VAPID_SUBJECT && !VAPID_SUBJECT.startsWith('mailto:') && !VAPID_SUBJECT.startsWith('https://')) {
+    VAPID_SUBJECT = 'mailto:' + VAPID_SUBJECT;
+}
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
 
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
         const body = await req.json();
         const { action } = body;
+
+        // ─── GET VAPID KEY ─────────────────────────────────────────────
+        if (action === 'get_vapid_key') {
+            return Response.json({ vapid_public_key: VAPID_PUBLIC_KEY });
+        }
 
         // ─── SUBSCRIBE ────────────────────────────────────────────────
         if (action === 'subscribe') {
@@ -163,26 +179,28 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Envia Web Push para uma subscrição.
+ * Envia Web Push com VAPID para uma subscrição.
  * Retorna true se sucesso, false se endpoint inválido/expirado.
  */
 async function sendWebPush(sub, payloadStr) {
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+        console.warn('[pushNotify] VAPID keys não configuradas — push ignorado');
+        return false;
+    }
     try {
-        const res = await fetch(sub.endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'TTL': '86400',
-            },
-            body: payloadStr,
-        });
-        if (res.status === 404 || res.status === 410) {
-            // Endpoint expirado ou removido pelo browser
-            console.warn(`[pushNotify] Subscrição expirada para ${sub.user_email}: ${res.status}`);
-            return false;
-        }
+        const pushSubscription = {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth },
+        };
+        await webpush.sendNotification(pushSubscription, payloadStr, { TTL: 86400 });
         return true;
-    } catch {
+    } catch (err) {
+        // 404/410 = subscrição expirada ou removida pelo browser
+        if (err.statusCode === 404 || err.statusCode === 410) {
+            console.warn(`[pushNotify] Subscrição expirada para ${sub.user_email}: ${err.statusCode}`);
+        } else {
+            console.error(`[pushNotify] Erro push para ${sub.user_email}:`, err.message);
+        }
         return false;
     }
 }
