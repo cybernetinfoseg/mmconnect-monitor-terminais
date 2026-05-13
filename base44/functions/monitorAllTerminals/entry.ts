@@ -30,8 +30,9 @@ const PASSIVE_TIMEOUT = {
     websocket_cloud:  300,  // timmy_ws_server: heartbeat pode ser 60-90s → 5× margem
 };
 
-const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s', 'websocket_cloud']);
+const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s']);
 const ACTIVE_TYPES  = new Set(['ip_publico', 'dns', 'api']);
+const WS_CLOUD_TIMEOUT = 300; // segundos fallback se servidor Timmy inacessível
 
 const HISTORY_THROTTLE_SECONDS = 3600;
 const CHECK_TIMEOUT_MS = 5000;
@@ -59,7 +60,27 @@ Deno.serve(async (req) => {
                     let latencia_ms = null;
                     let timestampOffline = agora;
 
-                    if (PASSIVE_TYPES.has(tipo)) {
+                    if (tipo === 'websocket_cloud') {
+                        // ── WEBSOCKET CLOUD: consultar servidor Timmy em tempo real ──
+                        const wsResult = await checkTimmyWsServer(terminal);
+                        if (wsResult.serverReachable) {
+                            // Servidor acessível — usar resposta direta
+                            novoStatus = wsResult.online ? 'online' : 'offline';
+                        } else {
+                            // Servidor inacessível — fallback: timeout do último ping
+                            if (terminal.ultimo_ping) {
+                                const seg = Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000);
+                                novoStatus = seg > WS_CLOUD_TIMEOUT ? 'offline' : 'online';
+                            } else {
+                                novoStatus = 'offline';
+                            }
+                        }
+                        await base44.asServiceRole.entities.Terminal.update(terminal.id, {
+                            status: novoStatus,
+                            ultimo_check: agora.toISOString(),
+                            ...(novoStatus === 'online' ? { ultimo_ping: agora.toISOString(), segundos_sem_ping: 0 } : {}),
+                        });
+                    } else if (PASSIVE_TYPES.has(tipo)) {
                         // ── PASSIVO: verificar timeout do último ping ──────────────
                         const timeoutSec = PASSIVE_TIMEOUT[tipo] || 150;
                         if (terminal.ultimo_ping) {
@@ -220,6 +241,21 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: error.message }, { status: 500 });
     }
 });
+
+async function checkTimmyWsServer(terminal) {
+    const sn = (terminal.numero_serie || '').trim();
+    if (!sn) return { serverReachable: false, online: false };
+    const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
+    if (!host) return { serverReachable: false, online: false };
+    try {
+        const resp = await fetch(`http://${host}:7789/status/${sn}`, { signal: AbortSignal.timeout(4000) });
+        if (!resp.ok) return { serverReachable: true, online: false };
+        const data = await resp.json();
+        return { serverReachable: true, online: data.connected === true };
+    } catch {
+        return { serverReachable: false, online: false };
+    }
+}
 
 async function checkTerminalActive(terminal) {
     const porta = terminal.porta || 5005;

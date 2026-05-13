@@ -260,11 +260,16 @@ function shouldRunNow(schedule, now) {
 
   if (freq === 'semanal') {
     const dias = JSON.parse(schedule.dias_semana || '[1,2,3,4,5]');
-    return dias.includes(now.getUTCDay());
+    // Usar dia da semana local (Europe/London) consistente com a hora local já usada acima
+    const localDayStr = now.toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
+    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+    const localDay = dayMap[localDayStr] ?? now.getUTCDay();
+    return dias.includes(localDay);
   }
 
   if (freq === 'mensal') {
-    return now.getUTCDate() === (schedule.dia_mes || 1);
+    const localDate = parseInt(now.toLocaleString('en-GB', { timeZone: 'Europe/London', day: '2-digit' }), 10);
+    return localDate === (schedule.dia_mes || 1);
   }
 
   if (freq === 'unica' && schedule.data_unica) {
