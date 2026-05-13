@@ -122,8 +122,11 @@ export default function Terminais() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (editingTerminal) {
-        return base44.entities.Terminal.update(editingTerminal.id, data);
+        // Non-admins cannot change usuario_email — preserve existing ownership
+        const updateData = isAdmin ? data : { ...data, usuario_email: editingTerminal.usuario_email || editingTerminal.created_by };
+        return base44.entities.Terminal.update(editingTerminal.id, updateData);
       }
+      // On create: always set usuario_email to current user (or admin-selected user)
       return base44.entities.Terminal.create({ ...data, usuario_email: data.usuario_email || currentUser?.email });
     },
     onMutate: async (data) => {
@@ -672,10 +675,10 @@ export default function Terminais() {
               ) : (
                 <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-slate-50 text-sm text-slate-600">
                   <UserIcon className="h-4 w-4 text-slate-400 shrink-0" />
-                  {currentUser?.email || '—'}
+                  {(editingTerminal ? (editingTerminal.usuario_email || editingTerminal.created_by) : currentUser?.email) || '—'}
                 </div>
               )}
-              <p className="text-xs text-slate-400">{isAdmin ? 'Selecione o utilizador responsável pelo terminal' : 'Preenchido automaticamente — identifica o responsável pelo terminal'}</p>
+              <p className="text-xs text-slate-400">{isAdmin ? 'Selecione o utilizador responsável pelo terminal' : 'Responsável pelo terminal'}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
