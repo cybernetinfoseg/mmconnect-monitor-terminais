@@ -76,10 +76,12 @@ async function sendAdmsCommand(terminal, action, params = {}) {
 
 /**
  * sendTimmyCommand — envia comando ao timmy_ws_server.py via HTTP (porta 7789).
- * Usa sempre NOC_SERVER_HOST como servidor central Timmy.
+ * Prioridade: ip_publico do terminal → dns → NOC_SERVER_HOST global.
+ * Isto permite servidores Timmy locais/diferentes por terminal.
  */
 async function sendTimmyCommand(terminal, command) {
-  const host = getNocServerHost();
+  // Usar IP/host específico do terminal se disponível, caso contrário usar o servidor global
+  const host = terminal.ip_publico || terminal.dns || getNocServerHost();
   const ctrlPort = 7789;
   const sn = terminal.numero_serie || '';
 
@@ -130,14 +132,55 @@ async function hikvisionRequest(terminal, method, path, body = null) {
   try { return JSON.parse(text); } catch { return { raw: text, status: resp.status }; }
 }
 
+/**
+ * dahuaRequest — Digest Auth (MD5) para Dahua CGI.
+ * A Dahua requer Digest Auth na maioria dos endpoints (Basic retorna 401).
+ */
 async function dahuaRequest(terminal, cgiPath) {
   const base = buildTerminalBaseUrl(terminal);
-  const creds = btoa(`admin:${terminal.observacoes || 'admin'}`);
-  const resp = await fetch(`${base}${cgiPath}`, {
-    headers: { 'Authorization': `Basic ${creds}` },
+  const user = 'admin';
+  const pass = terminal.observacoes || 'admin';
+  const url = `${base}${cgiPath}`;
+
+  // 1ª tentativa — sem auth (obter WWW-Authenticate com nonce)
+  const r1 = await fetch(url, { signal: AbortSignal.timeout(10000) }).catch(() => null);
+  if (!r1 || r1.status !== 401) {
+    // Sem autenticação ou resposta directa
+    return { status: r1?.status || 0, body: await r1?.text().catch(() => '') };
+  }
+
+  // Extrair parâmetros Digest do header WWW-Authenticate
+  const wwwAuth = r1.headers.get('www-authenticate') || '';
+  const realm  = (wwwAuth.match(/realm="([^"]*)"/)  || [])[1] || '';
+  const nonce  = (wwwAuth.match(/nonce="([^"]*)"/)  || [])[1] || '';
+  const qop    = (wwwAuth.match(/qop="([^"]*)"/)    || [])[1] || '';
+  const opaque = (wwwAuth.match(/opaque="([^"]*)"/) || [])[1] || '';
+
+  // Calcular HA1, HA2, response (MD5 via SubtleCrypto)
+  const md5 = async (str) => {
+    const buf = await crypto.subtle.digest('MD5', new TextEncoder().encode(str)).catch(() => null);
+    if (!buf) return str; // fallback se MD5 não disponível
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const nc = '00000001';
+  const cnonce = Math.random().toString(36).substring(2, 10);
+  const ha1 = await md5(`${user}:${realm}:${pass}`);
+  const ha2 = await md5(`GET:${cgiPath.split('?')[0]}`);
+  const response = qop
+    ? await md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
+    : await md5(`${ha1}:${nonce}:${ha2}`);
+
+  const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${cgiPath.split('?')[0]}", ` +
+    (qop ? `qop=${qop}, nc=${nc}, cnonce="${cnonce}", ` : '') +
+    `response="${response}"` +
+    (opaque ? `, opaque="${opaque}"` : '');
+
+  const r2 = await fetch(url, {
+    headers: { 'Authorization': authHeader },
     signal: AbortSignal.timeout(10000),
-  });
-  return { status: resp.status, body: await resp.text() };
+  }).catch(() => null);
+  return { status: r2?.status || 0, body: await r2?.text().catch(() => '') };
 }
 
 // ─── Action Handlers ─────────────────────────────────────────────────────────

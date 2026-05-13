@@ -13,16 +13,16 @@ Deno.serve(async (req) => {
         const now = new Date();
         const threshold24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-        // Buscar dados em paralelo
-        const [openAlerts, admins, allUsers, terminals] = await Promise.all([
+        // Buscar dados em paralelo — evitar carregar todos os utilizadores
+        const [openAlerts, admins, terminals] = await Promise.all([
             base44.asServiceRole.entities.EscalationAlert.filter({ resolvido: false, escalado: false }),
             base44.asServiceRole.entities.User.filter({ role: 'admin' }),
-            base44.asServiceRole.entities.User.list().catch(() => []),
             base44.asServiceRole.entities.Terminal.list(),
         ]);
 
         const adminEmails = admins.map(a => a.email).filter(Boolean);
-        const usersWithTelegram = allUsers.filter(u => u.telegram_bot_token && u.telegram_chat_id);
+        // Apenas admins com Telegram — evita carregar todos os utilizadores
+        const usersWithTelegram = admins.filter(u => u.telegram_bot_token && u.telegram_chat_id);
         const onlineIds = new Set(terminals.filter(t => t.status === 'online').map(t => t.id));
 
         const escalated = [];

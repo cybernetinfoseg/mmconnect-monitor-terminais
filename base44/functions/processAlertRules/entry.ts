@@ -54,6 +54,9 @@ Deno.serve(async (req) => {
                     t.cliente_nome === rule.filtro_cliente || t.cliente === rule.filtro_cliente
                 );
             }
+            if (rule.filtro_terminal_id) {
+                filteredTerminals = filteredTerminals.filter(t => t.id === rule.filtro_terminal_id);
+            }
 
             let shouldFire = false;
             let messageBody = '';
