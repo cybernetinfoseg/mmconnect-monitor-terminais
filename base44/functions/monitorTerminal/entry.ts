@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'terminal_id obrigatório' }, { status: 400 });
     }
 
-    const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id);
+    const terminalResults = await base44.asServiceRole.entities.Terminal.filter({ id: terminal_id });
+    const terminal = terminalResults[0] || null;
     if (!terminal) {
       return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
     }
@@ -167,24 +168,24 @@ Deno.serve(async (req) => {
  * GET http://<host>:7789/status/<sn>
  */
 async function checkTimmyWsServer(terminal) {
-  const sn = (terminal.numero_serie || '').trim();
-  if (!sn) return { online: false };
+   const sn = (terminal.numero_serie || '').trim();
+   if (!sn) return { online: false };
 
-  const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
-  if (!host) return { online: false };
+   const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
+   if (!host) return { online: false };
 
-  const ctrlPort = 7789;
-  const url = `http://${host}:${ctrlPort}/status/${sn}`;
+   const port = terminal.porta || 7788;
+   const url = `http://${host}:${port}/status/${sn}`;
 
-  try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!resp.ok) return { online: false };
-    const data = await resp.json();
-    return { online: data.connected === true, devinfo: data.devinfo };
-  } catch {
-    return { online: false };
-  }
-}
+   try {
+     const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+     if (!resp.ok) return { online: false };
+     const data = await resp.json();
+     return { online: data.connected === true, devinfo: data.devinfo };
+   } catch {
+     return { online: false };
+   }
+ }
 
 async function checkTerminalActive(terminal) {
   const porta = terminal.porta || 5005;
