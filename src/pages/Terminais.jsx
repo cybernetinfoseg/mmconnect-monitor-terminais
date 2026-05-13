@@ -304,7 +304,8 @@ export default function Terminais() {
         t.ip_local?.toLowerCase().includes(q) ||
         t.ip_publico?.toLowerCase().includes(q) ||
         t.dns?.toLowerCase().includes(q) ||
-        t.modelo?.toLowerCase().includes(q);
+        t.modelo?.toLowerCase().includes(q) ||
+        String(t.porta || '').includes(q);
       const matchTipo = tipoFilter === 'all' || t.tipo_conexao === tipoFilter;
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
       const matchUser = userFilter === 'all' || (t.usuario_email || t.created_by) === userFilter;
@@ -423,10 +424,10 @@ export default function Terminais() {
           <CardContent className="p-3 sm:p-4 space-y-2">
             {/* Row 1: search + primary filters */}
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-              <div className="w-full sm:flex-1 sm:min-w-[200px] relative">
+              <div className="w-full sm:w-[220px] relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Nome, local, SN, IP, DNS, modelo..."
+                  placeholder="Nome, SN, IP, porta..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
