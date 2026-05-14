@@ -7,7 +7,7 @@ import {
   User, Loader2, Upload, CheckCircle2, XCircle, BarChart2
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -81,9 +81,16 @@ export default function Marcacoes() {
   // Set of terminal IDs belonging to this user
   const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
 
+  // Mapa terminal_id → owner para evitar double find() em allOwners
+  const terminalOwnerMap = useMemo(() => {
+    const m = {};
+    terminals.forEach(t => { m[t.id] = t.usuario_email || t.created_by || ''; });
+    return m;
+  }, [terminals]);
+
   const allOwners = useMemo(() =>
-    [...new Set(marcacoes.map(m => terminals.find(t => t.id === m.terminal_id)?.usuario_email || terminals.find(t => t.id === m.terminal_id)?.created_by).filter(Boolean))].sort(),
-    [marcacoes, terminals]
+    [...new Set(marcacoes.map(m => terminalOwnerMap[m.terminal_id]).filter(Boolean))].sort(),
+    [marcacoes, terminalOwnerMap]
   );
 
   const filtered = useMemo(() => {
@@ -93,9 +100,7 @@ export default function Marcacoes() {
       // Ownership filter — non-admins only see own terminals' records
       if (!isAdmin && !myTerminalIds.has(m.terminal_id)) return false;
       if (isAdmin && ownerFilter !== 'all') {
-        const t = terminals.find(t => t.id === m.terminal_id);
-        const owner = t?.usuario_email || t?.created_by;
-        if (owner !== ownerFilter) return false;
+        if (terminalOwnerMap[m.terminal_id] !== ownerFilter) return false;
       }
       const ts = m.timestamp ? new Date(m.timestamp) : null;
       if (from && ts && ts < from) return false;
@@ -108,7 +113,7 @@ export default function Marcacoes() {
       }
       return true;
     });
-  }, [marcacoes, dateFrom, dateTo, terminalFilter, tipoFilter, search, userMap, isAdmin, myTerminalIds, ownerFilter, terminals]);
+  }, [marcacoes, dateFrom, dateTo, terminalFilter, tipoFilter, search, userMap, isAdmin, myTerminalIds, ownerFilter, terminalOwnerMap]);
 
   const stats = useMemo(() => ({
     total: filtered.length,

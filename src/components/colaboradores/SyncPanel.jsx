@@ -25,7 +25,8 @@ export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh 
   const [syncProgress, setSyncProgress] = useState(null);
   const [syncResults, setSyncResults] = useState(null);
 
-  const timmyTerminals = terminals.filter(t => t.tipo_conexao === 'websocket_cloud' && t.fabricante === 'timmy');
+  // Inclui todos os terminais WebSocket Cloud (Timmy e outros fabricantes compatíveis)
+  const timmyTerminals = terminals.filter(t => t.tipo_conexao === 'websocket_cloud');
 
   const selectedTerminal = terminals.find(t => t.id === syncTerminalId);
 

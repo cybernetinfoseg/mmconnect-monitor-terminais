@@ -271,29 +271,31 @@ async function actionOpenDoor(terminal) {
     const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' });
     return { success: resp.result === true || resp.result === undefined, message: 'Porta aberta remotamente', data: resp };
   }
+
+  // Hikvision ISAPI: POST /ISAPI/AccessControl/RemoteControl/door/1 com body JSON
+  // Ref: Hikvision ISAPI v2.0 — Access Control Remote Control
+  const hikvisionOpenDoor = async () => {
+    const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1',
+      { RemoteControlDoorParam: { door: 1, controlType: 'open' } });
+    return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
+  };
+
+  // Dahua CGI: openDoor via accessControl.cgi
+  // Ref: Dahua HTTP API — Access Control
+  const dahuaOpenDoor = async () => {
+    const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
+    return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
+  };
+
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
-    if (fab === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
-      return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
-    }
-    if (fab === 'dahua') {
-      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
-      return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
-    }
+    if (fab === 'hikvision') return await hikvisionOpenDoor();
+    if (fab === 'dahua') return await dahuaOpenDoor();
     return await sendAdmsCommand(terminal, 'opendoor', {});
   }
   if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
-    if (fab === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
-      return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
-    }
-    if (fab === 'dahua') {
-      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
-      return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
-    }
-    if (fab === 'zkteco' || fab === 'anviz') {
-      return await sendAdmsCommand(terminal, 'opendoor', {});
-    }
+    if (fab === 'hikvision') return await hikvisionOpenDoor();
+    if (fab === 'dahua') return await dahuaOpenDoor();
+    if (fab === 'zkteco' || fab === 'anviz') return await sendAdmsCommand(terminal, 'opendoor', {});
   }
   return { success: false, error: `opendoor não suportado para ${tipo}` };
 }
@@ -402,10 +404,27 @@ async function actionAddUser(terminal, params) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
+    // Protocolo Timmy setuserinfo:
+    //   backupnum: 10=senha, 11=cartão RFID, 15=facial (apenas registo de credenciais básicas)
+    //   record: valor da credencial (número da senha, número do cartão)
+    // Prioridade: cartão > senha > sem credencial (o terminal regista biometria separadamente)
     let backupnum = 10;
-    let record = password ? Number(password) : 0;
-    if (card) { backupnum = 11; record = Number(card); }
-    const resp = await sendTimmyCommand(terminal, { cmd: 'setuserinfo', enrollid: Number(enrollid), name, backupnum, admin: Number(privilege), record });
+    let record = 0;
+    if (card && String(card).trim()) {
+      backupnum = 11;
+      record = Number(card) || 0;
+    } else if (password && String(password).trim()) {
+      backupnum = 10;
+      record = Number(password) || 0;
+    }
+    const resp = await sendTimmyCommand(terminal, {
+      cmd: 'setuserinfo',
+      enrollid: Number(enrollid),
+      name,
+      backupnum,
+      admin: Number(privilege),
+      record,
+    });
     return { success: resp.result === true, message: `Utilizador "${name}" (ID:${enrollid}) adicionado`, data: resp };
   }
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
