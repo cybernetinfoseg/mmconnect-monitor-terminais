@@ -12,6 +12,9 @@ import CompletarPerfil from './pages/CompletarPerfil';
 import Utilizadores from './pages/Utilizadores';
 import Marcacoes from './pages/Marcacoes';
 import ExportacaoMarcacoes from './pages/ExportacaoMarcacoes';
+import Presenca from './pages/Presenca';
+import GestaoHorarios from './pages/GestaoHorarios';
+import GestaoAusencias from './pages/GestaoAusencias';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -74,6 +77,9 @@ const AuthenticatedApp = () => {
       <Route path="/Utilizadores" element={<LayoutWrapper currentPageName="Utilizadores"><Utilizadores /></LayoutWrapper>} />
       <Route path="/Marcacoes" element={<LayoutWrapper currentPageName="Marcacoes"><Marcacoes /></LayoutWrapper>} />
       <Route path="/ExportacaoMarcacoes" element={<LayoutWrapper currentPageName="ExportacaoMarcacoes"><ExportacaoMarcacoes /></LayoutWrapper>} />
+      <Route path="/Presenca" element={<LayoutWrapper currentPageName="Presenca"><Presenca /></LayoutWrapper>} />
+      <Route path="/GestaoHorarios" element={<LayoutWrapper currentPageName="GestaoHorarios"><GestaoHorarios /></LayoutWrapper>} />
+      <Route path="/GestaoAusencias" element={<LayoutWrapper currentPageName="GestaoAusencias"><GestaoAusencias /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

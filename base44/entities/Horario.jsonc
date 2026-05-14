@@ -1,0 +1,45 @@
+{
+  "name": "Horario",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome do hor\u00e1rio (ex: Turno Manh\u00e3, Administrativo)"
+    },
+    "hora_entrada": {
+      "type": "string",
+      "description": "Hora de entrada esperada (HH:MM)"
+    },
+    "hora_saida": {
+      "type": "string",
+      "description": "Hora de sa\u00edda esperada (HH:MM)"
+    },
+    "dias_semana": {
+      "type": "string",
+      "description": "JSON array com dias da semana: [1,2,3,4,5] (0=Dom, 6=S\u00e1b)"
+    },
+    "tolerancia_minutos": {
+      "type": "number",
+      "default": 10,
+      "description": "Toler\u00e2ncia em minutos para atrasos"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Email do respons\u00e1vel"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se o hor\u00e1rio est\u00e1 ativo"
+    },
+    "cor": {
+      "type": "string",
+      "description": "Cor de identifica\u00e7\u00e3o (hex ou nome CSS)"
+    }
+  },
+  "required": [
+    "nome",
+    "hora_entrada",
+    "hora_saida"
+  ]
+}

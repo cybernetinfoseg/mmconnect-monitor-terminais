@@ -24,7 +24,10 @@ import {
   MapPin,
   Users,
   Fingerprint,
-  Share2
+  Share2,
+  Building2,
+  CalendarOff,
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -42,6 +45,9 @@ const ALL_NAV_ITEMS = [
   { name: 'Mapa', page: 'Mapa', icon: MapPin },
   { name: 'Colaboradores', page: 'Utilizadores', icon: Users },
   { name: 'Marcações', page: 'Marcacoes', icon: Fingerprint },
+  { name: 'Presença', page: 'Presenca', icon: Building2 },
+  { name: 'Horários', page: 'GestaoHorarios', icon: Clock },
+  { name: 'Ausências', page: 'GestaoAusencias', icon: CalendarOff },
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
