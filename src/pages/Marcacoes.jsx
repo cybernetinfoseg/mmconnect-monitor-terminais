@@ -141,16 +141,31 @@ export default function Marcacoes() {
     finally { setCollecting(null); }
   };
 
+  const filteredCollectTerminals = useMemo(() => terminals.filter(t => {
+    if (collectTipo !== 'all' && t.tipo_conexao !== collectTipo) return false;
+    if (collectStatus !== 'all' && t.status !== collectStatus) return false;
+    if (collectLocal !== 'all' && t.local !== collectLocal) return false;
+    if (collectFabricante !== 'all' && t.fabricante !== collectFabricante) return false;
+    if (collectUser !== 'all' && (t.usuario_email || t.created_by) !== collectUser) return false;
+    if (collectSearch) {
+      const q = collectSearch.toLowerCase();
+      return t.nome?.toLowerCase().includes(q) || t.local?.toLowerCase().includes(q) ||
+        t.numero_serie?.toLowerCase().includes(q) || t.ip_local?.toLowerCase().includes(q) ||
+        t.ip_publico?.toLowerCase().includes(q) || String(t.porta || '').includes(q);
+    }
+    return true;
+  }), [terminals, collectTipo, collectStatus, collectLocal, collectFabricante, collectUser, collectSearch]);
+
   const handleCollectAll = async () => {
     setCollecting('all');
     let total = 0, errors = 0;
-    for (const t of terminals) {
+    for (const t of filteredCollectTerminals) {
       try { total += await collectFromTerminal(t); }
       catch { errors++; }
     }
     setCollecting(null);
     refetch();
-    errors === 0 ? toast.success(`${total} marcação(ões) recolhida(s) de ${terminals.length} terminal(is)`) : toast.error(`${total} OK / ${errors} erro(s)`);
+    errors === 0 ? toast.success(`${total} marcação(ões) recolhida(s) de ${filteredCollectTerminals.length} terminal(is)`) : toast.error(`${total} OK / ${errors} erro(s)`);
   };
 
   const handleExportCSV = () => {
@@ -220,9 +235,11 @@ export default function Marcacoes() {
                 <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                   <Upload className="h-4 w-4 text-teal-600" /> Recolher Marcações
                 </p>
-                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-xs" onClick={handleCollectAll} disabled={collecting === 'all'}>
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-xs" onClick={handleCollectAll} disabled={collecting === 'all' || filteredCollectTerminals.length === 0}>
                   {collecting === 'all' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                  Recolher Todos os Terminais
+                  {filteredCollectTerminals.length < terminals.length
+                    ? `Recolher ${filteredCollectTerminals.length} Terminal(is)`
+                    : 'Recolher Todos os Terminais'}
                 </Button>
               </div>
               {/* Filtros de terminal */}
@@ -298,29 +315,14 @@ export default function Marcacoes() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {terminals
-                  .filter(t => {
-                    if (collectTipo !== 'all' && t.tipo_conexao !== collectTipo) return false;
-                    if (collectStatus !== 'all' && t.status !== collectStatus) return false;
-                    if (collectLocal !== 'all' && t.local !== collectLocal) return false;
-                    if (collectFabricante !== 'all' && t.fabricante !== collectFabricante) return false;
-                    if (collectUser !== 'all' && (t.usuario_email || t.created_by) !== collectUser) return false;
-                    if (collectSearch) {
-                      const q = collectSearch.toLowerCase();
-                      return t.nome?.toLowerCase().includes(q) || t.local?.toLowerCase().includes(q) ||
-                        t.numero_serie?.toLowerCase().includes(q) || t.ip_local?.toLowerCase().includes(q) ||
-                        t.ip_publico?.toLowerCase().includes(q) || String(t.porta || '').includes(q);
-                    }
-                    return true;
-                  })
-                  .map(t => (
+                {filteredCollectTerminals.map(t => (
                     <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
                       className={cn('text-xs gap-1.5', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
                       {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
                       {t.nome}
                       {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
                     </Button>
-                  ))}
+                ))}
               </div>
             </CardContent>
           </Card>
