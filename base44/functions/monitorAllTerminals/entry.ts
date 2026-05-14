@@ -225,8 +225,7 @@ async function checkTimmyWsServer(terminal) {
     const host = terminal.ip_publico || terminal.dns || null;
     if (!host) return { serverReachable: false, online: false };
     try {
-        const port = terminal.porta || 7789;
-        const ctrlPort = port + 1; // porta HTTP de controlo = WS_PORT + 1
+        const ctrlPort = 7789; // porta HTTP de controlo do servidor Timmy (sempre fixa)
         const resp = await fetch(`http://${host}:${ctrlPort}/status/${sn}`, { signal: AbortSignal.timeout(4000) });
         if (!resp.ok) return { serverReachable: true, online: false };
         const data = await resp.json();
