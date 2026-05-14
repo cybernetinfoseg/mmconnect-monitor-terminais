@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
@@ -66,6 +67,7 @@ export default function Agendamentos() {
   const [currentUser, setCurrentUser] = useState(null);
   const [runningId, setRunningId] = useState(null);
   const queryClient = useQueryClient();
+  const { timezone: userTimezone } = useUserTimezone();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -281,7 +283,7 @@ export default function Agendamentos() {
       {/* Info */}
       <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
-        <p>As ações são executadas automaticamente pelo sistema a cada 5 minutos. Os resultados ficam registados nos <strong>Logs de Operação</strong> de cada terminal. Os horários são na timezone <strong>Europe/London</strong>. Comandos críticos (abrir porta, lockctrl) têm <strong>3 tentativas automáticas</strong> em caso de falha.</p>
+        <p>As ações são executadas automaticamente pelo sistema a cada 5 minutos. Os resultados ficam registados nos <strong>Logs de Operação</strong> de cada terminal. Os horários são na timezone <strong>{userTimezone}</strong>. Comandos críticos (abrir porta, lockctrl) têm <strong>3 tentativas automáticas</strong> em caso de falha.</p>
       </div>
 
       {/* Ativos */}

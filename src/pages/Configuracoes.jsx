@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Settings, Trash2, AlertTriangle, Bot, Key, Copy,
   Info, RefreshCw, Eye, EyeOff, CheckCircle, XCircle,
-  Plug, Radio, Save, Shield, Server, Bell, Clock
+  Plug, Radio, Save, Shield, Server, Bell, Clock, Globe
 } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -25,6 +25,7 @@ import AgentSourceCode from '../components/configuracoes/AgentSourceCode';
 import NocServerCode from '../components/configuracoes/NocServerCode';
 import P2sServerCode from '../components/configuracoes/P2sServerCode';
 import TimmyWsServerCode from '../components/configuracoes/TimmyWsServerCode';
+import TimezoneSelector from '../components/configuracoes/TimezoneSelector';
 
 const APP_ID = '697aa46c9998c30665e2e19a';
 
@@ -406,7 +407,25 @@ export default function Configuracoes() {
           )}
 
           {/* ── Tab: Conta ── */}
-          <TabsContent value="conta" className="mt-4">
+          <TabsContent value="conta" className="mt-4 space-y-4">
+            {/* Timezone */}
+            {currentUser && (
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-blue-600" />
+                    Timezone / Fuso Horário
+                  </CardTitle>
+                  <CardDescription>
+                    Define em que fuso horário o relógio e os agendamentos são apresentados. O DST (horário de verão) é ajustado automaticamente.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TimezoneSelector user={currentUser} onSaved={(tz) => setCurrentUser(prev => ({ ...prev, timezone: tz }))} />
+                </CardContent>
+              </Card>
+            )}
+
             {currentUser && (
               <Card className="bg-white/80 backdrop-blur-sm border-red-200">
                 <CardHeader>
