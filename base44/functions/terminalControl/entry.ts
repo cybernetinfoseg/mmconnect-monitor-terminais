@@ -79,7 +79,7 @@ async function sendAdmsCommand(terminal, action, params = {}) {
  * Prioridade: ip_publico do terminal → dns → NOC_SERVER_HOST global.
  * Isto permite servidores Timmy locais/diferentes por terminal.
  */
-async function sendTimmyCommand(terminal, command) {
+async function sendTimmyCommand(terminal, command, retries = 1) {
   // Usar IP/host específico do terminal se disponível, caso contrário usar o servidor global
   const host = terminal.ip_publico || terminal.dns || getNocServerHost();
   const ctrlPort = 7789;
@@ -93,23 +93,36 @@ async function sendTimmyCommand(terminal, command) {
   }
 
   const url = `http://${host}:${ctrlPort}/cmd`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sn, command }),
-    signal: AbortSignal.timeout(12000),
-  }).catch(e => { throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível — ${e.message}`); });
 
-  if (!resp.ok) {
-    const errBody = await resp.text().catch(() => '');
-    throw new Error(`Servidor Timmy respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
-  }
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn, command }),
+        signal: AbortSignal.timeout(20000), // 20s para dar tempo ao WS responder
+      });
 
-  const data = await resp.json();
-  if (!data.success) {
-    throw new Error(data.error || 'Servidor Timmy não conseguiu enviar o comando ao terminal');
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        throw new Error(`Servidor Timmy respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
+      }
+
+      const data = await resp.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Servidor Timmy não conseguiu enviar o comando ao terminal');
+      }
+      return data.result || { result: true };
+
+    } catch (e) {
+      if (attempt < retries) {
+        console.warn(`[sendTimmyCommand] tentativa ${attempt + 1} falhou (${command.cmd}) — a repetir em 2s: ${e.message}`);
+        await new Promise(r => setTimeout(r, 2000));
+      } else {
+        throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível após ${retries + 1} tentativa(s) — ${e.message}`);
+      }
+    }
   }
-  return data.result || { result: true };
 }
 
 function buildTerminalBaseUrl(terminal) {
@@ -256,7 +269,7 @@ async function actionOpenDoor(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' }).catch(() => ({ result: true }));
+    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' });
     return { success: resp.result === true || resp.result === undefined, message: 'Porta aberta remotamente', data: resp };
   }
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
@@ -291,7 +304,7 @@ async function actionReboot(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'reboot' }).catch(() => ({ result: true }));
+    const resp = await sendTimmyCommand(terminal, { cmd: 'reboot' });
     return { success: true, message: 'Comando de reinício enviado. Terminal reiniciará imediatamente.', data: resp };
   }
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
@@ -381,7 +394,7 @@ async function actionGetDevInfo(terminal) {
 async function actionSetDoorStatus(terminal, params) {
   const fuc = params?.fuc || 1;
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc }).catch(() => ({ result: true }));
+    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc });
     const msgs = { 1: 'Porta forçada aberta (permanente)', 2: 'Porta forçada fechada', 3: 'Porta aberta temporariamente', 4: 'Relay resetado', 6: 'Alarme cancelado' };
     return { success: resp.result === true || resp.result === undefined, message: msgs[fuc] || `lockctrl fuc=${fuc}`, data: resp };
   }
@@ -504,13 +517,13 @@ async function actionGetAllLogs(terminal, params) {
 
 async function actionClearLogs(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearlog apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'clearlog' }).catch(() => ({ result: true }));
+  const resp = await sendTimmyCommand(terminal, { cmd: 'clearlog' });
   return { success: resp.result === true || resp.result === undefined, message: 'Todos os logs eliminados do terminal', data: resp };
 }
 
 async function actionClearUsers(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearuserdata apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'clearuserdata' }).catch(() => ({ result: true }));
+  const resp = await sendTimmyCommand(terminal, { cmd: 'clearuserdata' });
   return { success: resp.result === true || resp.result === undefined, message: 'Todos os utilizadores eliminados do terminal', data: resp };
 }
 
@@ -523,7 +536,7 @@ async function actionGetParam(terminal) {
 
 async function actionInitDevice(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initialize apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'initialize' }).catch(() => ({ result: true }));
+  const resp = await sendTimmyCommand(terminal, { cmd: 'initialize' });
   return { success: resp.result === true || resp.result === undefined, message: 'Terminal inicializado (reset de fábrica)', data: resp };
 }
 
