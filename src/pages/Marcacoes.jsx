@@ -138,6 +138,18 @@ export default function Marcacoes() {
     const resp = await base44.functions.invoke('terminalControl', { terminal_id: terminal.id, action });
     const data = resp.data;
     if (data?.success && data.records?.length) {
+      // Deduplicação: buscar marcações recentes deste terminal (últimas 2h) antes de guardar
+      const duasHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const existentes = await base44.entities.Marcacao.filter({ terminal_id: terminal.id }, '-timestamp', 2000).catch(() => []);
+      const DEDUP_MS = 30000;
+      const dedupSet = new Set();
+      existentes.forEach(m => {
+        if (m.timestamp) {
+          const bucket = Math.floor(new Date(m.timestamp).getTime() / DEDUP_MS);
+          dedupSet.add(`${m.enrollid}|${bucket}`);
+        }
+      });
+
       const toSave = data.records.map(r => {
         const rawMode = r.mode ?? r.Mode ?? r.verifyType ?? r.verifytype;
         const modo = resolveMode(rawMode, terminal);
@@ -162,8 +174,17 @@ export default function Marcacoes() {
           local: terminal.local || '', exportado: false,
         };
       });
-      await base44.entities.Marcacao.bulkCreate(toSave);
-      return toSave.length;
+      // Filtrar duplicados
+      const novas = toSave.filter(r => {
+        if (!r.timestamp) return false;
+        const bucket = Math.floor(new Date(r.timestamp).getTime() / DEDUP_MS);
+        const key = `${r.enrollid}|${bucket}`;
+        if (dedupSet.has(key)) return false;
+        dedupSet.add(key);
+        return true;
+      });
+      if (novas.length > 0) await base44.entities.Marcacao.bulkCreate(novas);
+      return novas.length;
     }
     return 0;
   };
