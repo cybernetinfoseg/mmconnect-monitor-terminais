@@ -139,18 +139,26 @@ export default function Marcacoes() {
     const data = resp.data;
     if (data?.success && data.records?.length) {
       const toSave = data.records.map(r => {
-        const rawMode = r.mode ?? r.Mode ?? r.verifyType;
+        const rawMode = r.mode ?? r.Mode ?? r.verifyType ?? r.verifytype;
         const modo = resolveMode(rawMode, terminal);
-        // Determinar tipo entrada/saída pelo campo inout (0=entrada, 1=saída) se disponível
+        // Determinar tipo entrada/saída
         let tipo = 'desconhecido';
-        if (r.inout === 0 || r.InOutStatus === 0) tipo = 'entrada';
-        else if (r.inout === 1 || r.InOutStatus === 1) tipo = 'saida';
+        const inoutVal = r.inout ?? r.InOutStatus;
+        if (inoutVal === 0 || inoutVal === 'entrada') tipo = 'entrada';
+        else if (inoutVal === 1 || inoutVal === 'saida') tipo = 'saida';
+        // Converter timestamp "YYYY-MM-DD HH:MM:SS" → ISO 8601
+        const rawTs = r.time ?? r.Time ?? r.timestamp ?? '';
+        let ts = rawTs;
+        if (rawTs && rawTs.includes(' ') && rawTs.includes('-')) {
+          ts = rawTs.replace(' ', 'T');
+        }
+        const enrollid = r.enrollid ?? r.EnrollNumber ?? r.id;
         return {
           terminal_id: terminal.id, terminal_nome: terminal.nome,
-          enrollid: r.enrollid ?? r.EnrollNumber,
-          utilizador_nome: userMap[r.enrollid ?? r.EnrollNumber] || '',
-          timestamp: r.time ?? r.Time ?? new Date().toISOString(),
-          modo, raw_mode: rawMode, tipo,
+          enrollid: Number(enrollid) || 0,
+          utilizador_nome: userMap[enrollid] || '',
+          timestamp: ts || new Date().toISOString(),
+          modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo,
           local: terminal.local || '', exportado: false,
         };
       });

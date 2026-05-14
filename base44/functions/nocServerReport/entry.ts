@@ -232,6 +232,12 @@ Deno.serve(async (req) => {
                     if (dedupSet.has(dedupKey)) continue; // duplicado dentro da janela de 30s
                     dedupSet.add(dedupKey);
 
+                    // Normalizar tipo: aceita string ("entrada"/"saida") ou número (0=entrada, 1=saida)
+                    let tipo = 'desconhecido';
+                    const inoutVal = m.inout;
+                    if (inoutVal === 'entrada' || inoutVal === 0) tipo = 'entrada';
+                    else if (inoutVal === 'saida' || inoutVal === 1) tipo = 'saida';
+
                     await base44.asServiceRole.entities.Marcacao.create({
                         terminal_id,
                         terminal_nome: terminal.nome,
@@ -240,7 +246,7 @@ Deno.serve(async (req) => {
                         timestamp: tsStr,
                         modo: m.mode || 'desconhecido',
                         raw_mode: m.raw_mode ?? null,
-                        tipo: m.inout || 'desconhecido',
+                        tipo,
                         local: terminal.local || '',
                         exportado: false,
                     });
