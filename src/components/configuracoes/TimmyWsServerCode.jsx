@@ -39,7 +39,7 @@ import requests
 
 try:
     import websockets
-    from websockets.server import serve
+    from websockets import serve
 except ImportError:
     print("ERRO: instale 'websockets' com: pip install websockets")
     sys.exit(1)
@@ -525,7 +525,7 @@ if __name__ == "__main__":
 
     cfg = load_config()
     if not cfg:
-        logger.error("config.json ausente ou inválido. Verifique C:\\ProgramData\\TimmyWSServer\\config.json")
+        logger.error(r"config.json ausente ou inválido. Verifique C:\ProgramData\TimmyWSServer\config.json")
         sys.exit(1)
 
     if args.port:
