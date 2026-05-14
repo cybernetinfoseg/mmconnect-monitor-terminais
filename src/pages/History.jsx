@@ -136,18 +136,23 @@ export default function History() {
   const locais = useMemo(() => [...new Set(terminals.map(t => t.local).filter(Boolean))].sort(), [terminals]);
 
 
+  // Mapa terminal_id → local para evitar find() dentro do filter (O(n²) → O(n))
+  const terminalLocalMap = useMemo(() => {
+    const m = {};
+    terminals.forEach(t => { m[t.id] = t.local || ''; });
+    return m;
+  }, [terminals]);
+
   const filteredUptimeData = useMemo(() => {
     return uptimeData.filter(t => {
       if (terminalFilter !== 'all' && t.id !== terminalFilter) return false;
-      const terminal = terminals.find(ter => ter.id === t.id);
-      if (localFilter !== 'all' && terminal?.local !== localFilter) return false;
-
+      if (localFilter !== 'all' && terminalLocalMap[t.id] !== localFilter) return false;
       if (uptimeFilter === 'critical' && t.uptime >= 95) return false;
       if (uptimeFilter === 'warning' && (t.uptime < 95 || t.uptime >= 99)) return false;
       if (uptimeFilter === 'good' && t.uptime < 99) return false;
       return true;
     });
-  }, [uptimeData, terminalFilter, localFilter, uptimeFilter, terminals]);
+  }, [uptimeData, terminalFilter, localFilter, uptimeFilter, terminalLocalMap]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full overflow-x-hidden">

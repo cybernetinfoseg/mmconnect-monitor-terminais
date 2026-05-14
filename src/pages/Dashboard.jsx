@@ -10,7 +10,7 @@ import {
   AlertTriangle,
   User,
   LayoutList,
-  X
+  X,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -94,7 +94,7 @@ export default function Dashboard() {
     [terminals]
   );
 
-  // Apply filters
+  // Apply filters (null or '' = no filter)
   const filteredTerminals = useMemo(() => {
     return terminals.filter(t => {
       if (localFilter && t.local !== localFilter) return false;
@@ -145,12 +145,12 @@ export default function Dashboard() {
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtros</span>
             {(localFilter || statusFilter || userFilter) && (
               <Button variant="ghost" size="sm" onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }} className="text-slate-500 hover:text-slate-700 h-7 px-2 text-xs">
-                Limpar
+                ✕ Limpar filtros
               </Button>
             )}
           </div>
 
-          <div className={`grid grid-cols-1 ${canSeeAll ? 'sm:grid-cols-2' : ''} gap-2`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canSeeAll ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-2`}>
             {/* Local */}
             <div>
               <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
@@ -163,6 +163,22 @@ export default function Dashboard() {
               >
                 <option value="">Todos</option>
                 {locais.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+
+            {/* Status */}
+            <div>
+              <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
+                <LayoutList className="h-3 w-3" /> Status
+              </label>
+              <select
+                value={statusFilter || ''}
+                onChange={e => setStatusFilter(e.target.value || null)}
+                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
+              >
+                <option value="">Todos</option>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
               </select>
             </div>
 
@@ -194,7 +210,7 @@ export default function Dashboard() {
             value={stats.total}
             icon={Monitor}
             color="blue"
-            onClick={() => { setStatusFilter(null); setLocalFilter(null); setUserFilter(null); }}
+            onClick={() => { setStatusFilter(''); setLocalFilter(null); setUserFilter(null); }}
             active={!statusFilter && !localFilter && !userFilter}
           />
           <KPICard
@@ -204,7 +220,7 @@ export default function Dashboard() {
             color="green"
             trend="up"
             trendValue={`${stats.onlinePercentage}% disponível`}
-            onClick={() => setStatusFilter(statusFilter === 'online' ? null : 'online')}
+            onClick={() => setStatusFilter(statusFilter === 'online' ? '' : 'online')}
             active={statusFilter === 'online'}
           />
           <KPICard
@@ -212,7 +228,7 @@ export default function Dashboard() {
             value={stats.offline}
             icon={WifiOff}
             color="red"
-            onClick={() => setStatusFilter(statusFilter === 'offline' ? null : 'offline')}
+            onClick={() => setStatusFilter(statusFilter === 'offline' ? '' : 'offline')}
             active={statusFilter === 'offline'}
           />
         </div>

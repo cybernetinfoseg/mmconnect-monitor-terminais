@@ -335,7 +335,7 @@ export default function Incidents() {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Incidentes</h1>
-              <p className="text-xs sm:text-sm text-slate-500">Gerenciamento de alertas e incidentes</p>
+              <p className="text-xs sm:text-sm text-slate-500">Gestão de alertas e incidentes</p>
             </div>
           </div>
           

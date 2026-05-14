@@ -387,11 +387,11 @@ export default function Configuracoes() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <input
+                    <Input
                       type="number" min="1" max="60"
                       value={refreshInterval}
                       onChange={(e) => setRefreshInterval(e.target.value)}
-                      className="flex h-9 w-[120px] rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm"
+                      className="w-[120px]"
                     />
                     <span className="text-sm text-slate-500">minuto(s)</span>
                     <Button onClick={handleSaveInterval} disabled={savingInterval} size="sm" className="gap-2 bg-blue-600 hover:bg-blue-700">

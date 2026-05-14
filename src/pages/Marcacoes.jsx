@@ -136,10 +136,8 @@ export default function Marcacoes() {
   };
 
   const collectFromTerminal = async (terminal) => {
-    // TM-AI08 (face only) e outros: usar getnewlog que traz logs incrementais
-    // Para terminais FP-only: getlogs traz todos; para face: getnewlog é mais eficiente
     const cap = getTimmyCapabilities(terminal?.modelo);
-    const action = terminal.tipo_conexao === 'websocket_cloud' ? 'getlogs' : 'getlogs';
+    const action = 'getlogs';
     const resp = await base44.functions.invoke('terminalControl', { terminal_id: terminal.id, action });
     const data = resp.data;
     if (data?.success && data.records?.length) {
