@@ -1,10 +1,19 @@
 /**
  * executeScheduledActions — Executa ações remotas agendadas nos terminais
- * Chamado pelo cron a cada 5 minutos
+ * Chamado pelo cron a cada 5 minutos (via mainScheduler)
+ *
+ * CORREÇÕES v2:
+ * - Retry automático em falha de comandos críticos (opendoor, lockctrl)
+ * - shouldRunNow usa instante único (consistência entre hora e dia)
+ * - lockctrl respeita parâmetros do agendamento (fuc)
+ * - opendoor ZKTeco usa caminho ADMS correto
+ * - sendTimmyCommand com retry configurável
+ * - Timeout aumentado para comandos críticos
  */
+
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// ─── Helpers de conexão (espelhados de terminalControl) ─────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getNocServerHost() {
   const host = Deno.env.get('NOC_SERVER_HOST');
@@ -12,22 +21,63 @@ function getNocServerHost() {
   return host;
 }
 
-async function sendTimmyCommand(terminal, command) {
-  // Prioridade: ip_publico do terminal → NOC_SERVER_HOST global
+/**
+ * sendTimmyCommand com retry automático.
+ * maxAttempts=3 para comandos críticos (opendoor, lockctrl).
+ */
+async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
   const host = terminal.ip_publico || terminal.dns || getNocServerHost();
   const ctrlPort = 7789;
   const sn = terminal.numero_serie || '';
   if (!sn) throw new Error(`SN não configurado no terminal "${terminal.nome}"`);
+
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const resp = await fetch(`http://${host}:${ctrlPort}/cmd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn, command }),
+        signal: AbortSignal.timeout(20000), // 20s por tentativa
+      });
+      if (!resp.ok) throw new Error(`Servidor Timmy respondeu ${resp.status}`);
+      const data = await resp.json();
+      if (!data.success) throw new Error(data.error || 'Servidor Timmy falhou');
+      return data.result || { result: true };
+    } catch (e) {
+      lastError = e;
+      if (attempt < maxAttempts) {
+        console.warn(`[Timmy] tentativa ${attempt}/${maxAttempts} falhou (${JSON.stringify(command.cmd)}) — retrying em 3s: ${e.message}`);
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
+  }
+  throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível após ${maxAttempts} tentativa(s) — ${lastError?.message}`);
+}
+
+async function sendAdmsCommand(terminal, action, params = {}) {
+  const host = terminal.ip_publico || terminal.dns || getNocServerHost();
+  const ctrlPort = 7790;
+  const sn = terminal.numero_serie || '';
+  if (!sn) return { success: false, error: 'SN não configurado — obrigatório para terminais ADMS/ZKTeco.' };
+
   const resp = await fetch(`http://${host}:${ctrlPort}/cmd`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sn, command }),
-    signal: AbortSignal.timeout(12000),
-  }).catch(e => { throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível — ${e.message}`); });
-  if (!resp.ok) throw new Error(`Servidor Timmy respondeu ${resp.status}`);
+    body: JSON.stringify({ sn, action, params }),
+    signal: AbortSignal.timeout(15000),
+  }).catch(e => { throw new Error(`noc_server.py (${host}:${ctrlPort}) inacessível — ${e.message}`); });
+
+  if (!resp.ok) {
+    const errBody = await resp.text().catch(() => '');
+    throw new Error(`noc_server.py respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
+  }
   const data = await resp.json();
-  if (!data.success) throw new Error(data.error || 'Servidor Timmy falhou');
-  return data.result || { result: true };
+  return {
+    success: data.success !== false,
+    message: data.message || (data.success ? 'Comando executado' : 'Falha no servidor ADMS'),
+    data: data.result || data,
+  };
 }
 
 function buildBaseUrl(terminal) {
@@ -37,7 +87,11 @@ function buildBaseUrl(terminal) {
 
 async function hikvisionRequest(terminal, method, path, body = null) {
   const creds = btoa(`admin:${terminal.observacoes || 'admin'}`);
-  const opts = { method, headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/json' } };
+  const opts = {
+    method,
+    headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(10000),
+  };
   if (body) opts.body = JSON.stringify(body);
   const resp = await fetch(`${buildBaseUrl(terminal)}${path}`, opts);
   const text = await resp.text();
@@ -50,7 +104,6 @@ async function dahuaRequest(terminal, cgiPath) {
   const pass = terminal.observacoes || 'admin';
   const url = `${base}${cgiPath}`;
 
-  // Dahua requer Digest Auth — primeiro obter nonce
   const r1 = await fetch(url, { signal: AbortSignal.timeout(8000) }).catch(() => null);
   if (!r1 || r1.status !== 401) return { status: r1?.status || 0, body: await r1?.text().catch(() => '') };
 
@@ -74,44 +127,37 @@ async function dahuaRequest(terminal, cgiPath) {
   return { status: r2?.status || 0, body: await r2?.text().catch(() => '') };
 }
 
-// ─── Executores de ação ──────────────────────────────────────────────────────
+// ─── Executores de ação ───────────────────────────────────────────────────────
 
-async function runAction(terminal, action) {
+async function runAction(terminal, action, scheduleParams) {
   const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
   const tipo = terminal.tipo_conexao;
   const fab = terminal.fabricante || '';
 
+  // ── settime ──────────────────────────────────────────────────────────────
   if (action === 'settime') {
     if (tipo === 'websocket_cloud') {
       const r = await sendTimmyCommand(terminal, { cmd: 'settime', cloudtime: now });
       return { success: r.result === true, message: `Relógio acertado para ${now}`, data: r };
     }
     if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
-      // ZKTeco: tentar via HTTP direto se IP disponível
-      const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-      if (ip) {
-        const port = terminal.porta || 80;
-        const sn = terminal.numero_serie || '';
-        const r = await fetch(`http://${ip}:${port}/iclock/cdata`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `SN=${sn}&CMD=SET_TIME&TIME=${encodeURIComponent(now)}`,
-        }).catch(() => ({ status: 0 }));
-        return { success: r.status < 400, message: `Relógio acertado (ZKTeco) para ${now}` };
-      }
-      return { success: true, message: `Relógio será acertado na próxima sincronização ADMS (${now})`, note: 'IP não configurado — comando pendente' };
+      return await sendAdmsCommand(terminal, 'settime', { time: now });
     }
     if (fab === 'hikvision') {
-      const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/time', { timeMode: 'manual', localTime: now });
+      const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/time', { timeMode: 'manual', localTime: now, timeZone: 'UTC+0:00' });
       return { success: true, message: 'Relógio acertado (Hikvision)', data: r };
     }
     if (fab === 'dahua') {
       const r = await dahuaRequest(terminal, `/cgi-bin/global.cgi?action=setCurrentTime&time=${encodeURIComponent(now)}`);
       return { success: r.status === 200, message: 'Relógio acertado (Dahua)', data: r };
     }
+    if (['ip_publico', 'dns', 'ip_local'].includes(tipo) && (fab === 'zkteco' || fab === 'anviz')) {
+      return await sendAdmsCommand(terminal, 'settime', { time: now });
+    }
     return { success: false, error: `settime não suportado para ${tipo}/${fab}` };
   }
 
+  // ── getlogs ──────────────────────────────────────────────────────────────
   if (action === 'getlogs') {
     if (tipo === 'websocket_cloud') {
       const r = await sendTimmyCommand(terminal, { cmd: 'getnewlog', stn: true });
@@ -120,135 +166,165 @@ async function runAction(terminal, action) {
     if (tipo === 'adms_push') {
       return { success: true, message: 'Terminais ADMS enviam marcações automaticamente ao servidor.' };
     }
-    if (tipo === 'sdk_tcp') {
-      const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-      if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-      const port = terminal.porta || 80;
-      const r = await fetch(`http://${ip}:${port}/iclock/cdata?SN=${terminal.numero_serie || ''}&table=ATTLOG&Stamp=0000-00-00+00:00:00`).catch(() => null);
-      if (!r) return { success: false, error: 'Terminal não respondeu' };
-      const body = await r.text().catch(() => '');
-      const lines = body.split('\n').filter(l => l.trim());
-      return { success: r.status < 400, message: `${lines.length} marcações obtidas (ZKTeco SDK)`, count: lines.length };
-    }
-    if (fab === 'hikvision') {
-      const r = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', { AcsEventCond: { searchID: '1', searchResultPosition: 0, maxResults: 50 } });
-      return { success: true, message: 'Marcações Hikvision recolhidas', data: r };
-    }
-    if (fab === 'dahua') {
-      const r = await dahuaRequest(terminal, '/cgi-bin/recordFinder.cgi?action=find&name=AttendanceRecord&StartTime=2000-01-01%2000:00:00&EndTime=2099-12-31%2023:59:59');
-      return { success: r.status === 200, message: 'Marcações Dahua recolhidas' };
+    if (tipo === 'sdk_tcp' || ['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+      if (fab === 'hikvision') {
+        const r = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', { AcsEventCond: { searchID: '1', searchResultPosition: 0, maxResults: 50 } });
+        return { success: true, message: 'Marcações Hikvision recolhidas', data: r };
+      }
+      if (fab === 'dahua') {
+        const r = await dahuaRequest(terminal, '/cgi-bin/recordFinder.cgi?action=find&name=AttendanceRecord&StartTime=2000-01-01%2000:00:00&EndTime=2099-12-31%2023:59:59');
+        return { success: r.status === 200, message: 'Marcações Dahua recolhidas' };
+      }
+      // ZKTeco via noc_server.py (ADMS relay)
+      return await sendAdmsCommand(terminal, 'getlogs', {});
     }
     return { success: false, error: `getlogs não suportado para ${tipo}/${fab}` };
   }
 
+  // ── opendoor — CRÍTICO: 3 tentativas ──────────────────────────────────────
   if (action === 'opendoor') {
     if (tipo === 'websocket_cloud') {
-      const r = await sendTimmyCommand(terminal, { cmd: 'opendoor' });
-      return { success: r.result === true, message: 'Porta aberta', data: r };
+      const r = await sendTimmyCommand(terminal, { cmd: 'opendoor' }, 3); // 3 tentativas
+      return { success: r.result === true || r.result === undefined, message: 'Porta aberta', data: r };
     }
     if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
-      const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-      if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-      const port = terminal.porta || 80;
-      const sn = terminal.numero_serie || '';
-      const r = await fetch(`http://${ip}:${port}/iclock/cdata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `SN=${sn}&CMD=OPEN_DOOR&Lock=1`,
-      }).catch(() => ({ status: 0 }));
-      return { success: r.status < 400, message: 'Comando de abertura enviado ao ZKTeco' };
+      if (fab === 'hikvision') {
+        const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1',
+          { RemoteControlDoorParam: { door: 1, controlType: 'open' } });
+        return { success: true, message: 'Porta aberta (Hikvision)', data: r };
+      }
+      if (fab === 'dahua') {
+        const r = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
+        return { success: r.status === 200, message: 'Porta aberta (Dahua)', data: r };
+      }
+      // ZKTeco ADMS: via noc_server.py relay (protocolo correto)
+      return await sendAdmsCommand(terminal, 'opendoor', {});
     }
-    if (fab === 'hikvision') {
-      const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
-      return { success: true, message: 'Porta aberta (Hikvision)', data: r };
-    }
-    if (fab === 'dahua') {
-      const r = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1');
-      return { success: r.status === 200, message: 'Porta aberta (Dahua)', data: r };
+    if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+      if (fab === 'hikvision') {
+        const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1',
+          { RemoteControlDoorParam: { door: 1, controlType: 'open' } });
+        return { success: true, message: 'Porta aberta (Hikvision)', data: r };
+      }
+      if (fab === 'dahua') {
+        const r = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
+        return { success: r.status === 200, message: 'Porta aberta (Dahua)', data: r };
+      }
+      if (fab === 'zkteco' || fab === 'anviz') {
+        return await sendAdmsCommand(terminal, 'opendoor', {});
+      }
     }
     return { success: false, error: `opendoor não suportado para ${tipo}/${fab}` };
   }
 
+  // ── reboot ───────────────────────────────────────────────────────────────
   if (action === 'reboot') {
     if (tipo === 'websocket_cloud') {
       const r = await sendTimmyCommand(terminal, { cmd: 'reboot' }).catch(() => ({ result: true }));
       return { success: true, message: 'Comando de reinício enviado', data: r };
     }
     if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
-      const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-      if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-      const port = terminal.porta || 80;
-      const sn = terminal.numero_serie || '';
-      const r = await fetch(`http://${ip}:${port}/iclock/cdata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `SN=${sn}&CMD=REBOOT`,
-      }).catch(() => ({ status: 0 }));
-      return { success: r.status < 400, message: 'Comando de reinício enviado ao ZKTeco' };
+      if (fab === 'hikvision') {
+        const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/reboot');
+        return { success: true, message: 'Reinício enviado (Hikvision)', data: r };
+      }
+      if (fab === 'dahua') {
+        const r = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=reboot');
+        return { success: r.status === 200, message: 'Reinício enviado (Dahua)' };
+      }
+      return await sendAdmsCommand(terminal, 'reboot', {});
     }
-    if (fab === 'hikvision') {
-      const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/reboot');
-      return { success: true, message: 'Reinício enviado (Hikvision)', data: r };
-    }
-    if (fab === 'dahua') {
-      const r = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=reboot');
-      return { success: r.status === 200, message: 'Reinício enviado (Dahua)' };
+    if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+      if (fab === 'hikvision') {
+        const r = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/reboot');
+        return { success: true, message: 'Reinício enviado (Hikvision)', data: r };
+      }
+      if (fab === 'dahua') {
+        const r = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=reboot');
+        return { success: r.status === 200, message: 'Reinício enviado (Dahua)' };
+      }
+      if (fab === 'zkteco' || fab === 'anviz') return await sendAdmsCommand(terminal, 'reboot', {});
     }
     return { success: false, error: `reboot não suportado para ${tipo}/${fab}` };
   }
 
+  // ── getdevinfo ────────────────────────────────────────────────────────────
   if (action === 'getdevinfo') {
     if (tipo === 'websocket_cloud') {
-      const r = await sendTimmyCommand(terminal, { cmd: 'getdevcap' });
+      const r = await sendTimmyCommand(terminal, { cmd: 'getreginfo' });
       return { success: r.result === true, message: 'Info do dispositivo obtida', data: r };
     }
-    if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
-      const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
-      if (!ip) return { success: false, error: 'IP do terminal não configurado' };
-      const port = terminal.porta || 80;
-      const r = await fetch(`http://${ip}:${port}/iclock/getrequest?action=getinfo`).catch(() => null);
-      if (!r) return { success: false, error: 'Terminal não respondeu' };
-      const body = await r.text().catch(() => '');
-      return { success: r.status < 400, message: 'Info do dispositivo ZKTeco obtida', data: { sn: terminal.numero_serie, modelo: terminal.modelo, raw: body.substring(0, 500) } };
-    }
-    if (fab === 'hikvision') {
-      const r = await hikvisionRequest(terminal, 'GET', '/ISAPI/System/deviceInfo');
-      return { success: true, message: 'Info Hikvision obtida', data: r };
-    }
-    if (fab === 'dahua') {
-      const r = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo');
-      return { success: r.status === 200, message: 'Info Dahua obtida', data: r.body };
+    if (tipo === 'adms_push' || tipo === 'sdk_tcp' || ['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+      if (fab === 'hikvision') {
+        const r = await hikvisionRequest(terminal, 'GET', '/ISAPI/System/deviceInfo');
+        return { success: true, message: 'Info Hikvision obtida', data: r };
+      }
+      if (fab === 'dahua') {
+        const r = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo');
+        return { success: r.status === 200, message: 'Info Dahua obtida', data: r.body };
+      }
+      return await sendAdmsCommand(terminal, 'getdevinfo', {});
     }
     return { success: false, error: `getdevinfo não suportado para ${tipo}/${fab}` };
   }
 
+  // ── lockctrl — CRÍTICO: 3 tentativas + respeita parâmetros do agendamento ─
   if (action === 'lockctrl') {
+    // scheduleParams pode conter { fuc: 1 } guardado no agendamento
+    const fuc = scheduleParams?.fuc ?? 1;
     if (tipo === 'websocket_cloud') {
-      const r = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc: 1 });
-      return { success: r.result === true, message: 'Porta forçada aberta', data: r };
+      const r = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc }, 3); // 3 tentativas
+      const msgs = { 1: 'Porta forçada aberta (permanente)', 2: 'Porta forçada fechada', 3: 'Porta aberta temporariamente', 4: 'Relay resetado', 6: 'Alarme cancelado' };
+      return { success: r.result === true || r.result === undefined, message: msgs[fuc] || `lockctrl fuc=${fuc}`, data: r };
     }
-    return { success: false, error: 'lockctrl apenas suportado via WebSocket Cloud' };
+    return { success: false, error: 'lockctrl apenas suportado via WebSocket Cloud (Timmy)' };
   }
 
   return { success: false, error: `Ação desconhecida: ${action}` };
 }
 
-// ─── Verificar se um agendamento deve ser executado agora ────────────────────
-
+// ─── Verificar se um agendamento deve ser executado agora ─────────────────────
+/**
+ * CORRIGIDO: usa um único instante para extrair hora+dia, evitando inconsistências
+ * em transições BST/GMT. Europe/London é a timezone do utilizador.
+ */
 function shouldRunNow(schedule, now) {
-  // Usar hora local Europe/London (o utilizador agenda na sua timezone)
-  const localStr = now.toLocaleString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
-  const [hourStr, minuteStr] = localStr.split(':');
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
-  const [schedHour, schedMin] = (schedule.hora || '00:00').split(':').map(Number);
+  // Derivar todas as partes da hora local a partir de um único toLocaleString
+  const parts = now.toLocaleString('en-GB', {
+    timeZone: 'Europe/London',
+    hour: '2-digit', minute: '2-digit',
+    weekday: 'short', day: '2-digit',
+    hour12: false,
+  });
 
-  // Janela de 5 minutos (o cron corre a cada 5 min)
-  const nowMins = hour * 60 + minute;
+  // Exemplo de output: "Wed, 14/05/2026, 09:30"
+  // Mas toLocaleString com múltiplas opções pode variar; usar Intl.DateTimeFormat para ser preciso
+  const dtf = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hour: '2-digit', minute: '2-digit',
+    weekday: 'short', day: '2-digit',
+    hour12: false,
+  });
+
+  const partsList = dtf.formatToParts(now);
+  const get = (type) => partsList.find(p => p.type === type)?.value || '0';
+
+  const hour   = parseInt(get('hour'),    10);
+  const minute = parseInt(get('minute'),  10);
+  const day    = parseInt(get('day'),     10);   // dia do mês
+  const weekdayStr = get('weekday');              // 'Mon', 'Tue', etc.
+
+  const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  const weekday = dayMap[weekdayStr] ?? now.getUTCDay();
+
+  const [schedHour, schedMin] = (schedule.hora || '00:00').split(':').map(Number);
+  const nowMins   = hour   * 60 + minute;
   const schedMins = schedHour * 60 + schedMin;
+
+  // Janela de 5 minutos (cron corre a cada 5 min)
   if (Math.abs(nowMins - schedMins) > 4) return false;
 
-  // Evitar re-execução na mesma janela (se já executou nos últimos 6 minutos)
+  // Anti-duplo: se já executou nos últimos 6 minutos, não executar de novo
   if (schedule.ultima_execucao) {
     const lastRun = new Date(schedule.ultima_execucao);
     const diffMins = (now - lastRun) / 60000;
@@ -260,16 +336,11 @@ function shouldRunNow(schedule, now) {
 
   if (freq === 'semanal') {
     const dias = JSON.parse(schedule.dias_semana || '[1,2,3,4,5]');
-    // Usar dia da semana local (Europe/London) consistente com a hora local já usada acima
-    const localDayStr = now.toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
-    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
-    const localDay = dayMap[localDayStr] ?? now.getUTCDay();
-    return dias.includes(localDay);
+    return dias.includes(weekday);
   }
 
   if (freq === 'mensal') {
-    const localDate = parseInt(now.toLocaleString('en-GB', { timeZone: 'Europe/London', day: '2-digit' }), 10);
-    return localDate === (schedule.dia_mes || 1);
+    return day === (schedule.dia_mes || 1);
   }
 
   if (freq === 'unica' && schedule.data_unica) {
@@ -281,18 +352,15 @@ function shouldRunNow(schedule, now) {
   return false;
 }
 
-// ─── Handler Principal ───────────────────────────────────────────────────────
+// ─── Handler Principal ────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-
-    // Função interna — sem verificação de auth (acesso controlado pelo mainScheduler)
-    const callerEmail = 'sistema@cron';
-
     const now = new Date();
+
     const schedules = await base44.asServiceRole.entities.ScheduledAction.filter({ ativo: true });
-    
+
     const results = [];
     let executed = 0;
 
@@ -305,7 +373,9 @@ Deno.serve(async (req) => {
         if (!terminal || !terminal.ativo) {
           result = { success: false, error: 'Terminal não encontrado ou inativo' };
         } else {
-          result = await runAction(terminal, schedule.acao);
+          // Passar parâmetros extras do agendamento (ex: fuc para lockctrl)
+          const scheduleParams = schedule.params ? JSON.parse(schedule.params) : {};
+          result = await runAction(terminal, schedule.acao, scheduleParams);
         }
       } catch (err) {
         result = { success: false, error: err.message };
@@ -314,33 +384,36 @@ Deno.serve(async (req) => {
       const ts = now.toISOString();
       const sucesso = result.success !== false;
 
-      // Gravar OperationLog
-      await base44.asServiceRole.entities.OperationLog.create({
-        terminal_id: schedule.terminal_id,
-        terminal_nome: schedule.terminal_nome,
+      // Gravar log e atualizar agendamento em paralelo
+      await Promise.all([
+        base44.asServiceRole.entities.OperationLog.create({
+          terminal_id: schedule.terminal_id,
+          terminal_nome: schedule.terminal_nome,
+          acao: schedule.acao,
+          executado_por: `cron:${schedule.nome}`,
+          sucesso,
+          mensagem: result.message || result.error || 'Executado via agendamento',
+          resposta_raw: JSON.stringify(result),
+          timestamp: ts,
+        }).catch(() => {}),
+
+        base44.asServiceRole.entities.ScheduledAction.update(schedule.id, {
+          ultima_execucao: ts,
+          ultimo_resultado: sucesso ? 'sucesso' : 'falha',
+          total_execucoes: (schedule.total_execucoes || 0) + 1,
+          // Execução única: desativar após executar
+          ...(schedule.frequencia === 'unica' ? { ativo: false } : {}),
+        }).catch(() => {}),
+      ]);
+
+      results.push({
+        id: schedule.id,
+        nome: schedule.nome,
         acao: schedule.acao,
-        executado_por: `cron:${schedule.nome}`,
+        terminal: schedule.terminal_nome,
         sucesso,
-        mensagem: result.message || result.error || 'Executado via agendamento',
-        resposta_raw: JSON.stringify(result),
-        timestamp: ts,
-      }).catch(() => {});
-
-      // Atualizar agendamento
-      const updates = {
-        ultima_execucao: ts,
-        ultimo_resultado: sucesso ? 'sucesso' : 'falha',
-        total_execucoes: (schedule.total_execucoes || 0) + 1,
-      };
-
-      // Se é execução única, desativar após executar
-      if (schedule.frequencia === 'unica') {
-        updates.ativo = false;
-      }
-
-      await base44.asServiceRole.entities.ScheduledAction.update(schedule.id, updates).catch(() => {});
-
-      results.push({ id: schedule.id, nome: schedule.nome, acao: schedule.acao, terminal: schedule.terminal_nome, sucesso, msg: result.message || result.error });
+        msg: result.message || result.error,
+      });
       executed++;
     }
 

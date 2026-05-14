@@ -79,7 +79,7 @@ async function sendAdmsCommand(terminal, action, params = {}) {
  * Prioridade: ip_publico do terminal → dns → NOC_SERVER_HOST global.
  * Isto permite servidores Timmy locais/diferentes por terminal.
  */
-async function sendTimmyCommand(terminal, command, retries = 1) {
+async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
   // Usar IP/host específico do terminal se disponível, caso contrário usar o servidor global
   const host = terminal.ip_publico || terminal.dns || getNocServerHost();
   const ctrlPort = 7789;
@@ -93,14 +93,15 @@ async function sendTimmyCommand(terminal, command, retries = 1) {
   }
 
   const url = `http://${host}:${ctrlPort}/cmd`;
+  let lastError;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sn, command }),
-        signal: AbortSignal.timeout(20000), // 20s para dar tempo ao WS responder
+        signal: AbortSignal.timeout(20000), // 20s por tentativa
       });
 
       if (!resp.ok) {
@@ -115,14 +116,14 @@ async function sendTimmyCommand(terminal, command, retries = 1) {
       return data.result || { result: true };
 
     } catch (e) {
-      if (attempt < retries) {
-        console.warn(`[sendTimmyCommand] tentativa ${attempt + 1} falhou (${command.cmd}) — a repetir em 2s: ${e.message}`);
-        await new Promise(r => setTimeout(r, 2000));
-      } else {
-        throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível após ${retries + 1} tentativa(s) — ${e.message}`);
+      lastError = e;
+      if (attempt < maxAttempts) {
+        console.warn(`[sendTimmyCommand] tentativa ${attempt}/${maxAttempts} falhou (${command.cmd}) — retry em 3s: ${e.message}`);
+        await new Promise(r => setTimeout(r, 3000));
       }
     }
   }
+  throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível após ${maxAttempts} tentativa(s) — ${lastError?.message}`);
 }
 
 function buildTerminalBaseUrl(terminal) {
@@ -268,11 +269,12 @@ async function actionOpenDoor(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' });
+    // 3 tentativas para comandos críticos de acesso
+    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' }, 3);
     return { success: resp.result === true || resp.result === undefined, message: 'Porta aberta remotamente', data: resp };
   }
 
-  // Hikvision ISAPI: POST /ISAPI/AccessControl/RemoteControl/door/1 com body JSON
+  // Hikvision ISAPI: PUT /ISAPI/AccessControl/RemoteControl/door/1 com body JSON
   // Ref: Hikvision ISAPI v2.0 — Access Control Remote Control
   const hikvisionOpenDoor = async () => {
     const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1',
@@ -388,9 +390,10 @@ async function actionGetDevInfo(terminal) {
 }
 
 async function actionSetDoorStatus(terminal, params) {
-  const fuc = params?.fuc || 1;
+  const fuc = params?.fuc ?? 1;
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc });
+    // 3 tentativas para comandos críticos de controlo de porta
+    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc }, 3);
     const msgs = { 1: 'Porta forçada aberta (permanente)', 2: 'Porta forçada fechada', 3: 'Porta aberta temporariamente', 4: 'Relay resetado', 6: 'Alarme cancelado' };
     return { success: resp.result === true || resp.result === undefined, message: msgs[fuc] || `lockctrl fuc=${fuc}`, data: resp };
   }

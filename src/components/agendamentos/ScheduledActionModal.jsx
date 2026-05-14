@@ -92,8 +92,23 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
   const calcProxima = () => {
     if (!form.hora) return null;
     const [h, m] = form.hora.split(':').map(Number);
+    // Calcular próxima execução na timezone Europe/London (onde o utilizador agenda)
     const now = new Date();
-    let next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, m));
+    // Obter data local Europe/London
+    const localParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/London',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(now);
+    const year  = parseInt(localParts.find(p => p.type === 'year').value, 10);
+    const month = parseInt(localParts.find(p => p.type === 'month').value, 10) - 1;
+    const day   = parseInt(localParts.find(p => p.type === 'day').value, 10);
+    // Construir datetime "hoje às HH:MM em London"
+    const londonStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`;
+    // Converter para UTC usando o offset Europe/London
+    const candidate = new Date(londonStr + ' UTC'); // aproximação; ajustar se offset != 0
+    // Usar Intl para converter corretamente
+    const tzDate = new Date(new Date(londonStr).toLocaleString('en-US', { timeZone: 'Europe/London' }));
+    let next = new Date(now.getTime() + (new Date(londonStr) - tzDate));
     if (next <= now) next = new Date(next.getTime() + 86400000);
     return next.toISOString();
   };
@@ -192,7 +207,7 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
             </div>
             {form.frequencia !== 'unica' && (
               <div className="space-y-1">
-                <Label>Hora (UTC) *</Label>
+                <Label>Hora (Europe/London) *</Label>
                 <Input type="time" value={form.hora} onChange={e => setForm(f => ({ ...f, hora: e.target.value }))} />
               </div>
             )}
@@ -233,7 +248,7 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
           {/* Data única */}
           {form.frequencia === 'unica' && (
             <div className="space-y-1">
-              <Label>Data e Hora (UTC) *</Label>
+              <Label>Data e Hora (Europe/London) *</Label>
               <Input type="datetime-local" value={form.data_unica} onChange={e => setForm(f => ({ ...f, data_unica: e.target.value }))} />
             </div>
           )}

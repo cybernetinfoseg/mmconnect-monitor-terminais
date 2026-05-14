@@ -47,14 +47,14 @@ const FREQ_LABELS = {
 const DIAS_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 function formatFrequencia(sched) {
-  if (sched.frequencia === 'diaria') return `Diária às ${sched.hora} UTC`;
+  if (sched.frequencia === 'diaria') return `Diária às ${sched.hora}`;
   if (sched.frequencia === 'semanal') {
     try {
       const dias = JSON.parse(sched.dias_semana || '[]').map(d => DIAS_LABELS[d]).join(', ');
-      return `${dias} às ${sched.hora} UTC`;
-    } catch { return `Semanal às ${sched.hora} UTC`; }
+      return `${dias} às ${sched.hora}`;
+    } catch { return `Semanal às ${sched.hora}`; }
   }
-  if (sched.frequencia === 'mensal') return `Dia ${sched.dia_mes} de cada mês às ${sched.hora} UTC`;
+  if (sched.frequencia === 'mensal') return `Dia ${sched.dia_mes} de cada mês às ${sched.hora}`;
   if (sched.frequencia === 'unica' && sched.data_unica) return moment(sched.data_unica).format('DD/MM/YY HH:mm');
   return sched.frequencia;
 }
@@ -281,7 +281,7 @@ export default function Agendamentos() {
       {/* Info */}
       <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
-        <p>As ações são executadas automaticamente pelo sistema a cada 5 minutos. Os resultados ficam registados nos <strong>Logs de Operação</strong> de cada terminal. Os horários são em <strong>UTC</strong>.</p>
+        <p>As ações são executadas automaticamente pelo sistema a cada 5 minutos. Os resultados ficam registados nos <strong>Logs de Operação</strong> de cada terminal. Os horários são na timezone <strong>Europe/London</strong>. Comandos críticos (abrir porta, lockctrl) têm <strong>3 tentativas automáticas</strong> em caso de falha.</p>
       </div>
 
       {/* Ativos */}
