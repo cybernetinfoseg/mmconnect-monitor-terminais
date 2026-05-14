@@ -229,8 +229,7 @@ async function actionGetLogs(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getnewlog', stn: true }).catch(() => null);
-    if (!resp) return { success: false, message: 'Terminal não respondeu ao pedido de logs.' };
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getnewlog', stn: true });
     const records = resp.record || [];
     return { success: resp.result === true, message: `${resp.count || 0} marcações recolhidas`, count: resp.count || 0, records: records.slice(0, 50) };
   }
@@ -339,12 +338,7 @@ async function actionGetDevInfo(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getreginfo' }).catch(async () =>
-      await sendTimmyCommand(terminal, { cmd: 'getdevcap' }).catch(() => null)
-    );
-    if (!resp) {
-      return { success: true, message: 'Info do terminal (registo local)', data: { sn: terminal.numero_serie, modelo: terminal.modelo, fabricante: terminal.fabricante, tipo_conexao: tipo } };
-    }
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getreginfo' });
     return {
       success: resp.result === true,
       message: 'Informação do dispositivo obtida',
@@ -509,8 +503,7 @@ async function actionGetUserInfo(terminal, params) {
 async function actionGetAllLogs(terminal, params) {
   const { count = 200 } = params || {};
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getalllog apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'getalllog', count }).catch(() => null);
-  if (!resp) return { success: false, message: 'Terminal não respondeu ao pedido de logs.' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getalllog', count });
   const records = resp.record || [];
   return { success: resp.result === true, message: `${records.length} marcações obtidas (total: ${resp.count || records.length})`, count: records.length, records: records.slice(0, 50) };
 }
@@ -529,8 +522,7 @@ async function actionClearUsers(terminal) {
 
 async function actionGetParam(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getparam apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'getterminalparameter' }).catch(() => null);
-  if (!resp) return { success: false, message: 'Terminal não respondeu' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getterminalparameter' });
   return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
 }
 
