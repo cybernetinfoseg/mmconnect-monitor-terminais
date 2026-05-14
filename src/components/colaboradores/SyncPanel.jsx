@@ -5,10 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   RefreshCw, Upload, Download, CheckCircle2, XCircle,
-  Loader2, AlertTriangle, Users, ArrowDownUp
+  Loader2, AlertTriangle, ArrowDownUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getTimmyCapabilities, resolvePrimaryBackupnum } from '@/lib/timmyModels';
 
 /**
  * SyncPanel — Sincronização bidirecional entre Sistema (BD) e Terminais Timmy.
@@ -34,25 +35,26 @@ export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh 
     const usersToSend = allUsers.filter(u => u.ativo !== false);
     if (!usersToSend.length) { toast.error('Sem colaboradores ativos para enviar'); return; }
 
+    const terminalObj = terminals.find(t => t.id === syncTerminalId);
+    const cap = getTimmyCapabilities(terminalObj?.modelo);
+
     setSyncing(true); setSyncDir('push');
-    setSyncProgress({ done: 0, total: usersToSend.length, label: 'A enviar para terminal' });
+    setSyncProgress({ done: 0, total: usersToSend.length, label: `A enviar para ${cap.name}` });
     setSyncResults(null);
 
     let ok = 0, fail = 0;
     const details = [];
     for (const user of usersToSend) {
-      try {
-        const bioTypes = (() => { try { return JSON.parse(user.bio_types || '[]'); } catch { return []; } })();
-        // Determine backupnum: prefer face(15) > card(11) > password(10) > fp(1)
-        let backupnum = bioTypes.includes(15) ? 15 : bioTypes.includes(11) ? 11 : bioTypes.includes(10) ? 10 : bioTypes[0] || 10;
-        let record = 0;
-        if (backupnum === 11) record = Number(user.card) || 0;
-        if (backupnum === 10) record = Number(user.password) || 0;
+    try {
+      const bioTypes = (() => { try { return JSON.parse(user.bio_types || '[]'); } catch { return []; } })();
+      // Filtrar bioTypes apenas pelos suportados pelo modelo do terminal
+      const supportedTypes = bioTypes.filter(bt => cap.supportedBackupnums.includes(bt));
+      const { backupnum, record } = resolvePrimaryBackupnum(supportedTypes.length ? supportedTypes : bioTypes, user);
 
-        const resp = await base44.functions.invoke('terminalControl', {
-          terminal_id: syncTerminalId, action: 'adduser',
-          params: { enrollid: user.enrollid, name: user.nome, password: user.password || '', card: user.card || '', privilege: user.privilege || 0 }
-        });
+      const resp = await base44.functions.invoke('terminalControl', {
+        terminal_id: syncTerminalId, action: 'adduser',
+        params: { enrollid: user.enrollid, name: user.nome, password: user.password || '', card: user.card || '', privilege: user.privilege || 0 }
+      });
         const success = resp.data?.success;
         success ? ok++ : fail++;
         details.push({ nome: user.nome, enrollid: user.enrollid, success, message: resp.data?.message || resp.data?.error });
@@ -162,14 +164,19 @@ export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh 
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— Escolher terminal —</SelectItem>
-                  {timmyTerminals.map(t => (
-                    <SelectItem key={t.id} value={t.id}>
-                      <div className="flex items-center gap-2">
-                        <span className={cn('w-2 h-2 rounded-full shrink-0', t.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300')} />
-                        {t.nome} {t.local ? `— ${t.local}` : ''}
-                      </div>
-                    </SelectItem>
-                  ))}
+                  {timmyTerminals.map(t => {
+                    const cap = getTimmyCapabilities(t.modelo);
+                    return (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div className="flex items-center gap-2">
+                          <span className={cn('w-2 h-2 rounded-full shrink-0', t.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300')} />
+                          <span>{t.nome}</span>
+                          <span className="text-slate-400 text-xs">{cap.icon} {cap.name}</span>
+                          {t.local && <span className="text-slate-300 text-xs">— {t.local}</span>}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

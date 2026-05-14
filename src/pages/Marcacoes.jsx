@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const MODO_LABELS = { fp: '🖐️ FP', face: '😊 Face', card: '💳 Cartão', pw: '🔑 Senha', 1: '🖐️ FP', 3: '💳 Cartão', 8: '😊 Face', 15: '🔑 Senha' };
+import { getModeInfo, getTimmyCapabilities } from '@/lib/timmyModels';
+
 const TIPO_COLORS = { entrada: 'bg-emerald-100 text-emerald-700 border-emerald-200', saida: 'bg-rose-100 text-rose-700 border-rose-200', desconhecido: 'bg-slate-100 text-slate-600 border-slate-200' };
 
 export default function Marcacoes() {
@@ -114,17 +115,43 @@ export default function Marcacoes() {
     naoExportadas: filtered.filter(m => !m.exportado).length,
   }), [filtered]);
 
+  // Converte raw_mode Timmy para string de modo e tipo de marcação
+  const resolveMode = (rawMode, terminal) => {
+    const cap = getTimmyCapabilities(terminal?.modelo);
+    // modo string legível
+    let modo = String(rawMode ?? '');
+    if (rawMode >= 1 && rawMode <= 9) modo = 'fp';
+    else if (rawMode === 10) modo = 'pw';
+    else if (rawMode === 11) modo = 'card';
+    else if (rawMode === 15) modo = 'face';
+    else if (rawMode === 20) modo = 'face'; // face+fp → face
+    return modo;
+  };
+
   const collectFromTerminal = async (terminal) => {
-    const resp = await base44.functions.invoke('terminalControl', { terminal_id: terminal.id, action: 'getlogs' });
+    // TM-AI08 (face only) e outros: usar getnewlog que traz logs incrementais
+    // Para terminais FP-only: getlogs traz todos; para face: getnewlog é mais eficiente
+    const cap = getTimmyCapabilities(terminal?.modelo);
+    const action = terminal.tipo_conexao === 'websocket_cloud' ? 'getlogs' : 'getlogs';
+    const resp = await base44.functions.invoke('terminalControl', { terminal_id: terminal.id, action });
     const data = resp.data;
     if (data?.success && data.records?.length) {
-      const toSave = data.records.map(r => ({
-        terminal_id: terminal.id, terminal_nome: terminal.nome,
-        enrollid: r.enrollid, utilizador_nome: userMap[r.enrollid] || '',
-        timestamp: r.time || new Date().toISOString(),
-        modo: r.mode === 1 ? 'fp' : r.mode === 3 ? 'card' : r.mode === 8 ? 'face' : r.mode === 15 ? 'pw' : String(r.mode),
-        raw_mode: r.mode, tipo: 'desconhecido', local: terminal.local || '', exportado: false,
-      }));
+      const toSave = data.records.map(r => {
+        const rawMode = r.mode ?? r.Mode ?? r.verifyType;
+        const modo = resolveMode(rawMode, terminal);
+        // Determinar tipo entrada/saída pelo campo inout (0=entrada, 1=saída) se disponível
+        let tipo = 'desconhecido';
+        if (r.inout === 0 || r.InOutStatus === 0) tipo = 'entrada';
+        else if (r.inout === 1 || r.InOutStatus === 1) tipo = 'saida';
+        return {
+          terminal_id: terminal.id, terminal_nome: terminal.nome,
+          enrollid: r.enrollid ?? r.EnrollNumber,
+          utilizador_nome: userMap[r.enrollid ?? r.EnrollNumber] || '',
+          timestamp: r.time ?? r.Time ?? new Date().toISOString(),
+          modo, raw_mode: rawMode, tipo,
+          local: terminal.local || '', exportado: false,
+        };
+      });
       await base44.entities.Marcacao.bulkCreate(toSave);
       return toSave.length;
     }
@@ -315,15 +342,24 @@ export default function Marcacoes() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {filteredCollectTerminals.map(t => (
+                {filteredCollectTerminals.map(t => {
+                  const cap = getTimmyCapabilities(t.modelo);
+                  const isTimmy = t.tipo_conexao === 'websocket_cloud';
+                  return (
                     <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
-                      className={cn('text-xs gap-1.5', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
-                      {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                      {t.nome}
-                      {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
+                      className={cn('text-xs gap-1.5 flex-col h-auto py-1.5 px-2.5 items-start', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
+                      <div className="flex items-center gap-1.5">
+                        {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                        <span className="font-medium">{t.nome}</span>
+                        {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
+                      </div>
+                      {isTimmy && (
+                        <span className="text-slate-400 text-[10px] font-normal">{cap.icon} {cap.name !== 'Timmy Genérico' ? cap.name : cap.description}</span>
+                      )}
                     </Button>
-                ))}
-              </div>
+                  );
+                })}
+               </div>
             </CardContent>
           </Card>
         )}
@@ -382,17 +418,26 @@ export default function Marcacoes() {
                 <tbody className="divide-y divide-slate-100">
                   {filtered.slice(0, 300).map((m, i) => {
                     const nome = m.utilizador_nome || userMap[m.enrollid] || `ID:${m.enrollid}`;
-                    const modoLabel = MODO_LABELS[m.modo] || MODO_LABELS[m.raw_mode] || m.modo || '—';
+                    const modeInfo = getModeInfo(m.modo, m.raw_mode);
+                    const terminal = terminals.find(t => t.id === m.terminal_id);
+                    const cap = terminal ? getTimmyCapabilities(terminal.modelo) : null;
                     return (
                       <tr key={m.id || i} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? format(new Date(m.timestamp), 'dd/MM/yy HH:mm:ss') : '—'}</td>
                         <td className="px-4 py-2.5">
-                          <p className="text-xs font-medium text-slate-800 truncate max-w-[100px] lg:max-w-[140px]">{m.terminal_nome || '—'}</p>
+                          <p className="text-xs font-medium text-slate-800 truncate max-w-[100px] lg:max-w-[160px]">{m.terminal_nome || '—'}</p>
                           {m.local && <p className="text-xs text-slate-400 truncate">{m.local}</p>}
+                          {cap && cap.name !== 'Timmy Genérico' && (
+                            <p className="text-xs text-slate-300 truncate hidden lg:block">{cap.icon} {cap.name}</p>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{m.enrollid}</td>
                         <td className="px-4 py-2.5 text-xs font-medium text-slate-700 max-w-[120px] truncate">{nome}</td>
-                        <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{modoLabel}</td>
+                        <td className="px-4 py-2.5 hidden md:table-cell">
+                          <Badge className={cn('text-xs', modeInfo.color)}>
+                            {modeInfo.icon} {modeInfo.label}
+                          </Badge>
+                        </td>
                         <td className="px-4 py-2.5"><Badge className={cn('text-xs', TIPO_COLORS[m.tipo] || TIPO_COLORS.desconhecido)}>{m.tipo || 'desconhecido'}</Badge></td>
                         <td className="px-4 py-2.5 hidden lg:table-cell">{m.exportado ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-slate-300" />}</td>
                       </tr>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -6,12 +6,13 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Camera, CreditCard, Fingerprint, KeyRound, User, Building2, Briefcase, Mail, Hash, Shield, ScanFace, X } from 'lucide-react';
+import { Camera, CreditCard, Fingerprint, KeyRound, User, Building2, Briefcase, Mail, Hash, Shield, ScanFace, X, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getTimmyCapabilities, getSupportedBioTypes, ALL_BIO_TYPES } from '@/lib/timmyModels';
 
 /**
  * Formulário completo de colaborador para terminais Timmy (Face ID + Biometria).
- * Suporta captura de foto via câmara do computador ou telemóvel.
+ * Adapta os campos de biometria disponíveis com base nos modelos dos terminais selecionados.
  */
 export default function ColaboradorForm({ formData, setFormData, terminals, selectedTerminals, setSelectedTerminals, filteredDialogTerminals, isAdmin, appUsers, filterDialogTerminalOwner, setFilterDialogTerminalOwner }) {
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -21,15 +22,24 @@ export default function ColaboradorForm({ formData, setFormData, terminals, sele
 
   const setField = (key, value) => setFormData(f => ({ ...f, [key]: value }));
 
-  // Biometric types for Timmy (backupnum values)
-  const BIOMETRIC_TYPES = [
-    { value: 1,  label: 'Impressão Digital 1',  icon: '🖐️' },
-    { value: 2,  label: 'Impressão Digital 2',  icon: '🖐️' },
-    { value: 3,  label: 'Impressão Digital 3',  icon: '🖐️' },
-    { value: 10, label: 'Senha Numérica',        icon: '🔑' },
-    { value: 11, label: 'Cartão RFID',           icon: '💳' },
-    { value: 15, label: 'Face ID',               icon: '😊' },
-  ];
+  // Calcular capacidades combinadas dos terminais selecionados
+  const terminalCapabilities = useMemo(() => {
+    const selectedT = terminals.filter(t => selectedTerminals.includes(t.id) && t.tipo_conexao === 'websocket_cloud');
+    if (!selectedT.length) return null;
+    // União das capacidades de todos os terminais selecionados
+    const caps = selectedT.map(t => getTimmyCapabilities(t.modelo));
+    const allBackupnums = new Set(caps.flatMap(c => c.supportedBackupnums));
+    const hasFace = caps.some(c => c.hasFace);
+    const hasFP = caps.some(c => c.hasFingerprint);
+    const models = [...new Set(caps.map(c => c.name))];
+    return { allBackupnums, hasFace, hasFP, models };
+  }, [terminals, selectedTerminals]);
+
+  // Tipos biométricos disponíveis: se há terminais Timmy selecionados, filtrar pelas capacidades
+  const BIOMETRIC_TYPES = useMemo(() => {
+    if (!terminalCapabilities) return ALL_BIO_TYPES;
+    return ALL_BIO_TYPES.filter(bt => terminalCapabilities.allBackupnums.has(bt.value));
+  }, [terminalCapabilities]);
 
   const selectedBioTypes = (() => {
     try { return JSON.parse(formData.bio_types || '[]'); } catch { return []; }
@@ -153,6 +163,17 @@ export default function ColaboradorForm({ formData, setFormData, terminals, sele
           <Fingerprint className="h-4 w-4 text-teal-600" />
           <span className="text-sm font-semibold text-slate-700">Credenciais Biométricas (Timmy Face ID)</span>
         </div>
+        {terminalCapabilities && (
+          <div className="flex items-start gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg mb-3">
+            <Info className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+            <div className="text-xs text-blue-700">
+              <span className="font-semibold">Terminais selecionados: </span>
+              {terminalCapabilities.models.join(', ')} — 
+              {terminalCapabilities.hasFace && ' 😊 Face ID'}
+              {terminalCapabilities.hasFP && ' 🖐️ Impressão Digital'}
+            </div>
+          </div>
+        )}
         <p className="text-xs text-slate-500 mb-3">Selecione os tipos de acesso configurados neste colaborador</p>
         <div className="grid grid-cols-3 gap-2 mb-3">
           {BIOMETRIC_TYPES.map(bt => (

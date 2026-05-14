@@ -1,0 +1,192 @@
+/**
+ * Timmy Terminal Models — Capacidades por tipo de modelo WebSocket Cloud
+ *
+ * Baseado nos produtos oficiais Timmy (sztimmy.net):
+ *   - TM-AI07F  : Face + Fingerprint (Omniface Mid-Range)
+ *   - TM-AI08   : Face Only (Maxface High-End, sem FP)
+ *   - TM-AIFace11F : Face + Fingerprint (série superior ao AI07F)
+ *   - TFS50/TM3800/TM20 : Fingerprint Only (sem câmara Face)
+ *   - Genérico WS : capacidades desconhecidas → mostrar tudo
+ *
+ * Protocolo WebSocket Timmy — campo `mode` nos logs de marcação:
+ *   1-9  → Impressão Digital (FP dedos 1-9)
+ *   10   → Senha numérica
+ *   11   → Cartão RFID
+ *   15   → Face ID
+ *   20   → Face + FP combinado
+ *
+ * Protocolo `setuserinfo` — campo `backupnum`:
+ *   1-9  → FP (dedo 1 a 9)
+ *   10   → Senha
+ *   11   → Cartão RFID
+ *   15   → Face ID
+ */
+
+// Mapeamento modo → label visual
+export const TIMMY_MODE_LABELS = {
+  1:  { label: 'FP Dedo 1',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  2:  { label: 'FP Dedo 2',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  3:  { label: 'FP Dedo 3',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  4:  { label: 'FP Dedo 4',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  5:  { label: 'FP Dedo 5',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  6:  { label: 'FP Dedo 6',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  7:  { label: 'FP Dedo 7',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  8:  { label: 'FP Dedo 8',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  9:  { label: 'FP Dedo 9',   icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  10: { label: 'Senha',        icon: '🔑', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  11: { label: 'Cartão RFID', icon: '💳', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  15: { label: 'Face ID',     icon: '😊', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  20: { label: 'Face+FP',     icon: '🔐', color: 'bg-teal-100 text-teal-700 border-teal-200' },
+  // Legacy string keys (backward compat)
+  fp:   { label: 'Impressão Digital', icon: '🖐️', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  face: { label: 'Face ID',           icon: '😊', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  card: { label: 'Cartão RFID',       icon: '💳', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  pw:   { label: 'Senha',             icon: '🔑', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+};
+
+export function getModeInfo(mode, rawMode) {
+  // Try numeric rawMode first, then string mode
+  const key = rawMode ?? mode;
+  return TIMMY_MODE_LABELS[key] || TIMMY_MODE_LABELS[mode] || { label: String(mode || '—'), icon: '?', color: 'bg-slate-100 text-slate-500 border-slate-200' };
+}
+
+// Capacidades por modelo (baseado no nome do modelo registado no terminal)
+// Compara com terminal.modelo (campo livre — verificação por substring)
+const MODEL_CAPABILITIES = [
+  {
+    // TM-AI07F — Face + Fingerprint (Omniface Mid-Range)
+    match: ['ai07f', 'ai07', 'omniface'],
+    name: 'TM-AI07F',
+    series: 'Omniface Mid-Range',
+    hasFace: true,
+    hasFingerprint: true,
+    hasCard: true,
+    hasPassword: true,
+    maxUsers: 3000,
+    maxFaceUsers: 3000,
+    maxFpUsers: 3000,
+    maxLogs: 100000,
+    supportedBackupnums: [1, 2, 3, 4, 5, 10, 11, 15],
+    icon: '😊🖐️',
+    description: 'Face + Impressão Digital',
+  },
+  {
+    // TM-AIFace11F — Face + Fingerprint (série superior)
+    match: ['aiface11f', 'face11f', 'ai11f'],
+    name: 'TM-AIFace11F',
+    series: 'Omniface High-End',
+    hasFace: true,
+    hasFingerprint: true,
+    hasCard: true,
+    hasPassword: true,
+    maxUsers: 5000,
+    maxFaceUsers: 5000,
+    maxFpUsers: 5000,
+    maxLogs: 200000,
+    supportedBackupnums: [1, 2, 3, 4, 5, 10, 11, 15],
+    icon: '😊🖐️',
+    description: 'Face + Impressão Digital (série superior)',
+  },
+  {
+    // TM-AI08 — Face Only (sem sensor FP)
+    match: ['ai08', 'maxface'],
+    name: 'TM-AI08',
+    series: 'Maxface High-End',
+    hasFace: true,
+    hasFingerprint: false,
+    hasCard: true,
+    hasPassword: true,
+    maxUsers: 50000,
+    maxFaceUsers: 50000,
+    maxFpUsers: 0,
+    maxLogs: 500000,
+    supportedBackupnums: [10, 11, 15],
+    icon: '😊',
+    description: 'Face ID Only (sem impressão digital)',
+  },
+  {
+    // TFS50 / TM3800 / TM20 — Fingerprint Only
+    match: ['tfs50', 'tm3800', 'tm20', 'tfs', 'fingerprint only'],
+    name: 'TFS50/TM3800',
+    series: 'Fingerprint Only',
+    hasFace: false,
+    hasFingerprint: true,
+    hasCard: true,
+    hasPassword: true,
+    maxUsers: 3000,
+    maxFaceUsers: 0,
+    maxFpUsers: 3000,
+    maxLogs: 100000,
+    supportedBackupnums: [1, 2, 3, 4, 5, 10, 11],
+    icon: '🖐️',
+    description: 'Impressão Digital (sem Face ID)',
+  },
+];
+
+const GENERIC_CAPABILITIES = {
+  name: 'Timmy Genérico',
+  series: 'WebSocket Cloud',
+  hasFace: true,
+  hasFingerprint: true,
+  hasCard: true,
+  hasPassword: true,
+  maxUsers: null,
+  maxFaceUsers: null,
+  maxFpUsers: null,
+  maxLogs: null,
+  supportedBackupnums: [1, 2, 3, 4, 5, 10, 11, 15, 20],
+  icon: '📟',
+  description: 'Capacidades não determinadas',
+};
+
+/**
+ * Retorna as capacidades do terminal com base no campo modelo.
+ * @param {string} modelo - terminal.modelo
+ * @returns {object} capabilities
+ */
+export function getTimmyCapabilities(modelo) {
+  if (!modelo) return GENERIC_CAPABILITIES;
+  const m = modelo.toLowerCase().replace(/[-\s]/g, '');
+  for (const cap of MODEL_CAPABILITIES) {
+    if (cap.match.some(k => m.includes(k.replace(/[-\s]/g, '')))) {
+      return cap;
+    }
+  }
+  return GENERIC_CAPABILITIES;
+}
+
+/**
+ * Dado o modelo do terminal, retorna os tipos biométricos suportados para o formulário de colaborador.
+ */
+export const ALL_BIO_TYPES = [
+  { value: 1,  label: 'FP — Dedo 1',     icon: '🖐️', group: 'fp' },
+  { value: 2,  label: 'FP — Dedo 2',     icon: '🖐️', group: 'fp' },
+  { value: 3,  label: 'FP — Dedo 3',     icon: '🖐️', group: 'fp' },
+  { value: 4,  label: 'FP — Dedo 4',     icon: '🖐️', group: 'fp' },
+  { value: 5,  label: 'FP — Dedo 5',     icon: '🖐️', group: 'fp' },
+  { value: 10, label: 'Senha Numérica',  icon: '🔑', group: 'pw' },
+  { value: 11, label: 'Cartão RFID',     icon: '💳', group: 'card' },
+  { value: 15, label: 'Face ID',         icon: '😊', group: 'face' },
+  { value: 20, label: 'Face + FP',       icon: '🔐', group: 'face_fp' },
+];
+
+export function getSupportedBioTypes(modelo) {
+  const cap = getTimmyCapabilities(modelo);
+  return ALL_BIO_TYPES.filter(bt => cap.supportedBackupnums.includes(bt.value));
+}
+
+/**
+ * Para o `setuserinfo` Timmy, escolhe o melhor backupnum com base nos tipos selecionados pelo colaborador.
+ * Prioridade: face(15) > face+fp(20) > fp(1-5) > card(11) > pw(10)
+ */
+export function resolvePrimaryBackupnum(bioTypes = [], user = {}) {
+  if (bioTypes.includes(15)) return { backupnum: 15, record: 0 };
+  if (bioTypes.includes(20)) return { backupnum: 20, record: 0 };
+  if ([1,2,3,4,5].some(v => bioTypes.includes(v))) {
+    const fp = [1,2,3,4,5].find(v => bioTypes.includes(v));
+    return { backupnum: fp, record: 0 };
+  }
+  if (bioTypes.includes(11)) return { backupnum: 11, record: Number(user.card) || 0 };
+  if (bioTypes.includes(10)) return { backupnum: 10, record: 0 };
+  return { backupnum: 10, record: 0 };
+}
