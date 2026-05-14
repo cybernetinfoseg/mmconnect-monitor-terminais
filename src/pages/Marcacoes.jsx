@@ -4,8 +4,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import {
   ClipboardList, Search, Download, RefreshCw,
-  User, Loader2, Upload, CheckCircle2, XCircle
+  User, Loader2, Upload, CheckCircle2, XCircle, BarChart2
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 import { getModeInfo, getTimmyCapabilities } from '@/lib/timmyModels';
+import RelatorioPorColaborador from '@/components/marcacoes/RelatorioPorColaborador';
 
 const TIPO_COLORS = { entrada: 'bg-emerald-100 text-emerald-700 border-emerald-200', saida: 'bg-rose-100 text-rose-700 border-rose-200', desconhecido: 'bg-slate-100 text-slate-600 border-slate-200' };
 
@@ -364,6 +366,26 @@ export default function Marcacoes() {
           </Card>
         )}
 
+        {/* Main content tabs */}
+        <Tabs defaultValue="lista">
+          <TabsList className="mb-2">
+            <TabsTrigger value="lista" className="gap-1.5 text-xs"><ClipboardList className="h-3.5 w-3.5" />Lista</TabsTrigger>
+            <TabsTrigger value="colaboradores" className="gap-1.5 text-xs"><BarChart2 className="h-3.5 w-3.5" />Por Colaborador</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="colaboradores">
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <RelatorioPorColaborador
+                marcacoes={filtered}
+                userMap={userMap}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="lista">
+
         {/* Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
           <div className="relative sm:col-span-2 lg:col-span-1">
@@ -457,6 +479,9 @@ export default function Marcacoes() {
             </div>
           </Card>
         )}
+          </TabsContent>
+        </Tabs>
+
       </div>
     </div>
   );

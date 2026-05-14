@@ -501,11 +501,25 @@ async function actionGetUserInfo(terminal, params) {
 }
 
 async function actionGetAllLogs(terminal, params) {
-  const { count = 200 } = params || {};
+  const { count = 200, from, to } = params || {};
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getalllog apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'getalllog', count });
+  // Se datas fornecidas, usar getlog com from/to; caso contrário getalllog
+  let cmd;
+  if (from || to) {
+    cmd = { cmd: 'getlog', count, stn: true };
+    if (from) cmd.from = from; // formato: "YYYY-MM-DD HH:MM:SS"
+    if (to)   cmd.to   = to;
+  } else {
+    cmd = { cmd: 'getalllog', count };
+  }
+  const resp = await sendTimmyCommand(terminal, cmd);
   const records = resp.record || [];
-  return { success: resp.result === true, message: `${records.length} marcações obtidas (total: ${resp.count || records.length})`, count: records.length, records: records.slice(0, 50) };
+  return {
+    success: resp.result === true,
+    message: `${records.length} marcações obtidas (total: ${resp.count || records.length})${from ? ` — de ${from}` : ''}${to ? ` até ${to}` : ''}`,
+    count: records.length,
+    records: records.slice(0, 200),
+  };
 }
 
 async function actionClearLogs(terminal) {

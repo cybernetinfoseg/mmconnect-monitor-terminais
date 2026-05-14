@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket Cloud (Protocolo Timmy/THbio)
-# ✅ VERSÃO CORRIGIDA v2: Grace period para evitar falsos OFFLINE durante reconexão
+# ✅ VERSÃO v3: Envia marcações (sendlog) ao nocServerReport para guardá-las automaticamente
 # Compatível com: Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros modelos THbio
 # Protocolo: WebSocket + JSON (RFC 6455) — porta padrão 7788 (configurável)
 #
@@ -76,6 +76,9 @@ ws_conn_lock   = threading.Lock()
 pending_commands = {}
 pending_lock     = threading.Lock()
 
+# Config global (usado nas threads de marcações)
+_current_config = {}
+
 
 # ──────────────────────────────────────────────────────────────
 # Logging
@@ -110,7 +113,7 @@ def listar_terminais_ws(app_id, api_key):
     terminais = [t for t in data.get("terminals", []) if t.get("tipo_conexao") == "websocket_cloud"]
     return terminais
 
-def reportar_status_ws(app_id, api_key, terminal_id, status, latencia_ms=None, segundos_sem_ping=0):
+def reportar_status_ws(app_id, api_key, terminal_id, status, latencia_ms=None, segundos_sem_ping=0, marcacoes=None):
     url = f"{BASE_URL.format(app_id=app_id)}/nocServerReport"
     payload = {
         "terminal_id":       terminal_id,
@@ -118,9 +121,71 @@ def reportar_status_ws(app_id, api_key, terminal_id, status, latencia_ms=None, s
         "latencia_ms":       latencia_ms,
         "segundos_sem_ping": segundos_sem_ping,
     }
-    r = requests.post(url, headers=_headers(api_key), json=payload, timeout=10)
+    if marcacoes:
+        payload["marcacoes"] = marcacoes
+    r = requests.post(url, headers=_headers(api_key), json=payload, timeout=15)
     r.raise_for_status()
     return r.json()
+
+
+# Mapeamento raw_mode → string de modo (protocolo Timmy/THbio)
+MODE_MAP = {
+    **{i: "fp"   for i in range(1, 10)},  # dedos 1-9
+    10: "pw",
+    11: "card",
+    15: "face",
+    20: "face",  # face+fp combinado → face
+}
+
+def parse_record(r, terminal_id):
+    """Normaliza um registo sendlog do terminal para o formato da entidade Marcacao."""
+    enrollid  = r.get("enrollid") or r.get("EnrollNumber") or r.get("id") or 0
+    raw_ts    = r.get("time") or r.get("Time") or r.get("timestamp") or ""
+    # Converter timestamp "YYYY-MM-DD HH:MM:SS" → ISO 8601
+    try:
+        import datetime
+        ts = datetime.datetime.strptime(raw_ts, "%Y-%m-%d %H:%M:%S").isoformat() if raw_ts else None
+    except Exception:
+        ts = raw_ts or None
+
+    raw_mode  = r.get("mode") or r.get("Mode") or r.get("verifytype") or 0
+    try:
+        raw_mode = int(raw_mode)
+    except Exception:
+        raw_mode = 0
+
+    mode_str  = MODE_MAP.get(raw_mode, f"modo_{raw_mode}")
+
+    inout_raw = r.get("inout") if "inout" in r else r.get("InOutStatus")
+    if inout_raw == 0:
+        inout = "entrada"
+    elif inout_raw == 1:
+        inout = "saida"
+    else:
+        inout = "desconhecido"
+
+    return {
+        "enrollid":  int(enrollid),
+        "timestamp": ts,
+        "mode":      mode_str,
+        "raw_mode":  raw_mode,
+        "inout":     inout,
+    }
+
+
+def reportar_marcacoes(app_id, api_key, terminal_id, status, records):
+    """Envia marcações ao nocServerReport numa thread separada (não bloqueia o loop WS)."""
+    if not records:
+        return
+    marcacoes = [parse_record(r, terminal_id) for r in records if r]
+    marcacoes = [m for m in marcacoes if m.get("timestamp")]  # filtrar sem timestamp
+    if not marcacoes:
+        return
+    try:
+        reportar_status_ws(app_id, api_key, terminal_id, status, marcacoes=marcacoes)
+        logger.info(f"[REPORT-WS] {len(marcacoes)} marcações enviadas ao nocServerReport para terminal {terminal_id}")
+    except Exception as e:
+        logger.error(f"[REPORT-WS] Erro ao enviar marcações: {e}")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -192,18 +257,28 @@ async def handle_terminal(websocket):
                 # Terminal enviou logs de presença: heartbeat implícito
                 if not sn:
                     sn = msg_sn
-                count   = msg.get("count", 0)
-                records = msg.get("record", [])
+                count    = msg.get("count", 0)
+                records  = msg.get("record", [])
                 logindex = msg.get("logindex", 0)
+                tid      = sn_to_terminal.get(sn)
 
-                if sn and sn in sn_to_terminal:
+                if sn and tid:
                     with ws_lock:
                         if sn in ws_state:
                             ws_state[sn]["last_seen"] = time.time()
                             ws_state[sn]["connected"] = True
                             ws_state[sn]["disconnected_at"] = None  # cancelar grace period
 
-                logger.info(f"[WS] SENDLOG SN={sn} count={count} logindex={logindex}")
+                    # Enviar marcações ao nocServerReport em thread separada
+                    if records:
+                        cfg_snap = _current_config.copy() if _current_config else {}
+                        threading.Thread(
+                            target=reportar_marcacoes,
+                            args=(cfg_snap.get("APP_ID"), cfg_snap.get("API_KEY"), tid, "online", records),
+                            daemon=True
+                        ).start()
+
+                logger.info(f"[WS] SENDLOG SN={sn} count={count} logindex={logindex} → {len(records)} registos")
 
                 await websocket.send(json.dumps({
                     "ret": "sendlog",
@@ -361,7 +436,41 @@ class CtrlHandler(BaseHTTPRequestHandler):
         if self.path == "/status":
             with ws_conn_lock:
                 connected_sns = list(ws_connections.keys())
-            self._respond(200, {"connected_terminals": connected_sns, "count": len(connected_sns)})
+            # Enriquecer com nomes e estado
+            terminals_info = []
+            with ws_lock:
+                for sn in connected_sns:
+                    estado = ws_state.get(sn, {})
+                    terminals_info.append({
+                        "sn": sn,
+                        "terminal_id": estado.get("terminal_id"),
+                        "nome": estado.get("nome", sn),
+                        "connected": estado.get("connected", False),
+                        "last_seen": estado.get("last_seen", 0),
+                        "segundos_sem_ping": int(time.time() - estado.get("last_seen", time.time())) if estado.get("last_seen") else 0,
+                    })
+            self._respond(200, {"connected_terminals": terminals_info, "count": len(connected_sns)})
+        elif self.path == "/reload":
+            # Recarregar lista de terminais da API sem reiniciar o servidor
+            cfg = _current_config
+            if not cfg:
+                self._respond(500, {"success": False, "error": "Config não disponível"})
+                return
+            try:
+                terminais = listar_terminais_ws(cfg["APP_ID"], cfg["API_KEY"])
+                global sn_to_terminal, sn_to_nome
+                sn_to_terminal = {}
+                sn_to_nome     = {}
+                for t in terminais:
+                    sn = (t.get("numero_serie") or "").strip()
+                    if sn:
+                        sn_to_terminal[sn] = t["id"]
+                        sn_to_nome[sn]     = t.get("nome", sn)
+                logger.info(f"[RELOAD] {len(sn_to_terminal)} terminal(is) recarregado(s)")
+                self._respond(200, {"success": True, "count": len(sn_to_terminal), "terminals": list(sn_to_nome.values())})
+            except Exception as e:
+                logger.error(f"[RELOAD] Erro: {e}")
+                self._respond(500, {"success": False, "error": str(e)})
         else:
             self.send_response(404)
             self.end_headers()
@@ -456,6 +565,9 @@ async def main_async(app_id, api_key, ws_port, stop_event):
 def run(config, stop_event=None):
     if stop_event is None:
         stop_event = threading.Event()
+
+    global _current_config
+    _current_config = config
 
     app_id    = config["APP_ID"]
     api_key   = config["API_KEY"]
@@ -620,6 +732,14 @@ export default function TimmyWsServerCode() {
         <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"CTRL_PORT": 7789,`}</p>
         <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 60`}</p>
         <p className="text-slate-700">{`}`}</p>
+      </div>
+
+      {/* Endpoints HTTP */}
+      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 space-y-1">
+        <p className="font-semibold text-slate-800">🔌 Endpoints HTTP do servidor (porta 7789)</p>
+        <p><code className="bg-slate-100 px-1 rounded">POST /cmd</code> — Envia comando remoto ao terminal (NOC Monitor)</p>
+        <p><code className="bg-slate-100 px-1 rounded">GET /status</code> — Lista terminais WS conectados com estado e ping</p>
+        <p><code className="bg-slate-100 px-1 rounded">GET /reload</code> — Recarrega lista de terminais da API <em>sem reiniciar</em></p>
       </div>
 
       {/* Firewall */}

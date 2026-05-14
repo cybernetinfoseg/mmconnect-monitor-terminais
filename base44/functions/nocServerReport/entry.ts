@@ -8,15 +8,21 @@
  *
  * Tipos geridos: heartbeat, adms_push, sdk_tcp, websocket_cloud
  * Autenticação: X-Api-Key pessoal
- * Payload: { terminal_id, status, latencia_ms?, segundos_sem_ping? }
+ * Payload: { terminal_id, status, latencia_ms?, segundos_sem_ping?, marcacoes[]? }
+ *
+ * Versão v3 — suporte a marcacoes[] enviadas pelo timmy_ws_server.py via cmd:"sendlog":
+ *   [{ enrollid, timestamp, mode, raw_mode, inout }]
+ * Deduplicação: janela de ±30s por terminal+enrollid para tolerância a retries do terminal.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const NOC_TYPES = ['heartbeat', 'adms_push', 'sdk_tcp', 'websocket_cloud'];
 
 // Número de reports offline consecutivos necessários para confirmar offline
-// (evita falsos offline por falha pontual de rede/servidor)
 const OFFLINE_CONFIRM_COUNT = 2;
+
+// Janela de deduplicação de marcações (ms) — tolerância para retries do terminal
+const DEDUP_WINDOW_MS = 30000;
 
 Deno.serve(async (req) => {
     try {
@@ -35,7 +41,7 @@ Deno.serve(async (req) => {
         }
 
         const ownerEmail = keyRecord.user_email;
-        const { terminal_id, status, latencia_ms, segundos_sem_ping } = body;
+        const { terminal_id, status, latencia_ms, segundos_sem_ping, marcacoes } = body;
 
         if (!terminal_id || !status) {
             return Response.json({ error: 'terminal_id e status são obrigatórios' }, { status: 400 });
@@ -87,17 +93,13 @@ Deno.serve(async (req) => {
         const offlineCount = cache?.offline_count ?? 0;
 
         // ── ANTI-FALSO-OFFLINE ────────────────────────────────────────────────────
-        // Se o report é offline, incrementar contador. Só confirmar offline após
-        // OFFLINE_CONFIRM_COUNT reports consecutivos. Se é online, reset imediato.
         let offlineCountNovo = 0;
         let statusConfirmado = statusEfetivo;
 
         if (statusEfetivo === 'offline') {
             offlineCountNovo = offlineCount + 1;
             if (offlineCountNovo < OFFLINE_CONFIRM_COUNT) {
-                // Ainda não confirmado — manter status anterior, não disparar eventos
                 console.log(`[nocServerReport] '${terminal.nome}' offline pendente (${offlineCountNovo}/${OFFLINE_CONFIRM_COUNT}) — aguardando confirmação`);
-                // Actualizar apenas contador e último check (não mudar status visível)
                 if (cache) {
                     await base44.asServiceRole.entities.StatusCache.update(cache.id, {
                         offline_count: offlineCountNovo,
@@ -110,10 +112,8 @@ Deno.serve(async (req) => {
                 });
                 return Response.json({ success: true, terminal: terminal.nome, status: statusAnterior || 'online', pending_offline: true, offline_count: offlineCountNovo });
             }
-            // Confirmado offline após N reports consecutivos
             statusConfirmado = 'offline';
         } else {
-            // Online — reset contador imediatamente
             offlineCountNovo = 0;
             statusConfirmado = 'online';
         }
@@ -196,8 +196,65 @@ Deno.serve(async (req) => {
             await base44.asServiceRole.entities.StatusCache.create({ terminal_id, ...cacheUpdate });
         }
 
-        console.log(`[nocServerReport] ${ownerEmail} → "${terminal.nome}" (${terminal.tipo_conexao}) → ${statusConfirmado}${mudouDeEstado ? ' [MUDANÇA]' : ''}`);
-        return Response.json({ success: true, terminal: terminal.nome, status: statusConfirmado, mudou: mudouDeEstado });
+        // ── MARCAÇÕES (sendlog do Timmy WebSocket) ───────────────────────────────
+        // O timmy_ws_server.py envia marcacoes[] quando recebe cmd:"sendlog"
+        let marcacoesGuardadas = 0;
+        if (Array.isArray(marcacoes) && marcacoes.length > 0) {
+            // Buscar utilizadores do terminal para enriquecer com nome
+            const terminalUsers = await base44.asServiceRole.entities.TerminalUser.filter({}).catch(() => []);
+            const enrollMap = {};
+            terminalUsers.forEach(u => { enrollMap[u.enrollid] = u.nome; });
+
+            // Buscar marcações recentes do terminal (últimas 2 horas) para deduplicação eficiente
+            const duasHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+            const recentesRaw = await base44.asServiceRole.entities.Marcacao.filter({ terminal_id }).catch(() => []);
+            // Índice de deduplicação: "enrollid|timestamp_ms_arredondado" → true
+            const dedupSet = new Set();
+            recentesRaw.forEach(m => {
+                if (m.timestamp) {
+                    const ms = new Date(m.timestamp).getTime();
+                    // Arredondar para janela de 30s (DEDUP_WINDOW_MS)
+                    const bucket = Math.floor(ms / DEDUP_WINDOW_MS);
+                    dedupSet.add(`${m.enrollid}|${bucket}`);
+                }
+            });
+
+            for (const m of marcacoes) {
+                try {
+                    const tsStr = m.timestamp || agora;
+                    const tsMs = new Date(tsStr).getTime();
+                    if (isNaN(tsMs)) continue;
+
+                    const enrollid = Number(m.enrollid) || 0;
+                    const bucket = Math.floor(tsMs / DEDUP_WINDOW_MS);
+                    const dedupKey = `${enrollid}|${bucket}`;
+
+                    if (dedupSet.has(dedupKey)) continue; // duplicado dentro da janela de 30s
+                    dedupSet.add(dedupKey);
+
+                    await base44.asServiceRole.entities.Marcacao.create({
+                        terminal_id,
+                        terminal_nome: terminal.nome,
+                        enrollid,
+                        utilizador_nome: enrollMap[enrollid] || '',
+                        timestamp: tsStr,
+                        modo: m.mode || 'desconhecido',
+                        raw_mode: m.raw_mode ?? null,
+                        tipo: m.inout || 'desconhecido',
+                        local: terminal.local || '',
+                        exportado: false,
+                    });
+                    marcacoesGuardadas++;
+                } catch (e) {
+                    console.warn(`[nocServerReport] Erro ao guardar marcação enrollid=${m.enrollid}: ${e.message}`);
+                }
+            }
+            console.log(`[nocServerReport] '${terminal.nome}' → ${marcacoesGuardadas}/${marcacoes.length} marcações guardadas`);
+        }
+        // ─────────────────────────────────────────────────────────────────────────
+
+        console.log(`[nocServerReport] ${ownerEmail} → "${terminal.nome}" (${terminal.tipo_conexao}) → ${statusConfirmado}${mudouDeEstado ? ' [MUDANÇA]' : ''}${marcacoesGuardadas ? ` [${marcacoesGuardadas} marcações]` : ''}`);
+        return Response.json({ success: true, terminal: terminal.nome, status: statusConfirmado, mudou: mudouDeEstado, marcacoes_guardadas: marcacoesGuardadas });
 
     } catch (error) {
         console.error('nocServerReport erro:', error.message);
