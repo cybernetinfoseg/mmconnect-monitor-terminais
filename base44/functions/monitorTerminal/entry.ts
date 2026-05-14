@@ -1,31 +1,28 @@
 /**
  * monitorTerminal — verificação pontual de um terminal via HTTP/TCP.
  *
+ * Anti-falso-offline:
+ *   - Terminais ativos (ip_publico, dns, api): 3 tentativas com pausa entre elas
+ *   - Só declara offline se TODAS as tentativas falharem
+ *
  * Pode ser chamado:
  *   - Pelo frontend (utilizador autenticado, dono ou admin)
  *   - Pelo scheduler/automação (sem user — usa service role)
  *
  * Terminais PASSIVOS não podem ser sondados diretamente:
- *   - ip_local   → Agente Local (agentReport)
- *   - heartbeat  → NOC Server TCP heartbeat
- *   - adms_push  → NOC Server ADMS push
- *   - sdk_tcp    → NOC Server SDK polling
- *   - p2s        → P2S Server (conexão inversa)
- *   - websocket_cloud → Timmy WS Server
- *
- * Terminais ATIVOS (sondagem direta):
- *   - ip_publico, dns, api
+ *   - ip_local, heartbeat, adms_push, sdk_tcp, p2s, websocket_cloud
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s', 'websocket_cloud']);
-const CHECK_TIMEOUT_MS = 5000;
+const CHECK_TIMEOUT_MS = 4000;
+const RETRY_COUNT = 3;
+const RETRY_DELAY_MS = 1500;
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Auth: aceita chamada sem user (automação/scheduler) ou user autenticado (dono/admin)
     let callerUser = null;
     const isAuthenticated = await base44.auth.isAuthenticated();
     if (isAuthenticated) {
@@ -44,32 +41,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
     }
 
-    // Se chamado por utilizador autenticado, verificar permissão
     if (callerUser) {
       if (callerUser.role !== 'admin' && terminal.created_by !== callerUser.email && terminal.usuario_email !== callerUser.email) {
         return Response.json({ error: 'Forbidden: não é dono deste terminal' }, { status: 403 });
       }
     }
 
-    // WebSocket Cloud: contactar terminal Timmy directamente via HTTP API /api
-    if (terminal.tipo_conexao === 'websocket_cloud') {
-      const result = await checkTimmyTerminal(terminal);
-      const agora = new Date();
-      const novoStatus = result.online ? 'online' : 'offline';
-
-      await base44.asServiceRole.entities.Terminal.update(terminal.id, {
-        status: novoStatus,
-        ultimo_check: agora.toISOString(),
-        ...(result.online ? { ultimo_ping: agora.toISOString(), segundos_sem_ping: 0 } : {}),
-      });
-
-      return Response.json({ success: true, terminal_id, status: novoStatus, source: 'timmy_ws_server', devinfo: result.devinfo });
-    }
-
-    // Outros terminais passivos: informar o motivo
+    // Terminais passivos: informar motivo
     if (PASSIVE_TYPES.has(terminal.tipo_conexao)) {
       const agente = terminal.tipo_conexao === 'ip_local' ? 'Agente Local' :
-                     terminal.tipo_conexao === 'p2s' ? 'P2S Server' : 'NOC Server';
+                     terminal.tipo_conexao === 'p2s' ? 'P2S Server' :
+                     terminal.tipo_conexao === 'websocket_cloud' ? 'Timmy WS Server' : 'NOC Server';
       return Response.json({
         success: false,
         error: `Terminais "${terminal.tipo_conexao}" são monitorizados pelo ${agente} (push) — sondagem direta não disponível.`,
@@ -78,7 +60,8 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    const result = await checkTerminalActive(terminal);
+    // Terminais ativos: 3 tentativas antes de declarar offline
+    const result = await checkTerminalActiveWithRetry(terminal, RETRY_COUNT);
     const agora = new Date();
     const novoStatus = result.online ? 'online' : 'offline';
 
@@ -97,10 +80,11 @@ Deno.serve(async (req) => {
     });
 
     // Actualizar cache
+    const cacheUpdate = { ultimo_status: novoStatus, atualizado_em: agora.toISOString() };
     if (cache) {
-      await base44.asServiceRole.entities.StatusCache.update(cache.id, { ultimo_status: novoStatus, atualizado_em: agora.toISOString() });
+      await base44.asServiceRole.entities.StatusCache.update(cache.id, cacheUpdate);
     } else {
-      await base44.asServiceRole.entities.StatusCache.create({ terminal_id: terminal.id, ultimo_status: novoStatus, atualizado_em: agora.toISOString() });
+      await base44.asServiceRole.entities.StatusCache.create({ terminal_id: terminal.id, ...cacheUpdate });
     }
 
     // Eventos de mudança de estado
@@ -130,7 +114,6 @@ Deno.serve(async (req) => {
           }).catch(() => {}),
         ]);
       } else {
-        // Voltou online — resolver incidentes abertos
         const [openIncidents, openEscalations] = await Promise.all([
           base44.asServiceRole.entities.AlertIncident.filter({ terminal_id: terminal.id, resolvido: false }).catch(() => []),
           base44.asServiceRole.entities.EscalationAlert.filter({ terminal_id: terminal.id, resolvido: false }).catch(() => []),
@@ -155,7 +138,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({ success: true, terminal_id, status: novoStatus, latencia_ms: result.latencia_ms, statusMudou });
+    return Response.json({ success: true, terminal_id, status: novoStatus, latencia_ms: result.latencia_ms, statusMudou, tentativas: result.tentativas });
 
   } catch (error) {
     console.error('[monitorTerminal] erro:', error.message);
@@ -164,32 +147,19 @@ Deno.serve(async (req) => {
 });
 
 /**
- * Consulta terminal Timmy directamente via HTTP API.
- * O terminal Timmy é um servidor HTTP (porta 80 ou custom).
- * Envia comando "reg" para verificar conexão.
+ * Verifica terminal ativo com retry.
+ * Só declara offline se TODAS as tentativas falharem.
  */
-async function checkTimmyTerminal(terminal) {
-   const host = terminal.ip_publico || terminal.dns || null;
-   if (!host) return { online: false };
-
-   const porta = terminal.porta || 80;
-   const url = `http://${host}:${porta}/api`;
-
-   try {
-     const resp = await fetch(url, {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({ cmd: 'getlang' }),
-       signal: AbortSignal.timeout(5000)
-     });
-     
-     if (!resp.ok) return { online: false };
-     const data = await resp.json();
-     return { online: data.result === true };
-   } catch {
-     return { online: false };
-   }
- }
+async function checkTerminalActiveWithRetry(terminal, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const result = await checkTerminalActive(terminal);
+    if (result.online) return { ...result, tentativas: attempt };
+    if (attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+    }
+  }
+  return { online: false, tentativas: maxRetries };
+}
 
 async function checkTerminalActive(terminal) {
   const porta = terminal.porta || 5005;
@@ -214,7 +184,7 @@ async function checkTerminalActive(terminal) {
 
     if (!host) return { online: false };
 
-    // TCP primeiro
+    // TCP
     try {
       const conn = await Promise.race([
         Deno.connect({ hostname: host, port: Number(porta) }),

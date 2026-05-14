@@ -54,8 +54,8 @@ LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
 
 DEFAULT_WS_PORT   = 7788
 DEFAULT_CTRL_PORT = 7789  # porta HTTP de controlo (NOC Monitor → servidor → terminal)
-OFFLINE_TIMEOUT   = 60    # segundos sem mensagem → offline (aumentado para tolerar reconexões)
-RECONNECT_GRACE   = 30    # segundos de grace period após desconexão antes de reportar offline
+OFFLINE_TIMEOUT   = 90    # segundos sem mensagem → offline (margem para heartbeat 3s × 30)
+RECONNECT_GRACE   = 45    # segundos de grace period após desconexão antes de reportar offline
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
 logger = logging.getLogger("timmy_ws")
@@ -618,7 +618,7 @@ export default function TimmyWsServerCode() {
         <p className="text-slate-700 pl-4">{`"APP_ID":  "697aa46c9998c30665e2e19a",`}</p>
         <p className="text-slate-700 pl-4 font-semibold text-violet-700">{`"WS_PORT": 7788,`}</p>
         <p className="text-slate-700 pl-4 font-semibold text-blue-700">{`"CTRL_PORT": 7789,`}</p>
-        <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 10`}</p>
+        <p className="text-slate-700 pl-4">{`"INTERVALO_REPORT": 60`}</p>
         <p className="text-slate-700">{`}`}</p>
       </div>
 
