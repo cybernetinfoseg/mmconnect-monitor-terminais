@@ -40,7 +40,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
 
   { name: 'Mapa', page: 'Mapa', icon: MapPin },
-  { name: 'Utilizadores', page: 'Utilizadores', icon: Users },
+  { name: 'Colaboradores', page: 'Utilizadores', icon: Users },
   { name: 'Marcações', page: 'Marcacoes', icon: Fingerprint },
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },

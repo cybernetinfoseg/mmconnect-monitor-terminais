@@ -5,20 +5,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Users, Plus, Pencil, Trash2, Search, Upload, Download,
   CheckCircle2, XCircle, Loader2, Send, ChevronDown, ChevronUp,
-  FileDown, FileUp, Zap, UserCheck, UserX
+  FileDown, FileUp, Zap, UserCheck, UserX, ArrowDownUp
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import ColaboradorForm from '@/components/colaboradores/ColaboradorForm';
+import SyncPanel from '@/components/colaboradores/SyncPanel';
 
 export default function Utilizadores() {
   const [search, setSearch] = useState('');
@@ -35,7 +34,6 @@ export default function Utilizadores() {
   const [selectedTerminals, setSelectedTerminals] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [expandedUser, setExpandedUser] = useState(null);
-  // filtro por dono POR utilizador expandido (chave = userId, valor = email do dono)
   const [expandedOwnerFilter, setExpandedOwnerFilter] = useState({});
   const [importProgress, setImportProgress] = useState(null);
   const [filterDialogTerminalOwner, setFilterDialogTerminalOwner] = useState('');
@@ -43,6 +41,7 @@ export default function Utilizadores() {
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkRemoving, setBulkRemoving] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(null);
+  const [showSync, setShowSync] = useState(false);
   const importRef = useRef();
 
   const queryClient = useQueryClient();
@@ -59,7 +58,7 @@ export default function Utilizadores() {
     enabled: !!currentUser && isAdmin,
   });
 
-  const { data: allUsers = [], isLoading } = useQuery({
+  const { data: allUsers = [], isLoading, refetch } = useQuery({
     queryKey: ['terminal-users', currentUser?.email, isAdmin],
     queryFn: async () => {
       if (isAdmin) return base44.entities.TerminalUser.list('-created_date', 500);
@@ -98,14 +97,14 @@ export default function Utilizadores() {
     onSuccess: () => {
       queryClient.invalidateQueries(['terminal-users']);
       setDialogOpen(false); setEditingUser(null); setFormData({}); setSelectedTerminals([]);
-      toast.success(editingUser ? 'Utilizador atualizado' : 'Utilizador criado');
+      toast.success(editingUser ? 'Colaborador atualizado' : 'Colaborador criado');
     },
     onError: (e) => toast.error(`Erro: ${e.message}`),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.TerminalUser.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries(['terminal-users']); toast.success('Eliminado'); },
+    onSuccess: () => { queryClient.invalidateQueries(['terminal-users']); toast.success('Colaborador eliminado'); },
     onError: (e) => toast.error(`Erro: ${e.message}`),
   });
 
@@ -132,10 +131,9 @@ export default function Utilizadores() {
     setDeletingFromTerminal({ userId: user.id, terminalId });
     try {
       const resp = await base44.functions.invoke('terminalControl', {
-        terminal_id: terminalId, action: 'deleteuser',
-        params: { enrollid: user.enrollid },
+        terminal_id: terminalId, action: 'deleteuser', params: { enrollid: user.enrollid },
       });
-      resp.data?.success ? toast.success('Utilizador removido do terminal') : toast.error(resp.data?.error || 'Erro ao remover');
+      resp.data?.success ? toast.success('Removido do terminal') : toast.error(resp.data?.error || 'Erro ao remover');
     } catch (e) {
       toast.error(e?.response?.data?.error || e.message);
     }
@@ -167,7 +165,7 @@ export default function Utilizadores() {
 
   const handleSendAllToAll = async () => {
     if (!terminals.length) { toast.error('Sem terminais disponíveis'); return; }
-    if (!filtered.length) { toast.error('Sem utilizadores para enviar'); return; }
+    if (!filtered.length) { toast.error('Sem colaboradores para enviar'); return; }
     setSendingAll(true);
     let totalOk = 0, totalFail = 0;
     const terminalIds = terminals.map(t => t.id);
@@ -183,12 +181,12 @@ export default function Utilizadores() {
   // ── CSV ───────────────────────────────────────────────────────────────────────
 
   const handleExportCSV = () => {
-    const headers = ['enrollid', 'nome', 'email', 'departamento', 'cargo', 'card', 'privilege', 'ativo', 'observacoes', 'owner_email'];
+    const headers = ['enrollid', 'nome', 'email', 'telefone', 'departamento', 'cargo', 'numero_cracha', 'card', 'privilege', 'ativo', 'data_inicio', 'data_fim', 'grupo_acesso', 'observacoes', 'owner_email'];
     const rows = filtered.map(u => headers.map(h => u[h] ?? ''));
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'utilizadores.csv'; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = 'colaboradores.csv'; a.click();
     URL.revokeObjectURL(url);
     toast.success('CSV exportado!');
   };
@@ -215,9 +213,12 @@ export default function Utilizadores() {
       try {
         await base44.entities.TerminalUser.create({
           enrollid: Number(row.enrollid), nome: row.nome, email: row.email || '',
-          departamento: row.departamento || '', cargo: row.cargo || '', card: row.card || '',
+          telefone: row.telefone || '', departamento: row.departamento || '', cargo: row.cargo || '',
+          numero_cracha: row.numero_cracha || '', card: row.card || '',
           privilege: Number(row.privilege) || 0, ativo: row.ativo === 'false' ? false : true,
-          observacoes: row.observacoes || '', owner_email: row.owner_email || currentUser?.email, terminais_ids: '[]',
+          data_inicio: row.data_inicio || '', data_fim: row.data_fim || '',
+          grupo_acesso: row.grupo_acesso || '', observacoes: row.observacoes || '',
+          owner_email: row.owner_email || currentUser?.email, terminais_ids: '[]', bio_types: '[]',
         });
         ok++;
       } catch {}
@@ -225,7 +226,7 @@ export default function Utilizadores() {
     }
     setImportProgress(null);
     queryClient.invalidateQueries(['terminal-users']);
-    toast.success(`${ok} utilizador(es) importado(s)!`);
+    toast.success(`${ok} colaborador(es) importado(s)!`);
   };
 
   // ── Bulk by owner ─────────────────────────────────────────────────────────────
@@ -289,30 +290,28 @@ export default function Utilizadores() {
       u.nome?.toLowerCase().includes(search.toLowerCase()) ||
       String(u.enrollid).includes(search) ||
       u.departamento?.toLowerCase().includes(search.toLowerCase()) ||
-      u.email?.toLowerCase().includes(search.toLowerCase())
+      u.email?.toLowerCase().includes(search.toLowerCase()) ||
+      u.numero_cracha?.toLowerCase().includes(search.toLowerCase())
     );
     return list;
   }, [allUsers, search, ownerFilter, isAdmin]);
 
-  // Terminais visíveis no painel expandido de um utilizador — filtrados pelo owner selecionado
   const getVisibleTerminals = (userId) => {
     const selectedOwner = expandedOwnerFilter[userId] || '';
     if (!selectedOwner) return terminals;
     return terminals.filter(t => (t.usuario_email || t.created_by) === selectedOwner);
   };
 
-  // Terminais no diálogo de edição — filtrados pelo owner escolhido no campo do diálogo
   const filteredDialogTerminals = isAdmin && filterDialogTerminalOwner
     ? terminals.filter(t => t.usuario_email === filterDialogTerminalOwner || t.created_by === filterDialogTerminalOwner)
     : terminals;
 
-  const handleNew = () => { setEditingUser(null); setFormData({ privilege: 0, ativo: true }); setSelectedTerminals([]); setFilterDialogTerminalOwner(''); setDialogOpen(true); };
+  const handleNew = () => { setEditingUser(null); setFormData({ privilege: 0, ativo: true, bio_types: '[]' }); setSelectedTerminals([]); setFilterDialogTerminalOwner(''); setDialogOpen(true); };
   const handleEdit = (u) => {
     setEditingUser(u); setFormData(u); setFilterDialogTerminalOwner('');
     try { setSelectedTerminals(JSON.parse(u.terminais_ids || '[]')); } catch { setSelectedTerminals([]); }
     setDialogOpen(true);
   };
-  const toggleTerminal = (tid) => setSelectedTerminals(prev => prev.includes(tid) ? prev.filter(id => id !== tid) : [...prev, tid]);
 
   // ── Render expanded panel ─────────────────────────────────────────────────────
 
@@ -323,29 +322,19 @@ export default function Utilizadores() {
 
     return (
       <div className={cn('space-y-3', isMobile ? 'mt-3 pt-3 border-t border-slate-100' : 'pt-3')}>
-        {/* Filtro de owner */}
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
           {isAdmin && (
-            <Select
-              value={selectedOwnerVal || 'all'}
-              onValueChange={(val) => setExpandedOwnerFilter(prev => ({ ...prev, [u.id]: val === 'all' ? '' : val }))}
-            >
-              <SelectTrigger className="h-7 text-xs w-[200px]">
-                <SelectValue placeholder="Todos os donos" />
-              </SelectTrigger>
+            <Select value={selectedOwnerVal || 'all'} onValueChange={val => setExpandedOwnerFilter(prev => ({ ...prev, [u.id]: val === 'all' ? '' : val }))}>
+              <SelectTrigger className="h-7 text-xs w-[200px]"><SelectValue placeholder="Todos os donos" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os donos</SelectItem>
-                {appUsers.map(au => (
-                  <SelectItem key={au.email} value={au.email}>{au.full_name || au.email}</SelectItem>
-                ))}
+                {appUsers.map(au => <SelectItem key={au.email} value={au.email}>{au.full_name || au.email}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
           <span className="text-xs text-slate-400">{visibleTerminals.length} terminal(is)</span>
         </div>
-
-        {/* Grelha de terminais */}
         <div className={cn('grid gap-2', isMobile ? 'grid-cols-1' : 'grid-cols-3 xl:grid-cols-4')}>
           {visibleTerminals.map(t => {
             const res = sendResult?.[t.id];
@@ -357,10 +346,7 @@ export default function Utilizadores() {
                   <p className="text-xs text-slate-400 truncate">{t.local}</p>
                 </div>
                 <div className="flex items-center gap-1 ml-2 shrink-0">
-                  {res && (res.success
-                    ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                    : <XCircle className="h-3.5 w-3.5 text-red-400" title={res.message} />
-                  )}
+                  {res && (res.success ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <XCircle className="h-3.5 w-3.5 text-red-400" title={res.message} />)}
                   <Button size="sm" className="h-6 px-1.5 bg-teal-600 hover:bg-teal-700" disabled={sendingTo === u.id} onClick={() => handleSendOne(u, [t.id])}>
                     {sendingTo === u.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
                   </Button>
@@ -372,8 +358,6 @@ export default function Utilizadores() {
             );
           })}
         </div>
-
-        {/* Botões de ação em massa */}
         <div className="flex gap-2">
           <Button size="sm" className="flex-1 bg-teal-600 hover:bg-teal-700 gap-2 text-xs" disabled={sendingTo === u.id || !visibleTerminals.length} onClick={() => handleSendOne(u, visibleTerminals.map(t => t.id))}>
             {sendingTo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
@@ -401,11 +385,14 @@ export default function Utilizadores() {
               <Users className="h-5 w-5 text-teal-600" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900">Utilizadores dos Terminais</h1>
-              <p className="text-xs text-slate-500">{filtered.length} de {allUsers.length} utilizador(es)</p>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900">Colaboradores</h1>
+              <p className="text-xs text-slate-500">{filtered.length} de {allUsers.length} colaborador(es) · Sincronização com terminais biométricos</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setShowSync(!showSync)} className={cn('gap-1.5 text-xs', showSync && 'bg-teal-50 border-teal-300 text-teal-700')}>
+              <ArrowDownUp className="h-3.5 w-3.5" /><span className="hidden sm:inline">Sincronizar</span>
+            </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={filtered.length === 0} className="gap-1.5 text-xs">
               <FileDown className="h-3.5 w-3.5" /><span className="hidden sm:inline">Exportar CSV</span>
             </Button>
@@ -434,17 +421,25 @@ export default function Utilizadores() {
           </div>
         )}
 
+        {/* Sync Panel */}
+        {showSync && (
+          <SyncPanel
+            terminals={terminals}
+            allUsers={allUsers}
+            currentUser={currentUser}
+            onRefresh={() => queryClient.invalidateQueries(['terminal-users'])}
+          />
+        )}
+
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input placeholder="Pesquisar por nome, ID, departamento..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-white" />
+            <Input placeholder="Pesquisar por nome, ID, departamento, crachá..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-white" />
           </div>
           {isAdmin && allOwners.length > 0 && (
             <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-              <SelectTrigger className="bg-white h-9 w-full sm:w-[220px] text-sm">
-                <SelectValue placeholder="Filtrar por dono" />
-              </SelectTrigger>
+              <SelectTrigger className="bg-white h-9 w-full sm:w-[220px] text-sm"><SelectValue placeholder="Filtrar por dono" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os donos</SelectItem>
                 {appUsers.map(u => <SelectItem key={u.email} value={u.email}>{u.full_name || u.email}</SelectItem>)}
@@ -464,26 +459,20 @@ export default function Utilizadores() {
               <div className="flex-1 min-w-0">
                 <label className="text-xs text-slate-500 mb-1 block">Selecionar Dono</label>
                 <Select value={bulkOwner || 'none'} onValueChange={v => setBulkOwner(v === 'none' ? '' : v)} disabled={bulkSending || bulkRemoving}>
-                  <SelectTrigger className="h-9 w-full text-sm">
-                    <SelectValue placeholder="— Escolher dono —" />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-9 w-full text-sm"><SelectValue placeholder="— Escolher dono —" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">— Escolher dono —</SelectItem>
                     {appUsers.map(u => {
-                      const uTerminals = terminals.filter(t => t.usuario_email === u.email || t.created_by === u.email);
-                      const uUsers = allUsers.filter(x => x.owner_email === u.email);
-                      return (
-                        <SelectItem key={u.email} value={u.email}>
-                          {u.full_name || u.email} ({uUsers.length} utilizadores, {uTerminals.length} terminais)
-                        </SelectItem>
-                      );
+                      const uT = terminals.filter(t => t.usuario_email === u.email || t.created_by === u.email);
+                      const uU = allUsers.filter(x => x.owner_email === u.email);
+                      return <SelectItem key={u.email} value={u.email}>{u.full_name || u.email} ({uU.length} colab., {uT.length} term.)</SelectItem>;
                     })}
                   </SelectContent>
                 </Select>
               </div>
               {bulkOwner && (
-                <div className="flex items-center gap-2 text-xs text-slate-500 shrink-0">
-                  <span className="bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-1">{bulkOwnerUsers.length} utilizadores</span>
+                <div className="flex gap-1.5 text-xs shrink-0">
+                  <span className="bg-teal-50 text-teal-700 border border-teal-200 rounded px-2 py-1">{bulkOwnerUsers.length} colaboradores</span>
                   <span className="bg-slate-50 text-slate-600 border border-slate-200 rounded px-2 py-1">{bulkOwnerTerminals.length} terminais</span>
                 </div>
               )}
@@ -510,15 +499,15 @@ export default function Utilizadores() {
           </div>
         )}
 
-        {/* Users Table (desktop) + Cards (mobile) */}
+        {/* Table / Cards */}
         {isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
         ) : filtered.length === 0 ? (
           <Card className="bg-white border-slate-200">
             <CardContent className="py-16 text-center text-slate-400">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">Nenhum utilizador encontrado</p>
-              <Button onClick={handleNew} className="mt-4 bg-teal-600 hover:bg-teal-700 text-sm"><Plus className="h-4 w-4 mr-2" /> Criar primeiro utilizador</Button>
+              <p className="font-medium">Nenhum colaborador encontrado</p>
+              <Button onClick={handleNew} className="mt-4 bg-teal-600 hover:bg-teal-700 text-sm"><Plus className="h-4 w-4 mr-2" /> Adicionar colaborador</Button>
             </CardContent>
           </Card>
         ) : (
@@ -531,7 +520,7 @@ export default function Utilizadores() {
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase w-16">ID</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Nome</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Departamento</th>
-                    <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Acesso</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Biometria</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Terminais</th>
                     {isAdmin && <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Dono</th>}
                     <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Ações</th>
@@ -541,6 +530,7 @@ export default function Utilizadores() {
                   {filtered.map(u => {
                     const termIds = (() => { try { return JSON.parse(u.terminais_ids || '[]'); } catch { return []; } })();
                     const userTerminals = terminals.filter(t => termIds.includes(t.id));
+                    const bioTypes = (() => { try { return JSON.parse(u.bio_types || '[]'); } catch { return []; } })();
                     const isExpanded = expandedUser === u.id;
                     return (
                       <React.Fragment key={u.id}>
@@ -549,8 +539,13 @@ export default function Utilizadores() {
                             <span className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 font-bold text-xs flex items-center justify-center">{u.enrollid}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <p className="font-semibold text-slate-800">{u.nome}</p>
-                            {u.email && <p className="text-xs text-slate-400">{u.email}</p>}
+                            <div className="flex items-center gap-2">
+                              {u.foto_url && <img src={u.foto_url} alt="" className="w-7 h-7 rounded-full object-cover shrink-0 border border-teal-200" />}
+                              <div>
+                                <p className="font-semibold text-slate-800">{u.nome}</p>
+                                {u.email && <p className="text-xs text-slate-400">{u.email}</p>}
+                              </div>
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-slate-600 text-xs">
                             <p>{u.departamento || '—'}</p>
@@ -558,8 +553,10 @@ export default function Utilizadores() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1 flex-wrap">
-                              {u.card && <Badge variant="outline" className="text-xs">💳</Badge>}
-                              {u.password && <Badge variant="outline" className="text-xs">🔑</Badge>}
+                              {bioTypes.includes(15) && <Badge className="text-xs bg-purple-100 text-purple-700 border-purple-200">😊 Face</Badge>}
+                              {(bioTypes.includes(1) || bioTypes.includes(2) || bioTypes.includes(3)) && <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">🖐️ FP</Badge>}
+                              {bioTypes.includes(11) && <Badge variant="outline" className="text-xs">💳</Badge>}
+                              {bioTypes.includes(10) && <Badge variant="outline" className="text-xs">🔑</Badge>}
                               {u.privilege === 14 && <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">Admin</Badge>}
                               {!u.ativo && <Badge variant="outline" className="text-xs text-slate-400">Inativo</Badge>}
                             </div>
@@ -579,11 +576,7 @@ export default function Utilizadores() {
                           </td>
                         </tr>
                         {isExpanded && (
-                          <tr key={`exp-${u.id}`}>
-                            <td colSpan={isAdmin ? 7 : 6} className="px-4 pb-4 bg-slate-50 border-b border-slate-200">
-                              {renderExpandedPanel(u, false)}
-                            </td>
-                          </tr>
+                          <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 pb-4 bg-slate-50 border-b border-slate-200">{renderExpandedPanel(u, false)}</td></tr>
                         )}
                       </React.Fragment>
                     );
@@ -598,6 +591,7 @@ export default function Utilizadores() {
                 {filtered.map(u => {
                   const termIds = (() => { try { return JSON.parse(u.terminais_ids || '[]'); } catch { return []; } })();
                   const userTerminals = terminals.filter(t => termIds.includes(t.id));
+                  const bioTypes = (() => { try { return JSON.parse(u.bio_types || '[]'); } catch { return []; } })();
                   const isExpanded = expandedUser === u.id;
                   return (
                     <motion.div key={u.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
@@ -605,17 +599,19 @@ export default function Utilizadores() {
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
-                              <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center shrink-0">
-                                <span className="text-teal-700 font-bold text-xs">{u.enrollid}</span>
-                              </div>
+                              {u.foto_url
+                                ? <img src={u.foto_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 border border-teal-200" />
+                                : <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center shrink-0"><span className="text-teal-700 font-bold text-xs">{u.enrollid}</span></div>
+                              }
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-slate-800 text-sm">{u.nome}</p>
                                 <p className="text-xs text-slate-400">{[u.departamento, u.cargo].filter(Boolean).join(' · ') || '—'}</p>
                                 <div className="flex gap-1 mt-1.5 flex-wrap">
-                                  {u.card && <Badge variant="outline" className="text-xs">💳</Badge>}
-                                  {u.password && <Badge variant="outline" className="text-xs">🔑</Badge>}
-                                  {u.privilege === 14 && <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">Admin</Badge>}
-                                  {userTerminals.length > 0 && <Badge className="text-xs bg-teal-50 text-teal-700 border-teal-200">{userTerminals.length} terminal(is)</Badge>}
+                                  {bioTypes.includes(15) && <Badge className="text-xs bg-purple-100 text-purple-700 border-purple-200">😊</Badge>}
+                                  {(bioTypes.includes(1) || bioTypes.includes(2) || bioTypes.includes(3)) && <Badge className="text-xs bg-blue-100 text-blue-700 border-blue-200">🖐️</Badge>}
+                                  {bioTypes.includes(11) && <Badge variant="outline" className="text-xs">💳</Badge>}
+                                  {bioTypes.includes(10) && <Badge variant="outline" className="text-xs">🔑</Badge>}
+                                  {userTerminals.length > 0 && <Badge className="text-xs bg-teal-50 text-teal-700 border-teal-200">{userTerminals.length} term.</Badge>}
                                 </div>
                               </div>
                             </div>
@@ -641,76 +637,34 @@ export default function Utilizadores() {
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editingUser ? 'Editar Utilizador' : 'Novo Utilizador'}</DialogTitle></DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>ID de Inscrição *</Label>
-                <Input type="number" placeholder="Ex: 1001" value={formData.enrollid || ''} onChange={e => setFormData(f => ({ ...f, enrollid: Number(e.target.value) }))} />
-                <p className="text-xs text-slate-400">ID único no terminal</p>
-              </div>
-              <div className="space-y-1">
-                <Label>Nome *</Label>
-                <Input placeholder="Nome completo" value={formData.nome || ''} onChange={e => setFormData(f => ({ ...f, nome: e.target.value }))} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1"><Label>Email</Label><Input type="email" placeholder="email@empresa.com" value={formData.email || ''} onChange={e => setFormData(f => ({ ...f, email: e.target.value }))} /></div>
-              <div className="space-y-1"><Label>Departamento</Label><Input placeholder="RH, TI, Produção..." value={formData.departamento || ''} onChange={e => setFormData(f => ({ ...f, departamento: e.target.value }))} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1"><Label>Cargo</Label><Input placeholder="Engenheiro, Operador..." value={formData.cargo || ''} onChange={e => setFormData(f => ({ ...f, cargo: e.target.value }))} /></div>
-              <div className="space-y-1">
-                <Label>Privilégio</Label>
-                <Select value={String(formData.privilege ?? 0)} onValueChange={v => setFormData(f => ({ ...f, privilege: Number(v) }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="0">Normal</SelectItem><SelectItem value="14">Administrador</SelectItem></SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1"><Label>Nº Cartão RFID</Label><Input placeholder="Opcional" value={formData.card || ''} onChange={e => setFormData(f => ({ ...f, card: e.target.value }))} /></div>
-              <div className="space-y-1"><Label>Senha Numérica</Label><Input type="password" placeholder="Opcional" value={formData.password || ''} onChange={e => setFormData(f => ({ ...f, password: e.target.value }))} /></div>
-            </div>
-            {terminals.length > 0 && (
-              <div className="space-y-2">
-                <Label>Terminais Associados</Label>
-                {isAdmin && (
-                  <Select value={filterDialogTerminalOwner || 'all'} onValueChange={v => { setFilterDialogTerminalOwner(v === 'all' ? '' : v); setSelectedTerminals([]); }}>
-                    <SelectTrigger className="h-9 w-full text-sm"><SelectValue placeholder="Todos os donos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os donos</SelectItem>
-                      {appUsers.map(u => <SelectItem key={u.email} value={u.email}>{u.full_name ? `${u.full_name} (${u.email})` : u.email}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
-                <div className="max-h-36 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
-                  {filteredDialogTerminals.map(t => (
-                    <label key={t.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 px-3 py-2">
-                      <input type="checkbox" checked={selectedTerminals.includes(t.id)} onChange={() => toggleTerminal(t.id)} className="rounded" />
-                      <span className="text-sm flex-1">{t.nome}</span>
-                      <span className="text-xs text-slate-400">{t.local}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="space-y-1"><Label>Observações</Label><Textarea rows={2} value={formData.observacoes || ''} onChange={e => setFormData(f => ({ ...f, observacoes: e.target.value }))} /></div>
-            <div className="flex items-center gap-2"><Switch checked={formData.ativo !== false} onCheckedChange={v => setFormData(f => ({ ...f, ativo: v }))} /><Label>Ativo</Label></div>
-            <div className="flex gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-              <Button className="flex-1 bg-teal-600 hover:bg-teal-700" disabled={saveMutation.isPending || !formData.enrollid || !formData.nome} onClick={() => saveMutation.mutate(formData)}>
-                {saveMutation.isPending ? 'A guardar...' : 'Guardar'}
-              </Button>
-            </div>
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingUser ? 'Editar Colaborador' : 'Novo Colaborador'}</DialogTitle>
+          </DialogHeader>
+          <ColaboradorForm
+            formData={formData}
+            setFormData={setFormData}
+            terminals={terminals}
+            selectedTerminals={selectedTerminals}
+            setSelectedTerminals={setSelectedTerminals}
+            filteredDialogTerminals={filteredDialogTerminals}
+            isAdmin={isAdmin}
+            appUsers={appUsers}
+            filterDialogTerminalOwner={filterDialogTerminalOwner}
+            setFilterDialogTerminalOwner={setFilterDialogTerminalOwner}
+          />
+          <div className="flex gap-2 pt-2 border-t border-slate-100 mt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button className="flex-1 bg-teal-600 hover:bg-teal-700" disabled={saveMutation.isPending || !formData.enrollid || !formData.nome} onClick={() => saveMutation.mutate(formData)}>
+              {saveMutation.isPending ? 'A guardar...' : 'Guardar Colaborador'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Eliminar utilizador?</AlertDialogTitle><AlertDialogDescription>Esta ação é permanente.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Eliminar colaborador?</AlertDialogTitle><AlertDialogDescription>Esta ação é permanente e não remove o colaborador dos terminais.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => { deleteMutation.mutate(deleteId); setDeleteId(null); }}>Eliminar</AlertDialogAction>
