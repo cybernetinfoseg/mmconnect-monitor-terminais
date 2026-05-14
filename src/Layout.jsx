@@ -46,6 +46,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Colaboradores', page: 'Utilizadores', icon: Users },
   { name: 'Marcações', page: 'Marcacoes', icon: Fingerprint },
   { name: 'Presença', page: 'Presenca', icon: Building2 },
+  { name: 'Controlo Acesso', page: 'ControloAcesso', icon: Shield },
   { name: 'Horários', page: 'GestaoHorarios', icon: Clock },
   { name: 'Ausências', page: 'GestaoAusencias', icon: CalendarOff },
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },

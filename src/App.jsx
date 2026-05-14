@@ -13,6 +13,7 @@ import Utilizadores from './pages/Utilizadores';
 import Marcacoes from './pages/Marcacoes';
 import ExportacaoMarcacoes from './pages/ExportacaoMarcacoes';
 import Presenca from './pages/Presenca';
+import ControloAcesso from './pages/ControloAcesso';
 import GestaoHorarios from './pages/GestaoHorarios';
 import GestaoAusencias from './pages/GestaoAusencias';
 import PageNotFound from './lib/PageNotFound';
@@ -78,6 +79,7 @@ const AuthenticatedApp = () => {
       <Route path="/Marcacoes" element={<LayoutWrapper currentPageName="Marcacoes"><Marcacoes /></LayoutWrapper>} />
       <Route path="/ExportacaoMarcacoes" element={<LayoutWrapper currentPageName="ExportacaoMarcacoes"><ExportacaoMarcacoes /></LayoutWrapper>} />
       <Route path="/Presenca" element={<LayoutWrapper currentPageName="Presenca"><Presenca /></LayoutWrapper>} />
+      <Route path="/ControloAcesso" element={<LayoutWrapper currentPageName="ControloAcesso"><ControloAcesso /></LayoutWrapper>} />
       <Route path="/GestaoHorarios" element={<LayoutWrapper currentPageName="GestaoHorarios"><GestaoHorarios /></LayoutWrapper>} />
       <Route path="/GestaoAusencias" element={<LayoutWrapper currentPageName="GestaoAusencias"><GestaoAusencias /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
