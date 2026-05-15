@@ -306,9 +306,9 @@ export default function ColaboradorForm({ formData, setFormData, terminals, sele
                 if (newVal !== filterDialogTerminalOwner) setSelectedTerminals([]);
               }}
             >
-              <SelectTrigger className="h-8 w-full text-xs mb-2"><SelectValue placeholder="Todos os donos" /></SelectTrigger>
+              <SelectTrigger className="h-8 w-full text-xs mb-2"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os donos</SelectItem>
+                <SelectItem value="all">Todos os utilizadores</SelectItem>
                 {appUsers.map(u => <SelectItem key={u.email} value={u.email}>{u.full_name || u.email}</SelectItem>)}
               </SelectContent>
             </Select>

@@ -330,9 +330,9 @@ export default function Utilizadores() {
           <p className="text-xs font-semibold text-slate-600">Enviar para terminal:</p>
           {isAdmin && (
             <Select value={selectedOwnerVal || 'all'} onValueChange={val => setExpandedOwnerFilter(prev => ({ ...prev, [u.id]: val === 'all' ? '' : val }))}>
-              <SelectTrigger className="h-7 text-xs w-[200px]"><SelectValue placeholder="Todos os donos" /></SelectTrigger>
+              <SelectTrigger className="h-7 text-xs w-[200px]"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os donos</SelectItem>
+                <SelectItem value="all">Todos os utilizadores</SelectItem>
                 {appUsers.map(au => <SelectItem key={au.email} value={au.email}>{au.full_name || au.email}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -443,9 +443,9 @@ export default function Utilizadores() {
           </div>
           {isAdmin && allOwners.length > 0 && (
             <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-              <SelectTrigger className="bg-white h-9 w-full sm:w-[220px] text-sm"><SelectValue placeholder="Filtrar por dono" /></SelectTrigger>
+              <SelectTrigger className="bg-white h-9 w-full sm:w-[220px] text-sm"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os donos</SelectItem>
+                <SelectItem value="all">Todos os utilizadores</SelectItem>
                 {appUsers.map(u => <SelectItem key={u.email} value={u.email}>{u.full_name || u.email}</SelectItem>)}
               </SelectContent>
             </Select>
