@@ -90,6 +90,18 @@ export default function Agendamentos() {
     [allSchedules]
   );
 
+  const { data: appUsersAgend = [] } = useQuery({
+    queryKey: ['app-users-agend'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: !!currentUser && canSeeAll,
+  });
+
+  const userEmailToNameAgend = useMemo(() => {
+    const map = {};
+    appUsersAgend.forEach(u => { map[u.email] = u.full_name || u.email; });
+    return map;
+  }, [appUsersAgend]);
+
   const schedules = useMemo(() => {
     if (!currentUser) return [];
     if (canSeeAll) {
@@ -277,7 +289,7 @@ export default function Agendamentos() {
             className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
           >
             <option value="all">Todos os utilizadores</option>
-            {allUsersSchedules.map(u => <option key={u} value={u}>{u}</option>)}
+            {allUsersSchedules.map(u => <option key={u} value={u}>{userEmailToNameAgend[u] || u}</option>)}
           </select>
         </div>
       )}

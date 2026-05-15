@@ -302,9 +302,13 @@ export default function Utilizadores() {
     return terminals.filter(t => (t.usuario_email || t.created_by) === selectedOwner);
   };
 
-  const filteredDialogTerminals = isAdmin && filterDialogTerminalOwner
-    ? terminals.filter(t => t.usuario_email === filterDialogTerminalOwner || t.created_by === filterDialogTerminalOwner)
-    : terminals;
+  const filteredDialogTerminals = useMemo(() => {
+    if (!isAdmin || !filterDialogTerminalOwner || filterDialogTerminalOwner === 'all') return terminals;
+    return terminals.filter(t =>
+      t.usuario_email === filterDialogTerminalOwner ||
+      t.created_by === filterDialogTerminalOwner
+    );
+  }, [isAdmin, filterDialogTerminalOwner, terminals]);
 
   const handleNew = () => { setEditingUser(null); setFormData({ privilege: 0, ativo: true, bio_types: '[]' }); setSelectedTerminals([]); setFilterDialogTerminalOwner(''); setDialogOpen(true); };
   const handleEdit = (u) => {
