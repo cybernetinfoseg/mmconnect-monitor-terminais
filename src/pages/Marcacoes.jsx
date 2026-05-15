@@ -158,11 +158,6 @@ export default function Marcacoes() {
       const toSave = data.records.map(r => {
         const rawMode = r.mode ?? r.Mode ?? r.verifyType ?? r.verifytype;
         const modo = resolveMode(rawMode, terminal);
-        // Determinar tipo entrada/saída
-        let tipo = 'desconhecido';
-        const inoutVal = r.inout ?? r.InOutStatus;
-        if (inoutVal === 0 || inoutVal === 'entrada') tipo = 'entrada';
-        else if (inoutVal === 1 || inoutVal === 'saida') tipo = 'saida';
         // Converter timestamp "YYYY-MM-DD HH:MM:SS" → ISO 8601
         const rawTs = r.time ?? r.Time ?? r.timestamp ?? '';
         let ts = rawTs;
@@ -170,6 +165,24 @@ export default function Marcacoes() {
           ts = rawTs.replace(' ', 'T');
         }
         const enrollid = r.enrollid ?? r.EnrollNumber ?? r.id;
+        
+        // Determinar tipo entrada/saída
+        let tipo = 'desconhecido';
+        const inoutVal = r.inout ?? r.InOutStatus;
+        if (inoutVal === 0 || inoutVal === 'entrada') {
+          tipo = 'entrada';
+        } else if (inoutVal === 1 || inoutVal === 'saida') {
+          tipo = 'saida';
+        } else if (ts) {
+          // Fallback: inferir por hora (7-12h entrada, 16-19h saída)
+          try {
+            const dt = new Date(ts.includes('T') ? ts : ts + 'T00:00:00');
+            const hora = dt.getHours();
+            if (hora >= 7 && hora <= 12) tipo = 'entrada';
+            else if (hora >= 16 && hora <= 19) tipo = 'saida';
+          } catch (e) {}
+        }
+        
         return {
           terminal_id: terminal.id, terminal_nome: terminal.nome,
           enrollid: Number(enrollid) || 0,

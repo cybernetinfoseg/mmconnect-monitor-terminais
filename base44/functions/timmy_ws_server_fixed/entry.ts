@@ -185,12 +185,33 @@ def parse_log_record(rec, terminal_id, terminal_nome, terminal_local):
     except Exception:
         timestamp = ts_str
 
+    # Protocolo Timmy: tentar extrair tipo (inout, InOutStatus) ou inferir por hora
+    tipo = "desconhecido"
+    inout_val = rec.get("inout") or rec.get("InOutStatus") or rec.get("inoutStatus")
+    if inout_val is not None:
+        if inout_val == 0 or inout_val == "0" or inout_val == "entrada":
+            tipo = "entrada"
+        elif inout_val == 1 or inout_val == "1" or inout_val == "saida":
+            tipo = "saida"
+    # Fallback: sem inout, tenta usar heurística por hora (8h-12h entrada, 17h-19h saída)
+    elif timestamp:
+        try:
+            import datetime
+            dt = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            hora = dt.hour
+            if 7 <= hora <= 12:
+                tipo = "entrada"
+            elif 16 <= hora <= 19:
+                tipo = "saida"
+        except Exception:
+            pass
+
     return {
         "terminal_id":    terminal_id,
         "terminal_nome":  terminal_nome,
         "enrollid":       int(rec.get("enrollid", 0)),
         "timestamp":      timestamp,
-        "tipo":           "desconhecido",   # Timmy não distingue entrada/saída nativamente
+        "tipo":           tipo,
         "modo":           modo,
         "raw_mode":       raw_mode,
         "local":          terminal_local or "",
