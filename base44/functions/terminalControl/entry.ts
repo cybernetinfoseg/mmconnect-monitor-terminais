@@ -518,12 +518,28 @@ async function actionDeleteUser(terminal, params) {
 // ─── Timmy-specific actions ──────────────────────────────────────────────────
 
 async function actionGetUserList(terminal, params) {
-  const { count = 100 } = params || {};
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getuserlist apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'getuserlist', count });
-  if (!resp) return { success: false, message: 'Terminal não respondeu' };
-  const users = resp.record || [];
-  return { success: resp.result === true, message: `${users.length} utilizador(es) encontrado(s)`, count: users.length, data: { total: resp.count, users } };
+
+  // Protocolo Timmy: "getalluserinfo" devolve todos os utilizadores registados no terminal
+  // Fallback para "getalluser" em firmwares mais antigos
+  let lastError;
+  for (const cmd of ['getalluserinfo', 'getalluser']) {
+    try {
+      const resp = await sendTimmyCommand(terminal, { cmd });
+      const users = resp.record || [];
+      return {
+        success: resp.result === true,
+        message: `${users.length} utilizador(es) encontrado(s)`,
+        count: users.length,
+        data: { total: resp.count || users.length, users },
+        cmd_usado: cmd,
+      };
+    } catch (e) {
+      lastError = e;
+      console.warn(`[actionGetUserList] comando "${cmd}" falhou: ${e.message}`);
+    }
+  }
+  return { success: false, error: lastError?.message || 'Nenhum comando de listagem suportado por este terminal' };
 }
 
 async function actionGetUserInfo(terminal, params) {
