@@ -24,7 +24,7 @@ import FilterDropdown from '../components/dashboard/FilterDropdown';
 import { cn } from '@/lib/utils';
 import { isSameDay } from 'date-fns';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import { formatDateTimePT } from '@/lib/localization';
+
 
 export default function Incidents() {
   const [statusFilter, setStatusFilter] = useState('all');
@@ -558,7 +558,7 @@ export default function Incidents() {
                           <div className="flex items-center gap-4 text-xs text-slate-400 mt-2">
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {formatDateTimePT(incident.timestamp)}
+                              {new Date(incident.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                             </span>
                             {incident.duracao_minutos && (
                               <span>

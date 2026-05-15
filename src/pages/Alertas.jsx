@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import AlertRuleModal from '../components/alerts/AlertRuleModal';
 import BrowserNotificationToggle from '../components/alerts/BrowserNotificationToggle';
 
@@ -31,6 +31,7 @@ export default function Alertas() {
   const [editingRule, setEditingRule] = useState(null);
   const [userFilter, setUserFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
+  const { timezone: userTimezone } = useUserTimezone();
   const queryClient = useQueryClient();
 
   const logAudit = (acao, entidade_id, descricao) =>
@@ -203,7 +204,7 @@ export default function Alertas() {
                               {rule.ultima_disparada && (
                                 <span className="flex items-center gap-1">
                                   <Zap className="h-3 w-3 text-yellow-500" />
-                                  Último disparo: {moment(rule.ultima_disparada).fromNow()}
+                                  Último disparo: {new Date(rule.ultima_disparada).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               )}
                               {rule.total_disparos > 0 && (
