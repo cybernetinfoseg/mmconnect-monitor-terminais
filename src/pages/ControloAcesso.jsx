@@ -93,7 +93,20 @@ export default function ControloAcesso() {
 
   const locaisDisponiveis = useMemo(() => [...new Set(terminaisAcesso.map(t => t.local).filter(Boolean))].sort(), [terminaisAcesso]);
   const fabricantesDisponiveis = useMemo(() => [...new Set(terminaisAcesso.map(t => t.fabricante).filter(Boolean))].sort(), [terminaisAcesso]);
-  const utilizadoresDisponiveis = useMemo(() => [...new Set(terminaisAcesso.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort(), [terminaisAcesso]);
+  const utilizadoresEmailsDisponiveis = useMemo(() => [...new Set(terminaisAcesso.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort(), [terminaisAcesso]);
+
+  const { data: appUsersAcesso = [] } = useQuery({
+    queryKey: ['app-users-acesso'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: !!currentUser && isAdmin,
+  });
+
+  // Map email → display name for the filter dropdown
+  const userEmailToName = useMemo(() => {
+    const map = {};
+    appUsersAcesso.forEach(u => { map[u.email] = u.full_name || u.email; });
+    return map;
+  }, [appUsersAcesso]);
 
   const terminaisFiltrados = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -109,7 +122,7 @@ export default function ControloAcesso() {
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
       const matchLocal = localFilter === 'all' || t.local === localFilter;
       const matchFabricante = fabricanteFilter === 'all' || t.fabricante === fabricanteFilter;
-      const matchUser = userFilter === 'all' || (t.usuario_email || t.created_by) === userFilter;
+      const matchUser = userFilter === 'all' || t.usuario_email === userFilter || t.created_by === userFilter;
       return matchSearch && matchTipo && matchStatus && matchLocal && matchFabricante && matchUser;
     });
   }, [terminaisAcesso, searchTerm, tipoFilter, statusFilter, localFilter, fabricanteFilter, userFilter]);
@@ -291,14 +304,16 @@ export default function ControloAcesso() {
                 </SelectContent>
               </Select>
             )}
-            {isAdmin && utilizadoresDisponiveis.length > 0 && (
+            {isAdmin && utilizadoresEmailsDisponiveis.length > 0 && (
               <Select value={userFilter} onValueChange={setUserFilter}>
                 <SelectTrigger className="h-8 text-xs bg-slate-700/60 border-slate-600 text-slate-200 w-40">
                   <SelectValue placeholder="Todos os utilizadores" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos os utilizadores</SelectItem>
-                  {utilizadoresDisponiveis.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  {utilizadoresEmailsDisponiveis.map(u => (
+                    <SelectItem key={u} value={u}>{userEmailToName[u] || u}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
