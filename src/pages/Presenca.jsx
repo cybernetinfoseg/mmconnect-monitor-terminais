@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import { format, subHours, isToday, parseISO } from 'date-fns';
+import { subHours, isToday, parseISO } from 'date-fns';
 import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -137,7 +137,7 @@ export default function Presenca() {
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Presença em Tempo Real</h1>
               <p className="text-xs text-slate-500">
-                Hoje · Atualizado {dataUpdatedAt ? format(new Date(dataUpdatedAt), 'HH:mm:ss') : '—'} · auto-refresh 30s
+                Hoje · Atualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'} · auto-refresh 30s
               </p>
             </div>
           </div>
