@@ -9,6 +9,7 @@ import {
   ChevronDown, ChevronRight, Wifi, WifiOff, Settings,
   RotateCcw, Trash2, Eye, Ban, UserCheck
 } from 'lucide-react';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,7 @@ const DOOR_STATES = {
 
 export default function ControloAcesso() {
   const [currentUser, setCurrentUser] = useState(null);
+  const { timezone: userTimezone } = useUserTimezone();
   const [selectedTerminal, setSelectedTerminal] = useState(null);
   const [sending, setSending] = useState(null);
   const [doorState, setDoorState] = useState('normal');
@@ -522,7 +524,7 @@ export default function ControloAcesso() {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <Badge className="text-[9px] bg-slate-700 text-slate-300 px-1.5">{log.acao}</Badge>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-300 mt-0.5 truncate">{log.mensagem || '—'}</p>
