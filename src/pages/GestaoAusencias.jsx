@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
@@ -28,10 +29,14 @@ export default function GestaoAusencias() {
   const [deleteId, setDeleteId] = useState(null);
   const [form, setForm] = useState({ enrollid: '', utilizador_nome: '', tipo: 'ferias', data_inicio: '', data_fim: '', motivo: '', aprovado: false });
   const [currentUser, setCurrentUser] = useState(null);
+  const { timezone: userTimezone } = useUserTimezone();
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
   const isAdmin = currentUser?.role === 'admin';
+  
+  // "hoje" na timezone do utilizador (YYYY-MM-DD)
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
 
   const { data: ausencias = [], isLoading } = useQuery({
     queryKey: ['ausencias'],
@@ -69,7 +74,7 @@ export default function GestaoAusencias() {
 
   const handleNew = () => {
     setEditingId(null);
-    setForm({ enrollid: '', utilizador_nome: '', tipo: 'ferias', data_inicio: format(new Date(), 'yyyy-MM-dd'), data_fim: format(new Date(), 'yyyy-MM-dd'), motivo: '', aprovado: false });
+    setForm({ enrollid: '', utilizador_nome: '', tipo: 'ferias', data_inicio: hoje, data_fim: hoje, motivo: '', aprovado: false });
     setDialogOpen(true);
   };
 
@@ -85,7 +90,6 @@ export default function GestaoAusencias() {
     } catch { return 0; }
   };
 
-  const hoje = format(new Date(), 'yyyy-MM-dd');
   const ativas = ausencias.filter(a => a.data_fim >= hoje);
   const passadas = ausencias.filter(a => a.data_fim < hoje);
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { format, subHours, isToday, parseISO } from 'date-fns';
 import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { cn } from '@/lib/utils';
 export default function Presenca() {
   const [search, setSearch] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const { timezone: userTimezone } = useUserTimezone();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
 
@@ -56,11 +58,14 @@ export default function Presenca() {
 
   // Para cada colaborador, encontrar a última marcação de hoje
   const presencaStatus = useMemo(() => {
-    const hoje = new Date().toISOString().substring(0, 10);
+    // "hoje" na timezone do utilizador (evita erro em fusos com offset grande)
+    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' }); // 'en-CA' dá formato YYYY-MM-DD
     const marcoesHoje = marcacoes.filter(m => {
       if (!m.timestamp) return false;
       if (!isAdmin && !myTerminalIds.has(m.terminal_id)) return false;
-      return m.timestamp.substring(0, 10) === hoje;
+      // Comparar dia do timestamp na timezone do utilizador
+      const diaTs = new Date(m.timestamp).toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+      return diaTs === hoje;
     });
 
     // Agrupar por enrollid → última marcação

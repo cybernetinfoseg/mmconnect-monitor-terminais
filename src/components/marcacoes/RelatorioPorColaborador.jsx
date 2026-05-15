@@ -40,7 +40,7 @@ function formatMinutos(min) {
   return `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}`;
 }
 
-export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, dateTo }) {
+export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, dateTo, userTimezone = 'UTC' }) {
   const [search, setSearch] = useState('');
 
   const diasIntervalo = useMemo(() => {
@@ -49,12 +49,15 @@ export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, 
     catch { return []; }
   }, [dateFrom, dateTo]);
 
-  // Dados para gráfico de marcações por hora do dia
+  // Dados para gráfico de marcações por hora do dia (na timezone do utilizador)
   const porHora = useMemo(() => {
     const counts = Array.from({ length: 24 }, (_, h) => ({ hora: `${String(h).padStart(2,'0')}h`, entrada: 0, saida: 0 }));
     marcacoes.forEach(m => {
       if (!m.timestamp) return;
-      const h = new Date(m.timestamp).getHours();
+      // Usar timezone do utilizador para extrair a hora correta
+      const hStr = new Date(m.timestamp).toLocaleString('en-GB', { timeZone: userTimezone, hour: '2-digit', hour12: false });
+      const h = parseInt(hStr, 10);
+      if (isNaN(h) || h < 0 || h > 23) return;
       if (m.tipo === 'entrada') counts[h].entrada++;
       else if (m.tipo === 'saida') counts[h].saida++;
     });
@@ -92,8 +95,9 @@ export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, 
     Object.values(mapa).forEach(col => {
       const porDia = {};
       col.marcacoes.forEach(m => {
-        const dia = m.timestamp?.substring(0, 10);
-        if (!dia) return;
+        if (!m.timestamp) return;
+        // Usar timezone do utilizador para agrupar por dia correto
+        const dia = new Date(m.timestamp).toLocaleDateString('en-CA', { timeZone: userTimezone });
         if (!porDia[dia]) porDia[dia] = [];
         porDia[dia].push(m);
       });

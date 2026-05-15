@@ -288,15 +288,15 @@ async function runAction(terminal, action, scheduleParams) {
  * CORRIGIDO v3: Lê a timezone do utilizador que criou o agendamento
  * Usa um único instante para extrair hora+dia, evitando inconsistências em transições DST.
  */
-async function shouldRunNow(schedule, now, base44) {
-  // Obter timezone do utilizador que criou o agendamento
+// allUsers: array já carregado externamente (evitar N queries)
+async function shouldRunNow(schedule, now, allUsers) {
+  // Obter timezone do utilizador que criou o agendamento (sem query adicional)
   let userTimezone = 'UTC';
   try {
-    const owner = await base44.asServiceRole.entities.User.list();
-    const ownerUser = owner.find(u => u.email === schedule.criado_por);
+    const ownerUser = allUsers.find(u => u.email === schedule.criado_por);
     if (ownerUser?.timezone) userTimezone = ownerUser.timezone;
   } catch (e) {
-    console.warn(`[shouldRunNow] não consegui obter timezone do utilizador ${schedule.criado_por}, usando UTC`);
+    console.warn(`[shouldRunNow] erro ao obter timezone para ${schedule.criado_por}, usando UTC`);
   }
 
   // Derivar todas as partes da hora local a partir de um único instante
@@ -362,11 +362,19 @@ Deno.serve(async (req) => {
 
     const schedules = await base44.asServiceRole.entities.ScheduledAction.filter({ ativo: true });
 
+    // Pré-carregar todos os utilizadores uma vez (evita N queries dentro do loop)
+    let allUsers = [];
+    try {
+      allUsers = await base44.asServiceRole.entities.User.list();
+    } catch (e) {
+      console.warn('[executeScheduledActions] Não foi possível carregar utilizadores:', e.message);
+    }
+
     const results = [];
     let executed = 0;
 
     for (const schedule of schedules) {
-      if (!await shouldRunNow(schedule, now, base44)) continue;
+      if (!await shouldRunNow(schedule, now, allUsers)) continue;
 
       let result;
       try {

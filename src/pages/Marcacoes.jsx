@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
@@ -36,6 +37,7 @@ export default function Marcacoes() {
   const [collectFabricante, setCollectFabricante] = useState('all');
   const [collectUser, setCollectUser] = useState('all');
 
+  const { timezone: userTimezone } = useUserTimezone();
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
@@ -232,7 +234,7 @@ export default function Marcacoes() {
   const handleExportCSV = () => {
     const headers = ['Data/Hora', 'Terminal', 'ID', 'Utilizador', 'Tipo', 'Modo', 'Local', 'Exportado'];
     const rows = filtered.map(m => [
-      m.timestamp ? format(new Date(m.timestamp), 'dd/MM/yyyy HH:mm:ss') : '',
+      m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
       m.terminal_nome || '', m.enrollid, m.utilizador_nome || userMap[m.enrollid] || '',
       m.tipo || '', m.modo || '', m.local || '', m.exportado ? 'Sim' : 'Não',
     ]);
@@ -412,6 +414,7 @@ export default function Marcacoes() {
                 userMap={userMap}
                 dateFrom={dateFrom}
                 dateTo={dateTo}
+                userTimezone={userTimezone}
               />
             </div>
           </TabsContent>
