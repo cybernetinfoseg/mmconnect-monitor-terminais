@@ -3,7 +3,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
-import { CalendarOff, Plus, Pencil, Trash2, CheckCircle2, XCircle } from 'lucide-react';
+import { CalendarOff, Plus, Pencil, Trash2, CheckCircle2, XCircle, Search } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,8 @@ export default function GestaoAusencias() {
   const [editingId, setEditingId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [form, setForm] = useState({ enrollid: '', utilizador_nome: '', tipo: 'ferias', data_inicio: '', data_fim: '', motivo: '', aprovado: false });
+  const [searchColab, setSearchColab] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
   const { timezone: userTimezone } = useUserTimezone();
   const queryClient = useQueryClient();
@@ -53,6 +55,22 @@ export default function GestaoAusencias() {
     enabled: !!currentUser,
   });
 
+  const { data: appUsers = [] } = useQuery({
+    queryKey: ['app-users-ausencias'],
+    queryFn: () => base44.entities.User.list(),
+    enabled: !!currentUser && isAdmin,
+  });
+
+  const colaboradoresFiltrados = useMemo(() => {
+    let list = colaboradores;
+    if (isAdmin && ownerFilter !== 'all') list = list.filter(c => c.owner_email === ownerFilter);
+    if (searchColab.trim()) {
+      const q = searchColab.toLowerCase();
+      list = list.filter(c => c.nome?.toLowerCase().includes(q) || String(c.enrollid).includes(q));
+    }
+    return list;
+  }, [colaboradores, ownerFilter, searchColab, isAdmin]);
+
   const saveMutation = useMutation({
     mutationFn: (data) => {
       const payload = { ...data, enrollid: Number(data.enrollid), owner_email: currentUser?.email };
@@ -75,12 +93,16 @@ export default function GestaoAusencias() {
   const handleNew = () => {
     setEditingId(null);
     setForm({ enrollid: '', utilizador_nome: '', tipo: 'ferias', data_inicio: hoje, data_fim: hoje, motivo: '', aprovado: false });
+    setSearchColab('');
+    setOwnerFilter('all');
     setDialogOpen(true);
   };
 
   const handleEdit = (a) => {
     setEditingId(a.id);
     setForm({ enrollid: a.enrollid, utilizador_nome: a.utilizador_nome || '', tipo: a.tipo, data_inicio: a.data_inicio, data_fim: a.data_fim, motivo: a.motivo || '', aprovado: a.aprovado || false });
+    setSearchColab('');
+    setOwnerFilter('all');
     setDialogOpen(true);
   };
 
@@ -229,15 +251,38 @@ export default function GestaoAusencias() {
         <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader><DialogTitle>{editingId ? 'Editar Ausência' : 'Registar Ausência'}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div>
-              <label className="text-xs font-medium text-slate-600 block mb-1">Colaborador</label>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-slate-600 block">Colaborador</label>
+              {/* Filtro por utilizador do sistema (admin only) */}
+              {isAdmin && appUsers.length > 0 && (
+                <Select value={ownerFilter} onValueChange={v => { setOwnerFilter(v); setForm(f => ({ ...f, enrollid: '', utilizador_nome: '' })); }}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Todos os utilizadores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os utilizadores</SelectItem>
+                    {appUsers.map(u => <SelectItem key={u.email} value={u.email}>{u.full_name || u.email}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {/* Pesquisa por ID / Nome */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Input
+                  placeholder="Pesquisar por ID ou nome..."
+                  value={searchColab}
+                  onChange={e => setSearchColab(e.target.value)}
+                  className="pl-8 h-8 text-xs"
+                />
+              </div>
               <Select value={String(form.enrollid)} onValueChange={v => {
                 const c = colaboradores.find(x => String(x.enrollid) === v);
                 setForm(f => ({ ...f, enrollid: v, utilizador_nome: c?.nome || '' }));
               }}>
                 <SelectTrigger><SelectValue placeholder="Selecionar colaborador" /></SelectTrigger>
                 <SelectContent>
-                  {colaboradores.map(c => <SelectItem key={c.enrollid} value={String(c.enrollid)}>{c.nome} (#{c.enrollid})</SelectItem>)}
+                  {colaboradoresFiltrados.map(c => <SelectItem key={c.enrollid} value={String(c.enrollid)}>{c.nome} (#{c.enrollid})</SelectItem>)}
+                  {colaboradoresFiltrados.length === 0 && <div className="py-2 text-center text-xs text-slate-400">Nenhum resultado</div>}
                 </SelectContent>
               </Select>
             </div>
