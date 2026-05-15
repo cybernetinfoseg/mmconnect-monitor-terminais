@@ -24,7 +24,7 @@ import AvailabilityHeatmap from '@/components/relatorios/AvailabilityHeatmap';
 import { jsPDF } from 'jspdf';
 
 export default function Relatorios() {
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = new Date().toLocaleDateString('en-CA');
     const sevenDaysAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
     const [dataInicio, setDataInicio] = useState(sevenDaysAgo);

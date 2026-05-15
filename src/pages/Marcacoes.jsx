@@ -480,7 +480,7 @@ export default function Marcacoes() {
                     const cap = terminal ? getTimmyCapabilities(terminal.modelo) : null;
                     return (
                       <tr key={m.id || i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? format(new Date(m.timestamp), 'dd/MM/yy HH:mm:ss') : '—'}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</td>
                         <td className="px-4 py-2.5">
                           <p className="text-xs font-medium text-slate-800 truncate max-w-[100px] lg:max-w-[160px]">{m.terminal_nome || '—'}</p>
                           {m.local && <p className="text-xs text-slate-400 truncate">{m.local}</p>}

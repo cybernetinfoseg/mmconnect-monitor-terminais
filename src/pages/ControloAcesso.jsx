@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
+
 import {
   Shield, DoorOpen, DoorClosed, Lock, Unlock, Power,
   AlertTriangle, RefreshCw, Info, Users, Clock,
@@ -522,7 +522,7 @@ export default function ControloAcesso() {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <Badge className="text-[9px] bg-slate-700 text-slate-300 px-1.5">{log.acao}</Badge>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            {log.timestamp ? format(new Date(log.timestamp), 'dd/MM HH:mm') : '—'}
+                            {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-300 mt-0.5 truncate">{log.mensagem || '—'}</p>

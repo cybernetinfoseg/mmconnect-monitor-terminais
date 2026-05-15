@@ -205,7 +205,7 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} />
+                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} />
                   ))}
                 </div>
               </div>
@@ -220,7 +220,7 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => !p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} />
+                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} />
                   ))}
                 </div>
               </div>
@@ -232,8 +232,9 @@ export default function Presenca() {
   );
 }
 
-function PresencaCard({ pessoa }) {
+function PresencaCard({ pessoa, timezone }) {
   const dentro = pessoa.dentro;
+  const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: timezone || 'UTC' }) : '—';
   return (
     <Card className={cn(
       'border transition-all',
@@ -259,7 +260,7 @@ function PresencaCard({ pessoa }) {
               {pessoa.primeiraMarcacao && (
                 <div className="flex items-center gap-1 text-[11px]">
                   <LogIn className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
-                  <span className="text-slate-600">{format(new Date(pessoa.primeiraMarcacao.timestamp), 'HH:mm')}</span>
+                  <span className="text-slate-600">{fmtTime(pessoa.primeiraMarcacao.timestamp)}</span>
                   {pessoa.primeiraMarcacao.terminal_nome && (
                     <span className="text-slate-400 truncate">· {pessoa.primeiraMarcacao.terminal_nome}</span>
                   )}
@@ -268,7 +269,7 @@ function PresencaCard({ pessoa }) {
               {!dentro && pessoa.ultimaMarcacao && (
                 <div className="flex items-center gap-1 text-[11px]">
                   <LogOut className="h-2.5 w-2.5 text-rose-400 shrink-0" />
-                  <span className="text-slate-600">{format(new Date(pessoa.ultimaMarcacao.timestamp), 'HH:mm')}</span>
+                  <span className="text-slate-600">{fmtTime(pessoa.ultimaMarcacao.timestamp)}</span>
                   {pessoa.ultimaMarcacao.terminal_nome && (
                     <span className="text-slate-400 truncate">· {pessoa.ultimaMarcacao.terminal_nome}</span>
                   )}
