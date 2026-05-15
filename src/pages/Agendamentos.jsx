@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+
 import { toast } from 'sonner';
 import ScheduledActionModal from '@/components/agendamentos/ScheduledActionModal';
 
@@ -47,7 +47,7 @@ const FREQ_LABELS = {
 
 const DIAS_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-function formatFrequencia(sched) {
+function formatFrequencia(sched, timezone) {
   if (sched.frequencia === 'diaria') return `Diária às ${sched.hora}`;
   if (sched.frequencia === 'semanal') {
     try {
@@ -56,7 +56,9 @@ function formatFrequencia(sched) {
     } catch { return `Semanal às ${sched.hora}`; }
   }
   if (sched.frequencia === 'mensal') return `Dia ${sched.dia_mes} de cada mês às ${sched.hora}`;
-  if (sched.frequencia === 'unica' && sched.data_unica) return moment(sched.data_unica).format('DD/MM/YY HH:mm');
+  if (sched.frequencia === 'unica' && sched.data_unica) {
+    return new Date(sched.data_unica).toLocaleString('pt-PT', { timeZone: timezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
   return sched.frequencia;
 }
 
@@ -178,8 +180,8 @@ export default function Agendamentos() {
                 Terminal: <span className="font-medium text-slate-700">{sched.terminal_nome}</span>
               </p>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatFrequencia(sched)}
+              <Clock className="h-3 w-3" />
+              {formatFrequencia(sched, userTimezone)}
               </p>
 
               <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -189,7 +191,7 @@ export default function Agendamentos() {
                       ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                       : <XCircle className="h-3 w-3 text-red-400" />
                     }
-                    Última: {moment(sched.ultima_execucao).fromNow()}
+                    Última: {new Date(sched.ultima_execucao).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 {sched.total_execucoes > 0 && (
