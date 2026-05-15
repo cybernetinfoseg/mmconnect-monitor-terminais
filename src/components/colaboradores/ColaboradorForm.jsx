@@ -300,10 +300,8 @@ export default function ColaboradorForm({ formData, setFormData, terminals, sele
             <Select
               value={filterDialogTerminalOwner || 'all'}
               onValueChange={v => {
-                const newVal = v === 'all' ? '' : v;
-                setFilterDialogTerminalOwner(newVal);
-                // Só limpa seleção se mudou para um dono diferente
-                if (newVal !== filterDialogTerminalOwner) setSelectedTerminals([]);
+                setFilterDialogTerminalOwner(v === 'all' ? '' : v);
+                setSelectedTerminals([]);
               }}
             >
               <SelectTrigger className="h-8 w-full text-xs mb-2"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>

@@ -303,7 +303,7 @@ export default function Utilizadores() {
   };
 
   const filteredDialogTerminals = useMemo(() => {
-    if (!isAdmin || !filterDialogTerminalOwner || filterDialogTerminalOwner === 'all') return terminals;
+    if (!isAdmin || !filterDialogTerminalOwner) return terminals;
     return terminals.filter(t =>
       t.usuario_email === filterDialogTerminalOwner ||
       t.created_by === filterDialogTerminalOwner
