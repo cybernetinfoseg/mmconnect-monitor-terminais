@@ -285,22 +285,23 @@ async function runAction(terminal, action, scheduleParams) {
 
 // ─── Verificar se um agendamento deve ser executado agora ─────────────────────
 /**
- * CORRIGIDO: usa um único instante para extrair hora+dia, evitando inconsistências
- * em transições BST/GMT. Europe/London é a timezone do utilizador.
+ * CORRIGIDO v3: Lê a timezone do utilizador que criou o agendamento
+ * Usa um único instante para extrair hora+dia, evitando inconsistências em transições DST.
  */
-function shouldRunNow(schedule, now) {
-  // Derivar todas as partes da hora local a partir de um único toLocaleString
-  const parts = now.toLocaleString('en-GB', {
-    timeZone: 'Europe/London',
-    hour: '2-digit', minute: '2-digit',
-    weekday: 'short', day: '2-digit',
-    hour12: false,
-  });
+async function shouldRunNow(schedule, now, base44) {
+  // Obter timezone do utilizador que criou o agendamento
+  let userTimezone = 'UTC';
+  try {
+    const owner = await base44.asServiceRole.entities.User.list();
+    const ownerUser = owner.find(u => u.email === schedule.criado_por);
+    if (ownerUser?.timezone) userTimezone = ownerUser.timezone;
+  } catch (e) {
+    console.warn(`[shouldRunNow] não consegui obter timezone do utilizador ${schedule.criado_por}, usando UTC`);
+  }
 
-  // Exemplo de output: "Wed, 14/05/2026, 09:30"
-  // Mas toLocaleString com múltiplas opções pode variar; usar Intl.DateTimeFormat para ser preciso
+  // Derivar todas as partes da hora local a partir de um único instante
   const dtf = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Europe/London',
+    timeZone: userTimezone,
     hour: '2-digit', minute: '2-digit',
     weekday: 'short', day: '2-digit',
     hour12: false,
@@ -365,7 +366,7 @@ Deno.serve(async (req) => {
     let executed = 0;
 
     for (const schedule of schedules) {
-      if (!shouldRunNow(schedule, now)) continue;
+      if (!await shouldRunNow(schedule, now, base44)) continue;
 
       let result;
       try {
