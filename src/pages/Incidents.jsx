@@ -22,8 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FilterDropdown from '../components/dashboard/FilterDropdown';
 import { cn } from '@/lib/utils';
-import { format, isSameDay } from 'date-fns';
-import pt from 'date-fns/locale/pt';
+import { isSameDay } from 'date-fns';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { formatDateTimePT } from '@/lib/localization';
 
 export default function Incidents() {
@@ -31,6 +31,7 @@ export default function Incidents() {
   const [tipoFilter, setTipoFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('all');
   const [currentUser, setCurrentUser] = useState(null);
+  const { timezone: userTimezone } = useUserTimezone();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -139,7 +140,7 @@ export default function Incidents() {
     doc.text('NOC Monitor — Relatório de Incidentes', margin, 11);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', { locale: pt })}`, pageW - margin, 11, { align: 'right' });
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, pageW - margin, 11, { align: 'right' });
 
     y = 26;
     doc.setTextColor(30, 41, 59);
@@ -240,7 +241,7 @@ export default function Incidents() {
       const tipo = incident.tipo === 'offline' ? 'Offline' : 'Restaurado';
       const status = incident.resolvido ? ' ✓' : '';
       const duracao = incident.duracao_minutos ? `${incident.duracao_minutos} min` : '-';
-      const data = format(new Date(incident.timestamp), 'dd/MM/yy HH:mm', { locale: pt });
+      const data = new Date(incident.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
       const truncate = (str, max) => str?.length > max ? str.slice(0, max - 1) + '…' : (str || '-');
 
@@ -260,7 +261,7 @@ export default function Incidents() {
     doc.text('NOC Monitor — Relatório gerado automaticamente', margin, 292);
     doc.text(`Página 1`, pageW - margin, 292, { align: 'right' });
 
-    const filename = `incidentes_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`;
+    const filename = `incidentes_${new Date().toLocaleDateString('en-CA').replace(/-/g, '')}_${new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }).replace(':', '')}.pdf`;
     doc.save(filename);
   };
 
@@ -566,7 +567,7 @@ export default function Incidents() {
                             )}
                             {incident.resolvido_em && (
                               <span>
-                                Resolvido em: {format(new Date(incident.resolvido_em), 'dd/MM HH:mm', { locale: pt })}
+                                Resolvido em: {new Date(incident.resolvido_em).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
                           </div>

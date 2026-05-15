@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { createPageUrl } from '@/utils';
 import { Link } from 'react-router-dom';
-import moment from 'moment';
+
 
 const ACAO_COLORS = {
   terminal_criado: 'bg-emerald-100 text-emerald-700',
@@ -65,7 +65,7 @@ export default function RecentAuditWidget({ currentUser }) {
               </Badge>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-slate-600 truncate">{log.descricao || log.entidade}</p>
-                <p className="text-xs text-slate-400 truncate">{log.usuario_email} · {moment(log.timestamp).fromNow()}</p>
+                <p className="text-xs text-slate-400 truncate">{log.usuario_email} · {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</p>
               </div>
             </div>
           ))}
