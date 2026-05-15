@@ -350,17 +350,20 @@ async function actionGetDevInfo(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getreginfo' });
+    // Protocolo oficial Timmy: cmd = "getdevinfo" (pág. 22 — "Get terminal parameter")
+    // Nota: a info de reg (SN, modelo, firmware) chega no heartbeat de registo (cmd=reg)
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getdevinfo' });
     return {
       success: resp.result === true,
       message: 'Informação do dispositivo obtida',
       data: {
         sn: resp.sn || terminal.numero_serie,
-        modelo: resp.modelname || terminal.modelo,
-        firmware: resp.firmware, mac: resp.mac,
-        utilizadores: `${resp.useduser || 0}/${resp.usersize || '?'}`,
-        logs: `${resp.usedlog || 0}/${resp.logsize || '?'}`,
-        novos_logs: resp.usednewlog,
+        modelo: terminal.modelo,
+        deviceid: resp.deviceid,
+        language: resp.language,
+        volume: resp.volume,
+        verifymode: resp.verifymode,
+        userfpnum: resp.userfpnum,
       }
     };
   }
@@ -491,17 +494,9 @@ async function actionDeleteUser(terminal, params) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    // Tentar deleteuserinfo e depois deleteuser (variações de firmware)
-    for (const cmdName of ['deleteuserinfo', 'deleteuser']) {
-      try {
-        const resp = await sendTimmyCommand(terminal, { cmd: cmdName, enrollid: Number(enrollid) });
-        return { success: resp.result === true, message: `Utilizador ID:${enrollid} removido`, data: resp };
-      } catch (e) {
-        if (!e.message.includes('não suporta o comando')) throw e;
-        console.warn(`[actionDeleteUser] "${cmdName}" não suportado, tentando alternativa...`);
-      }
-    }
-    return { success: false, error: `O terminal "${terminal.nome}" não suporta remoção de utilizador via este comando. Firmware incompatível.` };
+    // Protocolo oficial Timmy: cmd = "deleteuser", backupnum=13 apaga tudo (fp+pwd+card+nome)
+    const resp = await sendTimmyCommand(terminal, { cmd: 'deleteuser', enrollid: Number(enrollid), backupnum: 13 });
+    return { success: resp.result === true, message: `Utilizador ID:${enrollid} removido`, data: resp };
   }
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
     return await sendAdmsCommand(terminal, 'deleteuser', { enrollid });
@@ -543,23 +538,15 @@ async function actionGetAllLogs(terminal, params) {
   const { count = 200, from, to } = params || {};
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getalllog apenas suportado via WebSocket Cloud (Timmy)' };
 
-  // Tentar por ordem: getalllog → getnewlog (compatibilidade com mais modelos Timmy)
-  const cmdsToTry = [];
-  if (from || to) {
-    // Com filtro de datas, usar getlog
-    const cmd = { cmd: 'getlog', count, stn: true };
-    if (from) cmd.from = from;
-    if (to)   cmd.to   = to;
-    cmdsToTry.push(cmd);
-    cmdsToTry.push({ cmd: 'getnewlog', stn: true });
-  } else {
-    // Sem filtro: tentar getalllog primeiro, depois getnewlog
-    cmdsToTry.push({ cmd: 'getalllog', count });
-    cmdsToTry.push({ cmd: 'getnewlog', stn: true });
-  }
+  // Protocolo oficial Timmy:
+  //   getalllog (pág. 16): suporta filtro de datas (from/to opcionais), usa stn:true para paginação
+  //   getnewlog (pág. 15): apenas logs novos não lidos, sem filtro de datas
+  const cmdGetAll = { cmd: 'getalllog', stn: true };
+  if (from) cmdGetAll.from = from;
+  if (to)   cmdGetAll.to   = to;
 
   let lastError;
-  for (const cmd of cmdsToTry) {
+  for (const cmd of [cmdGetAll, { cmd: 'getnewlog', stn: true }]) {
     try {
       const resp = await sendTimmyCommand(terminal, cmd);
       const records = resp.record || [];
@@ -579,63 +566,32 @@ async function actionGetAllLogs(terminal, params) {
 }
 
 async function actionClearLogs(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearlog apenas suportado via WebSocket Cloud (Timmy)' };
-  // Tentar clearlog e depois clearlogs (variações de firmware)
-  for (const cmdName of ['clearlog', 'clearlogs', 'deletelog']) {
-    try {
-      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
-      return { success: resp.result === true || resp.result === undefined, message: 'Todos os logs eliminados do terminal', data: resp };
-    } catch (e) {
-      if (!e.message.includes('não suporta o comando')) throw e;
-      console.warn(`[actionClearLogs] "${cmdName}" não suportado, tentando alternativa...`);
-    }
-  }
-  return { success: false, error: `O terminal "${terminal.nome}" não suporta o comando de limpar logs. Este firmware pode não implementar esta função.` };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'cleanlog apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "cleanlog" (pág. 18 do protocolo)
+  const resp = await sendTimmyCommand(terminal, { cmd: 'cleanlog' });
+  return { success: resp.result === true, message: 'Todos os logs eliminados do terminal', data: resp };
 }
 
 async function actionClearUsers(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearuserdata apenas suportado via WebSocket Cloud (Timmy)' };
-  // Tentar variações do comando
-  for (const cmdName of ['clearuserdata', 'clearuser', 'deleteuser']) {
-    try {
-      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
-      return { success: resp.result === true || resp.result === undefined, message: 'Todos os utilizadores eliminados do terminal', data: resp };
-    } catch (e) {
-      if (!e.message.includes('não suporta o comando')) throw e;
-      console.warn(`[actionClearUsers] "${cmdName}" não suportado, tentando alternativa...`);
-    }
-  }
-  return { success: false, error: `O terminal "${terminal.nome}" não suporta o comando de limpar utilizadores. Este firmware pode não implementar esta função.` };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'cleanuser apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "cleanuser" (pág. 14 do protocolo — "Clean all users")
+  const resp = await sendTimmyCommand(terminal, { cmd: 'cleanuser' });
+  return { success: resp.result === true, message: 'Todos os utilizadores eliminados do terminal', data: resp };
 }
 
 async function actionGetParam(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getparam apenas suportado via WebSocket Cloud (Timmy)' };
-  // Tentar variações do comando
-  for (const cmdName of ['getterminalparameter', 'getparam', 'getconfig', 'getdevparam']) {
-    try {
-      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
-      return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
-    } catch (e) {
-      if (!e.message.includes('não suporta o comando')) throw e;
-      console.warn(`[actionGetParam] "${cmdName}" não suportado, tentando alternativa...`);
-    }
-  }
-  return { success: false, error: `O terminal "${terminal.nome}" não suporta leitura de parâmetros. Este firmware pode não implementar esta função.` };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getdevinfo apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "getdevinfo" (pág. 22 — "Get terminal parameter")
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getdevinfo' });
+  return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
 }
 
 async function actionInitDevice(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initialize apenas suportado via WebSocket Cloud (Timmy)' };
-  // Tentar variações do comando
-  for (const cmdName of ['initialize', 'factoryreset', 'reset']) {
-    try {
-      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
-      return { success: resp.result === true || resp.result === undefined, message: 'Terminal inicializado (reset de fábrica)', data: resp };
-    } catch (e) {
-      if (!e.message.includes('não suporta o comando')) throw e;
-      console.warn(`[actionInitDevice] "${cmdName}" não suportado, tentando alternativa...`);
-    }
-  }
-  return { success: false, error: `O terminal "${terminal.nome}" não suporta reset de fábrica via comando remoto. Este firmware pode não implementar esta função.` };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initsys apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "initsys" (pág. 19 — "Initialize system")
+  // Atenção: apaga todos os utilizadores e logs mas mantém configurações
+  const resp = await sendTimmyCommand(terminal, { cmd: 'initsys' });
+  return { success: resp.result === true, message: 'Sistema inicializado — utilizadores e logs eliminados (configurações mantidas)', data: resp };
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
