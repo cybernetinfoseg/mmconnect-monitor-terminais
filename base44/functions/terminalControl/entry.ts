@@ -113,7 +113,15 @@ async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
       if (!data.success) {
         throw new Error(data.error || 'Servidor Timmy não conseguiu enviar o comando ao terminal');
       }
-      return data.result || { result: true };
+
+      const result = data.result || { result: true };
+
+      // Detectar "can not find this command" — o firmware não suporta este comando
+      if (result.result === false && result.msg && result.msg.toLowerCase().includes('can not find this command')) {
+        throw new Error(`O terminal "${terminal.nome}" (modelo: ${terminal.modelo || 'desconhecido'}) não suporta o comando "${command.cmd}". Este firmware não implementa esta função.`);
+      }
+
+      return result;
 
     } catch (e) {
       lastError = e;
@@ -483,8 +491,17 @@ async function actionDeleteUser(terminal, params) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'deleteuserinfo', enrollid: Number(enrollid) });
-    return { success: resp.result === true, message: `Utilizador ID:${enrollid} removido`, data: resp };
+    // Tentar deleteuserinfo e depois deleteuser (variações de firmware)
+    for (const cmdName of ['deleteuserinfo', 'deleteuser']) {
+      try {
+        const resp = await sendTimmyCommand(terminal, { cmd: cmdName, enrollid: Number(enrollid) });
+        return { success: resp.result === true, message: `Utilizador ID:${enrollid} removido`, data: resp };
+      } catch (e) {
+        if (!e.message.includes('não suporta o comando')) throw e;
+        console.warn(`[actionDeleteUser] "${cmdName}" não suportado, tentando alternativa...`);
+      }
+    }
+    return { success: false, error: `O terminal "${terminal.nome}" não suporta remoção de utilizador via este comando. Firmware incompatível.` };
   }
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
     return await sendAdmsCommand(terminal, 'deleteuser', { enrollid });
@@ -525,47 +542,100 @@ async function actionGetUserInfo(terminal, params) {
 async function actionGetAllLogs(terminal, params) {
   const { count = 200, from, to } = params || {};
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getalllog apenas suportado via WebSocket Cloud (Timmy)' };
-  // Se datas fornecidas, usar getlog com from/to; caso contrário getalllog
-  let cmd;
+
+  // Tentar por ordem: getalllog → getnewlog (compatibilidade com mais modelos Timmy)
+  const cmdsToTry = [];
   if (from || to) {
-    cmd = { cmd: 'getlog', count, stn: true };
-    if (from) cmd.from = from; // formato: "YYYY-MM-DD HH:MM:SS"
+    // Com filtro de datas, usar getlog
+    const cmd = { cmd: 'getlog', count, stn: true };
+    if (from) cmd.from = from;
     if (to)   cmd.to   = to;
+    cmdsToTry.push(cmd);
+    cmdsToTry.push({ cmd: 'getnewlog', stn: true });
   } else {
-    cmd = { cmd: 'getalllog', count };
+    // Sem filtro: tentar getalllog primeiro, depois getnewlog
+    cmdsToTry.push({ cmd: 'getalllog', count });
+    cmdsToTry.push({ cmd: 'getnewlog', stn: true });
   }
-  const resp = await sendTimmyCommand(terminal, cmd);
-  const records = resp.record || [];
-  return {
-    success: resp.result === true,
-    message: `${records.length} marcações obtidas (total: ${resp.count || records.length})${from ? ` — de ${from}` : ''}${to ? ` até ${to}` : ''}`,
-    count: records.length,
-    records: records.slice(0, 200),
-  };
+
+  let lastError;
+  for (const cmd of cmdsToTry) {
+    try {
+      const resp = await sendTimmyCommand(terminal, cmd);
+      const records = resp.record || [];
+      return {
+        success: true,
+        message: `${records.length} marcações obtidas (total: ${resp.count || records.length})${from ? ` — de ${from}` : ''}${to ? ` até ${to}` : ''}`,
+        count: records.length,
+        records: records.slice(0, 200),
+        cmd_usado: cmd.cmd,
+      };
+    } catch (e) {
+      lastError = e;
+      console.warn(`[actionGetAllLogs] comando "${cmd.cmd}" falhou: ${e.message}`);
+    }
+  }
+  return { success: false, error: lastError?.message || 'Nenhum comando de log suportado por este terminal' };
 }
 
 async function actionClearLogs(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearlog apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'clearlog' });
-  return { success: resp.result === true || resp.result === undefined, message: 'Todos os logs eliminados do terminal', data: resp };
+  // Tentar clearlog e depois clearlogs (variações de firmware)
+  for (const cmdName of ['clearlog', 'clearlogs', 'deletelog']) {
+    try {
+      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
+      return { success: resp.result === true || resp.result === undefined, message: 'Todos os logs eliminados do terminal', data: resp };
+    } catch (e) {
+      if (!e.message.includes('não suporta o comando')) throw e;
+      console.warn(`[actionClearLogs] "${cmdName}" não suportado, tentando alternativa...`);
+    }
+  }
+  return { success: false, error: `O terminal "${terminal.nome}" não suporta o comando de limpar logs. Este firmware pode não implementar esta função.` };
 }
 
 async function actionClearUsers(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearuserdata apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'clearuserdata' });
-  return { success: resp.result === true || resp.result === undefined, message: 'Todos os utilizadores eliminados do terminal', data: resp };
+  // Tentar variações do comando
+  for (const cmdName of ['clearuserdata', 'clearuser', 'deleteuser']) {
+    try {
+      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
+      return { success: resp.result === true || resp.result === undefined, message: 'Todos os utilizadores eliminados do terminal', data: resp };
+    } catch (e) {
+      if (!e.message.includes('não suporta o comando')) throw e;
+      console.warn(`[actionClearUsers] "${cmdName}" não suportado, tentando alternativa...`);
+    }
+  }
+  return { success: false, error: `O terminal "${terminal.nome}" não suporta o comando de limpar utilizadores. Este firmware pode não implementar esta função.` };
 }
 
 async function actionGetParam(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getparam apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'getterminalparameter' });
-  return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
+  // Tentar variações do comando
+  for (const cmdName of ['getterminalparameter', 'getparam', 'getconfig', 'getdevparam']) {
+    try {
+      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
+      return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
+    } catch (e) {
+      if (!e.message.includes('não suporta o comando')) throw e;
+      console.warn(`[actionGetParam] "${cmdName}" não suportado, tentando alternativa...`);
+    }
+  }
+  return { success: false, error: `O terminal "${terminal.nome}" não suporta leitura de parâmetros. Este firmware pode não implementar esta função.` };
 }
 
 async function actionInitDevice(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initialize apenas suportado via WebSocket Cloud (Timmy)' };
-  const resp = await sendTimmyCommand(terminal, { cmd: 'initialize' });
-  return { success: resp.result === true || resp.result === undefined, message: 'Terminal inicializado (reset de fábrica)', data: resp };
+  // Tentar variações do comando
+  for (const cmdName of ['initialize', 'factoryreset', 'reset']) {
+    try {
+      const resp = await sendTimmyCommand(terminal, { cmd: cmdName });
+      return { success: resp.result === true || resp.result === undefined, message: 'Terminal inicializado (reset de fábrica)', data: resp };
+    } catch (e) {
+      if (!e.message.includes('não suporta o comando')) throw e;
+      console.warn(`[actionInitDevice] "${cmdName}" não suportado, tentando alternativa...`);
+    }
+  }
+  return { success: false, error: `O terminal "${terminal.nome}" não suporta reset de fábrica via comando remoto. Este firmware pode não implementar esta função.` };
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
