@@ -350,20 +350,21 @@ async function actionGetDevInfo(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    // Protocolo oficial Timmy: cmd = "getdevinfo" (pág. 22 — "Get terminal parameter")
-    // Nota: a info de reg (SN, modelo, firmware) chega no heartbeat de registo (cmd=reg)
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getdevinfo' });
+    // "Info do Dispositivo" — devolve dados já guardados em BD (sem chamar o terminal)
+    // Os dados de hardware (SN, modelo, firmware) chegam no heartbeat de registo (cmd=reg)
     return {
-      success: resp.result === true,
+      success: true,
       message: 'Informação do dispositivo obtida',
       data: {
-        sn: resp.sn || terminal.numero_serie,
+        sn: terminal.numero_serie,
         modelo: terminal.modelo,
-        deviceid: resp.deviceid,
-        language: resp.language,
-        volume: resp.volume,
-        verifymode: resp.verifymode,
-        userfpnum: resp.userfpnum,
+        fabricante: terminal.fabricante,
+        local: terminal.local,
+        status: terminal.status,
+        ultimo_ping: terminal.ultimo_ping,
+        latencia_ms: terminal.latencia_ms,
+        segundos_sem_ping: terminal.segundos_sem_ping,
+        tipo_conexao: terminal.tipo_conexao,
       }
     };
   }
