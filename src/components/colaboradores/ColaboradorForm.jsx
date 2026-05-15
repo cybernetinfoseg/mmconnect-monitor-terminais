@@ -296,17 +296,11 @@ export default function ColaboradorForm({ formData, setFormData, terminals, sele
             <span className="text-sm font-semibold text-slate-700">🖥️ Terminais Associados</span>
             <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs">{selectedTerminals.length} selecionado(s)</Badge>
           </div>
-          {isAdmin && appUsers.length > 0 && (
-            <Select
-              value={filterDialogTerminalOwner || 'all'}
-              onValueChange={v => {
-                setFilterDialogTerminalOwner(v === 'all' ? '' : v);
-                setSelectedTerminals([]);
-              }}
-            >
-              <SelectTrigger className="h-8 w-full text-xs mb-2"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>
+          {isAdmin && (
+            <Select value={filterDialogTerminalOwner || 'all'} onValueChange={v => { setFilterDialogTerminalOwner(v === 'all' ? '' : v); setSelectedTerminals([]); }}>
+              <SelectTrigger className="h-8 w-full text-xs mb-2"><SelectValue placeholder="Filtrar por dono" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os utilizadores</SelectItem>
+                <SelectItem value="all">Todos os donos</SelectItem>
                 {appUsers.map(u => <SelectItem key={u.email} value={u.email}>{u.full_name || u.email}</SelectItem>)}
               </SelectContent>
             </Select>

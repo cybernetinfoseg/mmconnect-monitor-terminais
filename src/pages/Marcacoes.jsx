@@ -65,18 +65,6 @@ export default function Marcacoes() {
     enabled: !!currentUser,
   });
 
-  const { data: appUsers = [] } = useQuery({
-    queryKey: ['app-users-marcacoes'],
-    queryFn: () => base44.entities.User.list(),
-    enabled: !!currentUser && isAdmin,
-  });
-
-  const userEmailToName = useMemo(() => {
-    const map = {};
-    appUsers.forEach(u => { map[u.email] = u.full_name || u.email; });
-    return map;
-  }, [appUsers]);
-
   const { data: terminalUsers = [] } = useQuery({
     queryKey: ['terminal-users-map', currentUser?.email, isAdmin],
     queryFn: async () => {
@@ -377,7 +365,7 @@ export default function Marcacoes() {
                     <SelectContent>
                       <SelectItem value="all">Todos os utilizadores</SelectItem>
                       {[...new Set(terminals.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort().map(u => (
-                        <SelectItem key={u} value={u}>{userEmailToName[u] || u}</SelectItem>
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -461,7 +449,7 @@ export default function Marcacoes() {
             <select value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}
               className="h-9 px-3 rounded-md border border-slate-200 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-slate-300 col-span-full sm:col-span-1">
               <option value="all">Todos os utilizadores</option>
-              {allOwners.map(o => <option key={o} value={o}>{userEmailToName[o] || o}</option>)}
+              {allOwners.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           )}
         </div>

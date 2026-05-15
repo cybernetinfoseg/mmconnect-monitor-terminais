@@ -276,12 +276,6 @@ export default function Terminais() {
     [terminals]
   );
 
-  const userEmailToName = useMemo(() => {
-    const map = {};
-    allUsers.forEach(u => { map[u.email] = u.full_name || u.email; });
-    return map;
-  }, [allUsers]);
-
   // Contagem de terminais do utilizador atual (para limite) — usa usuario_email como ownership real
   const terminalCount = useMemo(() => {
     const count = terminals.filter(t => (t.usuario_email || t.created_by) === currentUser?.email).length;
@@ -493,7 +487,7 @@ export default function Terminais() {
                   className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
                 >
                   <option value="all">Todos os utilizadores</option>
-                  {usuarios.map(u => <option key={u} value={u}>{userEmailToName[u] || u}</option>)}
+                  {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               )}
               {(searchTerm || tipoFilter !== 'all' || statusFilter !== 'all' || localFilter !== 'all' || fabricanteFilter !== 'all' || userFilter !== 'all') && (
@@ -530,7 +524,7 @@ export default function Terminais() {
                           {(terminal.usuario_email || terminal.created_by) && (
                             <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
                               <UserIcon className="h-3 w-3 shrink-0" />
-                              {userEmailToName[terminal.usuario_email || terminal.created_by] || terminal.usuario_email || terminal.created_by}
+                              {terminal.usuario_email || terminal.created_by}
                             </p>
                           )}
                         </div>
