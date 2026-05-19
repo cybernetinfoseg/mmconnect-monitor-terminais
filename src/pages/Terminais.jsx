@@ -860,8 +860,7 @@ export default function Terminais() {
               <div className="space-y-3">
                 <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg text-xs text-violet-700 space-y-1">
                   <p className="font-semibold">📡 WebSocket Cloud — Timmy / THbio</p>
-                  <p>O terminal conecta-se ao servidor via <strong>WebSocket persistente</strong> (protocolo JSON). Compatível com: <strong>Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50</strong> e outros modelos THbio.</p>
-                  <p>O servidor <code className="bg-violet-100 px-1 rounded">timmy_ws_server.py</code> corre no Windows Server e escuta na porta configurada (padrão: 7788).</p>
+                  <p>O terminal conecta-se ao servidor via <strong>WebSocket persistente</strong>. Compatível com: <strong>Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50</strong> e outros modelos THbio.</p>
                   <p className="text-violet-600">⚠️ O <strong>Número de Série (SN)</strong> é obrigatório — é como o servidor identifica o terminal. Aceda via: <em>MENU → Sys Info → Info → SN</em></p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -875,44 +874,12 @@ export default function Terminais() {
                     <p className="text-xs text-slate-500">Visível em: MENU → Sys Info → Info → SN</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Porta WebSocket</Label>
-                    <Input
-                      type="number"
-                      value={formData.porta || 7788}
-                      onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})}
-                      placeholder="7788"
-                    />
-                    <p className="text-xs text-slate-500">Porta configurada no timmy_ws_server.py (padrão: 7788)</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>IP / Host do Servidor <span className="text-red-500">*</span></Label>
-                  <Input
-                    value={formData.ip_publico || ''}
-                    onChange={(e) => setFormData({...formData, ip_publico: e.target.value})}
-                    placeholder="192.168.1.10 ou meuservidor.ddns.net"
-                  />
-                  <p className="text-xs text-slate-500">IP ou hostname do servidor onde o <code className="bg-slate-100 px-1 rounded">timmy_ws_server.py</code> está a correr — usado para enviar comandos remotos via porta 7789</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
                     <Label>Modelo do Terminal</Label>
                     <Input
                       value={formData.modelo || ''}
                       onChange={(e) => setFormData({...formData, modelo: e.target.value})}
                       placeholder="TM-AI07F, TM-AIFace11F, TFS30..."
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Fabricante</Label>
-                    <select
-                      value={formData.fabricante || 'timmy'}
-                      onChange={(e) => setFormData({...formData, fabricante: e.target.value})}
-                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      <option value="timmy">Timmy / THbio</option>
-                      <option value="outro">Outro</option>
-                    </select>
                   </div>
                 </div>
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
