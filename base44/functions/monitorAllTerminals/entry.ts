@@ -18,7 +18,7 @@ const PASSIVE_TIMEOUT = {
     sdk_tcp:          180,  // noc_server SDK polling
     p2s:              180,  // p2s_server conexão inversa
     adms_push:        450,  // ADMS ciclo pode ser até 3min → 1.5× margem
-    websocket_cloud:  480,  // timmy: heartbeat 3s, report 30-45s → margem conservadora de 8× (480s)
+    websocket_cloud:  360,  // timmy: heartbeat 3s, report 60s → margem de 6×
 };
 
 const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s']);
@@ -220,26 +220,21 @@ async function checkTerminalActiveWithRetry(terminal, maxRetries = 3) {
 }
 
 async function checkTimmyWsServer(terminal) {
-     const sn = (terminal.numero_serie || '').trim();
-     if (!sn) return { serverReachable: false, online: false };
-     // Prioridade: ip_publico/dns específico do terminal → NOC_SERVER_HOST global
-     const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
-     if (!host) return { serverReachable: false, online: false };
-     try {
-         const ctrlPort = 7789; // porta HTTP de controlo do servidor Timmy (sempre fixa)
-         const resp = await fetch(`http://${host}:${ctrlPort}/status/${sn}`, { signal: AbortSignal.timeout(5000) });
-         if (!resp.ok) return { serverReachable: true, online: false };
-         const data = await resp.json();
-         // Anti-bouncing: se último ping é recente (< 2min), ignora status transitório
-         const lastPing = terminal.ultimo_ping ? new Date(terminal.ultimo_ping) : null;
-         const segDesdeUltimo = lastPing ? Math.floor((Date.now() - lastPing.getTime()) / 1000) : 999999;
-         const statusReliable = data.connected === true && segDesdeUltimo < 120;
-         return { serverReachable: true, online: statusReliable || (data.connected === true) };
-     } catch (e) {
-         console.warn(`[monitorAllTerminals] WebSocket server fetch failed for ${sn}: ${e.message}`);
-         return { serverReachable: false, online: false };
-     }
- }
+    const sn = (terminal.numero_serie || '').trim();
+    if (!sn) return { serverReachable: false, online: false };
+    // Prioridade: ip_publico/dns específico do terminal → NOC_SERVER_HOST global
+    const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
+    if (!host) return { serverReachable: false, online: false };
+    try {
+        const ctrlPort = 7789; // porta HTTP de controlo do servidor Timmy (sempre fixa)
+        const resp = await fetch(`http://${host}:${ctrlPort}/status/${sn}`, { signal: AbortSignal.timeout(4000) });
+        if (!resp.ok) return { serverReachable: true, online: false };
+        const data = await resp.json();
+        return { serverReachable: true, online: data.connected === true };
+    } catch {
+        return { serverReachable: false, online: false };
+    }
+}
 
 async function checkTerminalActive(terminal) {
     const porta = terminal.porta || 5005;
