@@ -63,7 +63,7 @@ LOG_FILE     = os.path.join(APP_DIR, "timmy_ws.log")
 
 DEFAULT_WS_PORT    = 7788
 DEFAULT_CTRL_PORT  = 7789
-OFFLINE_TIMEOUT    = 45    # segundos sem mensagem → considera offline (aumentado de 15s para evitar oscilações)
+OFFLINE_TIMEOUT    = 15    # segundos sem mensagem → considera offline
 BASE_URL = "https://app.base44.app/api/apps/{app_id}/functions"
 
 logger = logging.getLogger("timmy_ws")
@@ -185,33 +185,12 @@ def parse_log_record(rec, terminal_id, terminal_nome, terminal_local):
     except Exception:
         timestamp = ts_str
 
-    # Protocolo Timmy: tentar extrair tipo (inout, InOutStatus) ou inferir por hora
-    tipo = "desconhecido"
-    inout_val = rec.get("inout") or rec.get("InOutStatus") or rec.get("inoutStatus")
-    if inout_val is not None:
-        if inout_val == 0 or inout_val == "0" or inout_val == "entrada":
-            tipo = "entrada"
-        elif inout_val == 1 or inout_val == "1" or inout_val == "saida":
-            tipo = "saida"
-    # Fallback: sem inout, tenta usar heurística por hora (8h-12h entrada, 17h-19h saída)
-    elif timestamp:
-        try:
-            import datetime
-            dt = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-            hora = dt.hour
-            if 7 <= hora <= 12:
-                tipo = "entrada"
-            elif 16 <= hora <= 19:
-                tipo = "saida"
-        except Exception:
-            pass
-
     return {
         "terminal_id":    terminal_id,
         "terminal_nome":  terminal_nome,
         "enrollid":       int(rec.get("enrollid", 0)),
         "timestamp":      timestamp,
-        "tipo":           tipo,
+        "tipo":           "desconhecido",   # Timmy não distingue entrada/saída nativamente
         "modo":           modo,
         "raw_mode":       raw_mode,
         "local":          terminal_local or "",
@@ -587,23 +566,20 @@ def ciclo_reporte_ws(app_id, api_key, intervalo=30, stop_event=None):
             if not tid:
                 continue
 
-            # Verificar timeout de heartbeat (com histerese: só marca offline após 45s sem mensagem)
-             if connected and last_seen > 0 and (time.time() - last_seen) > OFFLINE_TIMEOUT:
-                 with ws_lock:
-                     if sn in ws_state:
-                         ws_state[sn]["connected"] = False
-                 connected = False
-                 logger.warning(f"[REPORT-WS] '{nome}' (SN={sn}) TIMEOUT de heartbeat (>{OFFLINE_TIMEOUT}s) → OFFLINE")
+            # Verificar timeout de heartbeat
+            if connected and last_seen > 0 and (time.time() - last_seen) > OFFLINE_TIMEOUT:
+                with ws_lock:
+                    if sn in ws_state:
+                        ws_state[sn]["connected"] = False
+                connected = False
 
-             seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
-             status = "online" if connected else "offline"
+            seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
+            status = "online" if connected else "offline"
 
-             try:
-                 reportar_status_ws(app_id, api_key, tid, status, latencia, seg_offline)
-                 if status == "online":
-                     logger.debug(f"[REPORT-WS] '{nome}' (SN={sn}) → {status.upper()} (heartbeat OK)")
-                 else:
-                     logger.warning(f"[REPORT-WS] '{nome}' (SN={sn}) → {status.upper()} (offline={seg_offline}s)")
+            try:
+                reportar_status_ws(app_id, api_key, tid, status, latencia, seg_offline)
+                logger.info(f"[REPORT-WS] '{nome}' (SN={sn}) → {status.upper()}"
+                            + (f" offline={seg_offline}s" if seg_offline else ""))
             except Exception as e:
                 logger.error(f"[REPORT-WS] Erro ao reportar '{nome}': {e}")
 

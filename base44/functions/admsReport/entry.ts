@@ -83,25 +83,13 @@ Deno.serve(async (req) => {
                     if (dedupSet.has(dedupKey)) { skipped++; continue; }
                     dedupSet.add(dedupKey);
 
-                    // Determinar tipo de marcação: se não vem, inferir por hora
-                    let tipo = rec.tipo || 'desconhecido';
-                    if (tipo === 'desconhecido' && rec.timestamp) {
-                        try {
-                            const dt = new Date(rec.timestamp);
-                            const hora = dt.getHours();
-                            // Heurística: 7-12h entrada, 16-19h saída
-                            if (hora >= 7 && hora <= 12) tipo = 'entrada';
-                            else if (hora >= 16 && hora <= 19) tipo = 'saida';
-                        } catch (e) {}
-                    }
-
                     await base44.asServiceRole.entities.Marcacao.create({
                         terminal_id: rec.terminal_id || terminal_id,
                         terminal_nome: rec.terminal_nome || terminal_nome || terminal.nome,
                         enrollid,
                         utilizador_nome: rec.utilizador_nome || enrollMap[enrollid] || '',
                         timestamp: rec.timestamp,
-                        tipo,
+                        tipo: rec.tipo || 'desconhecido',
                         modo: rec.modo || 'desconhecido',
                         raw_mode: rec.raw_mode != null ? Number(rec.raw_mode) : null,
                         local: rec.local || terminal_local || terminal.local || '',
