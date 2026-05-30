@@ -109,25 +109,42 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
     return next.toISOString();
   };
 
-  const handleSave = async () => {
-    if (!form.terminal_id || !form.nome || !form.acao || !form.hora) return;
+const handleSave = async () => {
+  try {
     setSaving(true);
-    const data = {
-      ...form,
-      dia_mes: Number(form.dia_mes) || 1,
-      data_unica: form.data_unica ? new Date(form.data_unica).toISOString() : undefined,
-      criado_por: currentUser?.email || '',
-      proxima_execucao: calcProxima(),
-    };
-    let result;
-    if (editItem) {
-      result = await base44.entities.ScheduledAction.update(editItem.id, data);
-    } else {
-      result = await base44.entities.ScheduledAction.create(data);
+    
+    // Constrói o payload padrão do agendamento
+    const payload = { ...form };
+
+    // Correção de fuso horário para a ação programada de relógio
+    if (form.acao === 'settime') {
+      const horaSincronizadaAgendamento = new Date().toLocaleString("sv-SE", {
+        timeZone: userTimezone || "Europe/Lisbon"
+      }).replace("T", " ");
+      
+      // Injeta os metadados para o executor do cron repassar ao WebSocket
+      payload.parametros_adicionais = JSON.stringify({
+        datetime: horaSincronizadaAgendamento
+      });
     }
+
+    if (sched) {
+      await base44.entities.ScheduledAction.update(sched.id, payload);
+      toast.success("Agendamento atualizado com fuso horário sincronizado!");
+    } else {
+      await base44.entities.ScheduledAction.create(payload);
+      toast.success("Agendamento criado com sucesso!");
+    }
+    
+    onSaved();
+    onClose();
+  } catch (error) {
+    toast.error("Erro ao guardar o agendamento.");
+    console.error(error);
+  } finally {
     setSaving(false);
-    onSaved(result || { ...data, id: editItem?.id });
-  };
+  }
+};
 
   const valid = form.terminal_id && form.nome && form.acao && form.hora &&
     (form.frequencia !== 'unica' || form.data_unica);
