@@ -62,11 +62,6 @@
     "api_key": {
       "type": "string",
       "description": "API Key pessoal para autentica\u00e7\u00e3o do agente local"
-    },
-    "timezone": {
-      "type": "string",
-      "default": "Europe/London",
-      "description": "Timezone preferida do utilizador (IANA, ex: America/Sao_Paulo)"
     }
   },
   "required": []

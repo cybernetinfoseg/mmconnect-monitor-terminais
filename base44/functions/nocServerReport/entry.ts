@@ -50,10 +50,11 @@ Deno.serve(async (req) => {
         const allUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail });
         const isAdmin = allUsers[0]?.role === 'admin';
 
-        const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id).catch(() => null);
+        const terminalResults = await base44.asServiceRole.entities.Terminal.filter({ id: terminal_id }).catch(() => []);
+        const terminal = terminalResults[0] || null;
 
         if (!terminal) {
-            return Response.json({ error: `Terminal não encontrado: ${terminal_id}` }, { status: 404 });
+            return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
         }
 
         if (!isAdmin) {
@@ -199,12 +200,8 @@ Deno.serve(async (req) => {
         // O timmy_ws_server.py envia marcacoes[] quando recebe cmd:"sendlog"
         let marcacoesGuardadas = 0;
         if (Array.isArray(marcacoes) && marcacoes.length > 0) {
-            // Buscar utilizadores do terminal para enriquecer marcações com nome
-            // Filtra por owner do terminal para evitar carregar toda a BD
-            const terminalOwnerEmail = terminal.usuario_email || terminal.created_by || '';
-            const terminalUsers = terminalOwnerEmail
-                ? await base44.asServiceRole.entities.TerminalUser.filter({ owner_email: terminalOwnerEmail }).catch(() => [])
-                : [];
+            // Buscar utilizadores do terminal para enriquecer com nome
+            const terminalUsers = await base44.asServiceRole.entities.TerminalUser.filter({}).catch(() => []);
             const enrollMap = {};
             terminalUsers.forEach(u => { enrollMap[u.enrollid] = u.nome; });
 

@@ -27,8 +27,7 @@ Deno.serve(async (req) => {
         console.log(`nocServerGetTerminals: autenticado como ${ownerEmail}`);
 
         // Verificar se o utilizador é admin
-        // User.filter requer autenticação — usar asServiceRole para evitar 401
-        const allUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail }).catch(() => []);
+        const allUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail });
         const ownerUser = allUsers[0];
         const isAdmin = ownerUser?.role === 'admin';
 

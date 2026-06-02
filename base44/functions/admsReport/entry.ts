@@ -1,20 +1,13 @@
 /**
- * admsReport — Endpoint unificado para o adms_server.py e noc_server.py
- *
- * Dois modos de uso:
- *   1. Ping simples (adms_server.py standalone):
- *      { terminal_id?, numero_serie?, status?, ip_terminal? }
- *
- *   2. Marcações ATTLOG (noc_server.py integrado):
- *      { terminal_id, terminal_nome?, terminal_local?, records[], source? }
- *      records: [{ terminal_id, enrollid, timestamp, tipo, modo, raw_mode, local, exportado }]
- *
+ * admsReport — Recebe heartbeats do adms_server.py
+ * Tipos geridos: adms_push
  * Autenticação: X-Api-Key pessoal
+ *
+ * O adms_server.py corre no Windows Server e escuta os HTTP POST
+ * dos terminais ZKTeco/Anviz em /iclock/cdata e /iclock/getrequest.
+ * Quando recebe um POST, chama este endpoint para atualizar o último ping.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-
-// Janela de deduplicação de marcações (ms) — tolerância para retries
-const DEDUP_WINDOW_MS = 30000;
 
 Deno.serve(async (req) => {
     try {
@@ -33,80 +26,6 @@ Deno.serve(async (req) => {
 
         const ownerEmail = keyRecord.user_email;
         const body = await req.json();
-
-        // ── MODO 2: Marcações ATTLOG (records[]) ────────────────────────────────
-        if (Array.isArray(body.records) && body.records.length > 0) {
-            const { terminal_id, terminal_nome, terminal_local, records } = body;
-
-            if (!terminal_id) {
-                return Response.json({ error: 'terminal_id é obrigatório para gravação de marcações' }, { status: 400 });
-            }
-
-            // Verificar permissão no terminal
-            const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id).catch(() => null);
-            if (!terminal) {
-                return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
-            }
-
-            const allUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail });
-            const isAdmin = allUsers[0]?.role === 'admin';
-            const terminalOwner = terminal.usuario_email || terminal.created_by;
-            if (!isAdmin && terminalOwner !== ownerEmail) {
-                return Response.json({ error: 'Sem permissão para este terminal' }, { status: 403 });
-            }
-
-            // Buscar mapa enrollid → nome
-            const terminalUsers = await base44.asServiceRole.entities.TerminalUser.filter({}).catch(() => []);
-            const enrollMap = {};
-            terminalUsers.forEach(u => { enrollMap[u.enrollid] = u.nome; });
-
-            // Deduplicação: buscar marcações recentes do terminal
-            const recentesRaw = await base44.asServiceRole.entities.Marcacao.filter({ terminal_id }).catch(() => []);
-            const dedupSet = new Set();
-            recentesRaw.forEach(m => {
-                if (m.timestamp) {
-                    const bucket = Math.floor(new Date(m.timestamp).getTime() / DEDUP_WINDOW_MS);
-                    dedupSet.add(`${m.enrollid}|${bucket}`);
-                }
-            });
-
-            let saved = 0, skipped = 0;
-            for (const rec of records) {
-                try {
-                    const tsMs = new Date(rec.timestamp).getTime();
-                    if (isNaN(tsMs)) { skipped++; continue; }
-
-                    const enrollid = Number(rec.enrollid) || 0;
-                    const bucket = Math.floor(tsMs / DEDUP_WINDOW_MS);
-                    const dedupKey = `${enrollid}|${bucket}`;
-
-                    if (dedupSet.has(dedupKey)) { skipped++; continue; }
-                    dedupSet.add(dedupKey);
-
-                    await base44.asServiceRole.entities.Marcacao.create({
-                        terminal_id: rec.terminal_id || terminal_id,
-                        terminal_nome: rec.terminal_nome || terminal_nome || terminal.nome,
-                        enrollid,
-                        utilizador_nome: rec.utilizador_nome || enrollMap[enrollid] || '',
-                        timestamp: rec.timestamp,
-                        tipo: rec.tipo || 'desconhecido',
-                        modo: rec.modo || 'desconhecido',
-                        raw_mode: rec.raw_mode != null ? Number(rec.raw_mode) : null,
-                        local: rec.local || terminal_local || terminal.local || '',
-                        exportado: false,
-                    });
-                    saved++;
-                } catch (e) {
-                    console.warn(`[admsReport] Erro ao guardar marcação enrollid=${rec.enrollid}: ${e.message}`);
-                    skipped++;
-                }
-            }
-
-            console.log(`[admsReport] ATTLOG "${terminal.nome}": ${saved} guardadas, ${skipped} ignoradas de ${records.length} recebidas`);
-            return Response.json({ success: true, saved, skipped, total: records.length });
-        }
-
-        // ── MODO 1: Ping simples (status do terminal) ────────────────────────────
         const { terminal_id, numero_serie, status, ip_terminal } = body;
 
         // Aceita lookup por terminal_id ou por numero_serie (SN do terminal ADMS)
@@ -157,7 +76,7 @@ Deno.serve(async (req) => {
             ultimo_check: agora,
             segundos_sem_ping: 0,
         };
-        if (ip_terminal) updateData.ip_local = ip_terminal;
+        if (ip_terminal) updateData.ip_local = ip_terminal; // registar IP do terminal sem sobrescrever observacoes
         await base44.asServiceRole.entities.Terminal.update(terminal.id, updateData);
 
         // Verificar cache de status
@@ -201,12 +120,13 @@ Deno.serve(async (req) => {
         }
 
         // Atualizar cache
-        const cacheData = { ultimo_status: reportedStatus, atualizado_em: agora, offline_count: 0 };
         if (cache) {
-            await base44.asServiceRole.entities.StatusCache.update(cache.id, cacheData);
+            await base44.asServiceRole.entities.StatusCache.update(cache.id, {
+                ultimo_status: reportedStatus, atualizado_em: agora,
+            });
         } else {
             await base44.asServiceRole.entities.StatusCache.create({
-                terminal_id: terminal.id, ...cacheData,
+                terminal_id: terminal.id, ultimo_status: reportedStatus, atualizado_em: agora,
             });
         }
 

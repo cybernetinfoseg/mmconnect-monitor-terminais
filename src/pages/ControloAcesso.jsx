@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-
+import { format } from 'date-fns';
 import {
   Shield, DoorOpen, DoorClosed, Lock, Unlock, Power,
   AlertTriangle, RefreshCw, Info, Users, Clock,
   CheckCircle2, XCircle, Loader2, Zap, Bell, BellOff,
   ChevronDown, ChevronRight, Wifi, WifiOff, Settings,
-  RotateCcw, Trash2, Eye, Ban, UserCheck, Search
+  RotateCcw, Trash2, Eye, Ban, UserCheck
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +30,6 @@ const DOOR_STATES = {
 
 export default function ControloAcesso() {
   const [currentUser, setCurrentUser] = useState(null);
-  const { timezone: userTimezone } = useUserTimezone();
   const [selectedTerminal, setSelectedTerminal] = useState(null);
   const [sending, setSending] = useState(null);
   const [doorState, setDoorState] = useState('normal');
@@ -42,12 +39,6 @@ export default function ControloAcesso() {
   const [userListLoading, setUserListLoading] = useState(false);
   const [blockingUser, setBlockingUser] = useState(null);
   const [expandedSection, setExpandedSection] = useState('door');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [tipoFilter, setTipoFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [localFilter, setLocalFilter] = useState('all');
-  const [fabricanteFilter, setFabricanteFilter] = useState('all');
-  const [userFilter, setUserFilter] = useState('all');
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
@@ -90,29 +81,6 @@ export default function ControloAcesso() {
     ),
     [terminals]
   );
-
-  const locaisDisponiveis = useMemo(() => [...new Set(terminaisAcesso.map(t => t.local).filter(Boolean))].sort(), [terminaisAcesso]);
-  const fabricantesDisponiveis = useMemo(() => [...new Set(terminaisAcesso.map(t => t.fabricante).filter(Boolean))].sort(), [terminaisAcesso]);
-  const utilizadoresDisponiveis = useMemo(() => [...new Set(terminaisAcesso.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort(), [terminaisAcesso]);
-
-  const terminaisFiltrados = useMemo(() => {
-    const q = searchTerm.toLowerCase();
-    return terminaisAcesso.filter(t => {
-      const matchSearch = !searchTerm ||
-        t.nome?.toLowerCase().includes(q) ||
-        t.numero_serie?.toLowerCase().includes(q) ||
-        t.ip_local?.toLowerCase().includes(q) ||
-        t.ip_publico?.toLowerCase().includes(q) ||
-        t.dns?.toLowerCase().includes(q) ||
-        String(t.porta || '').includes(q);
-      const matchTipo = tipoFilter === 'all' || t.tipo_conexao === tipoFilter;
-      const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-      const matchLocal = localFilter === 'all' || t.local === localFilter;
-      const matchFabricante = fabricanteFilter === 'all' || t.fabricante === fabricanteFilter;
-      const matchUser = userFilter === 'all' || (t.usuario_email || t.created_by) === userFilter;
-      return matchSearch && matchTipo && matchStatus && matchLocal && matchFabricante && matchUser;
-    });
-  }, [terminaisAcesso, searchTerm, tipoFilter, statusFilter, localFilter, fabricanteFilter, userFilter]);
 
   const terminal = selectedTerminal ? terminals.find(t => t.id === selectedTerminal.id) || selectedTerminal : null;
   const isTimmy = terminal?.tipo_conexao === 'websocket_cloud';
@@ -231,81 +199,10 @@ export default function ControloAcesso() {
         </div>
 
         {/* Seleção de terminal */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 space-y-3">
-          <label className="text-xs text-slate-400 font-medium block">Selecionar Terminal</label>
-
-          {/* Filtros */}
-          <div className="flex flex-wrap gap-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <Input
-                placeholder="Nome, SN, IP, porta..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-8 h-8 text-xs bg-slate-700/60 border-slate-600 text-slate-200 placeholder-slate-400 w-44"
-              />
-            </div>
-            <Select value={tipoFilter} onValueChange={setTipoFilter}>
-              <SelectTrigger className="h-8 text-xs bg-slate-700/60 border-slate-600 text-slate-200 w-36">
-                <SelectValue placeholder="Todos os tipos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                <SelectItem value="ip_local">IP Local</SelectItem>
-                <SelectItem value="ip_publico">IP Público</SelectItem>
-                <SelectItem value="dns">DNS/No-IP</SelectItem>
-                <SelectItem value="adms_push">ADMS/Push</SelectItem>
-                <SelectItem value="sdk_tcp">SDK-TCP</SelectItem>
-                <SelectItem value="websocket_cloud">WebSocket Cloud</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-8 text-xs bg-slate-700/60 border-slate-600 text-slate-200 w-32">
-                <SelectValue placeholder="Todos os status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="online">Online</SelectItem>
-                <SelectItem value="offline">Offline</SelectItem>
-              </SelectContent>
-            </Select>
-            {locaisDisponiveis.length > 0 && (
-              <Select value={localFilter} onValueChange={setLocalFilter}>
-                <SelectTrigger className="h-8 text-xs bg-slate-700/60 border-slate-600 text-slate-200 w-36">
-                  <SelectValue placeholder="Todos os locais" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os locais</SelectItem>
-                  {locaisDisponiveis.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-            {fabricantesDisponiveis.length > 0 && (
-              <Select value={fabricanteFilter} onValueChange={setFabricanteFilter}>
-                <SelectTrigger className="h-8 text-xs bg-slate-700/60 border-slate-600 text-slate-200 w-36">
-                  <SelectValue placeholder="Todos os fabricantes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os fabricantes</SelectItem>
-                  {fabricantesDisponiveis.map(f => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-            {isAdmin && utilizadoresDisponiveis.length > 0 && (
-              <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="h-8 text-xs bg-slate-700/60 border-slate-600 text-slate-200 w-40">
-                  <SelectValue placeholder="Todos os utilizadores" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os utilizadores</SelectItem>
-                  {utilizadoresDisponiveis.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-
+        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4">
+          <label className="text-xs text-slate-400 font-medium block mb-2">Selecionar Terminal</label>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-            {terminaisFiltrados.map(t => (
+            {terminaisAcesso.map(t => (
               <button
                 key={t.id}
                 onClick={() => { setSelectedTerminal(t); setDevInfo(null); setUserList(null); setDoorState('normal'); setExpandedSection('door'); }}
@@ -323,10 +220,8 @@ export default function ControloAcesso() {
                 </div>
               </button>
             ))}
-            {terminaisFiltrados.length === 0 && (
-              <p className="text-slate-500 text-xs col-span-full py-4 text-center">
-                {terminaisAcesso.length === 0 ? 'Nenhum terminal disponível para controlo' : 'Nenhum terminal corresponde aos filtros'}
-              </p>
+            {terminaisAcesso.length === 0 && (
+              <p className="text-slate-500 text-xs col-span-full py-4 text-center">Nenhum terminal disponível para controlo</p>
             )}
           </div>
         </div>
@@ -627,7 +522,7 @@ export default function ControloAcesso() {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <Badge className="text-[9px] bg-slate-700 text-slate-300 px-1.5">{log.acao}</Badge>
                           <span className="text-[10px] text-slate-400 font-mono">
-                            {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            {log.timestamp ? format(new Date(log.timestamp), 'dd/MM HH:mm') : '—'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-300 mt-0.5 truncate">{log.mensagem || '—'}</p>

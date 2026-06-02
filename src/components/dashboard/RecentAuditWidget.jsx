@@ -2,12 +2,11 @@ import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardList } from 'lucide-react';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { createPageUrl } from '@/utils';
 import { Link } from 'react-router-dom';
-
+import moment from 'moment';
 
 const ACAO_COLORS = {
   terminal_criado: 'bg-emerald-100 text-emerald-700',
@@ -31,7 +30,6 @@ const ACAO_SHORT = {
 
 export default function RecentAuditWidget({ currentUser }) {
   const isAdmin = currentUser?.role === 'admin';
-  const { timezone: userTimezone } = useUserTimezone();
 
   const { data: logs = [] } = useQuery({
     queryKey: ['audit-widget', currentUser?.email],
@@ -67,7 +65,7 @@ export default function RecentAuditWidget({ currentUser }) {
               </Badge>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-slate-600 truncate">{log.descricao || log.entidade}</p>
-                <p className="text-xs text-slate-400 truncate">{log.usuario_email} · {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</p>
+                <p className="text-xs text-slate-400 truncate">{log.usuario_email} · {moment(log.timestamp).fromNow()}</p>
               </div>
             </div>
           ))}

@@ -3,10 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, MapPin, Clock, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import { cn } from '@/lib/utils';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { formatDateTimePT } from '@/lib/localization';
 
 export default function TerminalsTable({ terminals, maxRows = 12, compact = false }) {
-  const { timezone: userTimezone } = useUserTimezone();
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
@@ -140,7 +139,7 @@ export default function TerminalsTable({ terminals, maxRows = 12, compact = fals
 
                   <td className={cn("text-center", compact ? "px-4 py-3" : "px-6 py-4")}><StatusBadge status={terminal.status} /></td>
                   <td className={cn("text-slate-500", compact ? "px-4 py-3 text-sm" : "px-6 py-4")}>
-                    {terminal.ultimo_ping ? new Date(terminal.ultimo_ping).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                    {terminal.ultimo_ping ? formatDateTimePT(terminal.ultimo_ping) : '—'}
                   </td>
                   <td className={cn("text-right font-mono", compact ? "px-4 py-3 text-sm" : "px-6 py-4", terminal.status === 'offline' ? 'text-red-600 font-semibold' : 'text-slate-500')}>
                     {formatTimeSince(terminal.segundos_sem_ping)}

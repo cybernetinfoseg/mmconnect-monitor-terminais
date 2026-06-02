@@ -222,8 +222,7 @@ async function checkTerminalActiveWithRetry(terminal, maxRetries = 3) {
 async function checkTimmyWsServer(terminal) {
     const sn = (terminal.numero_serie || '').trim();
     if (!sn) return { serverReachable: false, online: false };
-    // Prioridade: ip_publico/dns específico do terminal → NOC_SERVER_HOST global
-    const host = terminal.ip_publico || terminal.dns || Deno.env.get('NOC_SERVER_HOST') || null;
+    const host = terminal.ip_publico || terminal.dns || null;
     if (!host) return { serverReachable: false, online: false };
     try {
         const ctrlPort = 7789; // porta HTTP de controlo do servidor Timmy (sempre fixa)

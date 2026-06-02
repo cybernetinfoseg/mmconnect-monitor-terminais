@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
-import { subHours, isToday, parseISO } from 'date-fns';
+import { format, subHours, isToday, parseISO } from 'date-fns';
 import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +12,6 @@ import { cn } from '@/lib/utils';
 export default function Presenca() {
   const [search, setSearch] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
-  const { timezone: userTimezone } = useUserTimezone();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
 
@@ -58,14 +56,11 @@ export default function Presenca() {
 
   // Para cada colaborador, encontrar a última marcação de hoje
   const presencaStatus = useMemo(() => {
-    // "hoje" na timezone do utilizador (evita erro em fusos com offset grande)
-    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' }); // 'en-CA' dá formato YYYY-MM-DD
+    const hoje = new Date().toISOString().substring(0, 10);
     const marcoesHoje = marcacoes.filter(m => {
       if (!m.timestamp) return false;
       if (!isAdmin && !myTerminalIds.has(m.terminal_id)) return false;
-      // Comparar dia do timestamp na timezone do utilizador
-      const diaTs = new Date(m.timestamp).toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
-      return diaTs === hoje;
+      return m.timestamp.substring(0, 10) === hoje;
     });
 
     // Agrupar por enrollid → última marcação
@@ -137,7 +132,7 @@ export default function Presenca() {
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Presença em Tempo Real</h1>
               <p className="text-xs text-slate-500">
-                Hoje · Atualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'} · auto-refresh 30s
+                Hoje · Atualizado {dataUpdatedAt ? format(new Date(dataUpdatedAt), 'HH:mm:ss') : '—'} · auto-refresh 30s
               </p>
             </div>
           </div>
@@ -205,7 +200,7 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} />
+                    <PresencaCard key={p.enrollid} pessoa={p} />
                   ))}
                 </div>
               </div>
@@ -220,7 +215,7 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => !p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} />
+                    <PresencaCard key={p.enrollid} pessoa={p} />
                   ))}
                 </div>
               </div>
@@ -232,9 +227,8 @@ export default function Presenca() {
   );
 }
 
-function PresencaCard({ pessoa, timezone }) {
+function PresencaCard({ pessoa }) {
   const dentro = pessoa.dentro;
-  const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: timezone || 'UTC' }) : '—';
   return (
     <Card className={cn(
       'border transition-all',
@@ -260,7 +254,7 @@ function PresencaCard({ pessoa, timezone }) {
               {pessoa.primeiraMarcacao && (
                 <div className="flex items-center gap-1 text-[11px]">
                   <LogIn className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
-                  <span className="text-slate-600">{fmtTime(pessoa.primeiraMarcacao.timestamp)}</span>
+                  <span className="text-slate-600">{format(new Date(pessoa.primeiraMarcacao.timestamp), 'HH:mm')}</span>
                   {pessoa.primeiraMarcacao.terminal_nome && (
                     <span className="text-slate-400 truncate">· {pessoa.primeiraMarcacao.terminal_nome}</span>
                   )}
@@ -269,7 +263,7 @@ function PresencaCard({ pessoa, timezone }) {
               {!dentro && pessoa.ultimaMarcacao && (
                 <div className="flex items-center gap-1 text-[11px]">
                   <LogOut className="h-2.5 w-2.5 text-rose-400 shrink-0" />
-                  <span className="text-slate-600">{fmtTime(pessoa.ultimaMarcacao.timestamp)}</span>
+                  <span className="text-slate-600">{format(new Date(pessoa.ultimaMarcacao.timestamp), 'HH:mm')}</span>
                   {pessoa.ultimaMarcacao.terminal_nome && (
                     <span className="text-slate-400 truncate">· {pessoa.ultimaMarcacao.terminal_nome}</span>
                   )}

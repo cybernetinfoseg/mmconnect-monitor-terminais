@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
+import { format } from 'date-fns';
 import {
   Share2, Plus, Pencil, Trash2, Play, CheckCircle2, XCircle,
   Database, Globe, Loader2, RefreshCw, Code, ChevronDown, ChevronUp
@@ -59,7 +59,6 @@ export default function ExportacaoMarcacoes() {
   const [currentUser, setCurrentUser] = useState(null);
 
   const queryClient = useQueryClient();
-  const { timezone: userTimezone } = useUserTimezone();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -223,7 +222,7 @@ export default function ExportacaoMarcacoes() {
                           </p>
                           {c.ultima_exportacao && (
                             <p className="text-xs text-slate-400 mt-0.5">
-                              Última exportação: {new Date(c.ultima_exportacao).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              Última exportação: {format(new Date(c.ultima_exportacao), 'dd/MM/yyyy HH:mm')}
                               {c.total_exportado != null && ` • Total: ${c.total_exportado} registos`}
                             </p>
                           )}

@@ -79,7 +79,7 @@ async function sendAdmsCommand(terminal, action, params = {}) {
  * Prioridade: ip_publico do terminal → dns → NOC_SERVER_HOST global.
  * Isto permite servidores Timmy locais/diferentes por terminal.
  */
-async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
+async function sendTimmyCommand(terminal, command, retries = 1) {
   // Usar IP/host específico do terminal se disponível, caso contrário usar o servidor global
   const host = terminal.ip_publico || terminal.dns || getNocServerHost();
   const ctrlPort = 7789;
@@ -93,15 +93,14 @@ async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
   }
 
   const url = `http://${host}:${ctrlPort}/cmd`;
-  let lastError;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sn, command }),
-        signal: AbortSignal.timeout(20000), // 20s por tentativa
+        signal: AbortSignal.timeout(20000), // 20s para dar tempo ao WS responder
       });
 
       if (!resp.ok) {
@@ -113,25 +112,17 @@ async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
       if (!data.success) {
         throw new Error(data.error || 'Servidor Timmy não conseguiu enviar o comando ao terminal');
       }
-
-      const result = data.result || { result: true };
-
-      // Detectar "can not find this command" — o firmware não suporta este comando
-      if (result.result === false && result.msg && result.msg.toLowerCase().includes('can not find this command')) {
-        throw new Error(`O terminal "${terminal.nome}" (modelo: ${terminal.modelo || 'desconhecido'}) não suporta o comando "${command.cmd}". Este firmware não implementa esta função.`);
-      }
-
-      return result;
+      return data.result || { result: true };
 
     } catch (e) {
-      lastError = e;
-      if (attempt < maxAttempts) {
-        console.warn(`[sendTimmyCommand] tentativa ${attempt}/${maxAttempts} falhou (${command.cmd}) — retry em 3s: ${e.message}`);
-        await new Promise(r => setTimeout(r, 3000));
+      if (attempt < retries) {
+        console.warn(`[sendTimmyCommand] tentativa ${attempt + 1} falhou (${command.cmd}) — a repetir em 2s: ${e.message}`);
+        await new Promise(r => setTimeout(r, 2000));
+      } else {
+        throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível após ${retries + 1} tentativa(s) — ${e.message}`);
       }
     }
   }
-  throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível após ${maxAttempts} tentativa(s) — ${lastError?.message}`);
 }
 
 function buildTerminalBaseUrl(terminal) {
@@ -277,35 +268,32 @@ async function actionOpenDoor(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    // 3 tentativas para comandos críticos de acesso
-    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' }, 3);
+    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' });
     return { success: resp.result === true || resp.result === undefined, message: 'Porta aberta remotamente', data: resp };
   }
-
-  // Hikvision ISAPI: PUT /ISAPI/AccessControl/RemoteControl/door/1 com body JSON
-  // Ref: Hikvision ISAPI v2.0 — Access Control Remote Control
-  const hikvisionOpenDoor = async () => {
-    const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1',
-      { RemoteControlDoorParam: { door: 1, controlType: 'open' } });
-    return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
-  };
-
-  // Dahua CGI: openDoor via accessControl.cgi
-  // Ref: Dahua HTTP API — Access Control
-  const dahuaOpenDoor = async () => {
-    const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
-    return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
-  };
-
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
-    if (fab === 'hikvision') return await hikvisionOpenDoor();
-    if (fab === 'dahua') return await dahuaOpenDoor();
+    if (fab === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
+      return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
+    }
+    if (fab === 'dahua') {
+      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
+      return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
+    }
     return await sendAdmsCommand(terminal, 'opendoor', {});
   }
   if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
-    if (fab === 'hikvision') return await hikvisionOpenDoor();
-    if (fab === 'dahua') return await dahuaOpenDoor();
-    if (fab === 'zkteco' || fab === 'anviz') return await sendAdmsCommand(terminal, 'opendoor', {});
+    if (fab === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
+      return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
+    }
+    if (fab === 'dahua') {
+      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
+      return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
+    }
+    if (fab === 'zkteco' || fab === 'anviz') {
+      return await sendAdmsCommand(terminal, 'opendoor', {});
+    }
   }
   return { success: false, error: `opendoor não suportado para ${tipo}` };
 }
@@ -350,21 +338,17 @@ async function actionGetDevInfo(terminal) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    // "Info do Dispositivo" — devolve dados já guardados em BD (sem chamar o terminal)
-    // Os dados de hardware (SN, modelo, firmware) chegam no heartbeat de registo (cmd=reg)
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getreginfo' });
     return {
-      success: true,
+      success: resp.result === true,
       message: 'Informação do dispositivo obtida',
       data: {
-        sn: terminal.numero_serie,
-        modelo: terminal.modelo,
-        fabricante: terminal.fabricante,
-        local: terminal.local,
-        status: terminal.status,
-        ultimo_ping: terminal.ultimo_ping,
-        latencia_ms: terminal.latencia_ms,
-        segundos_sem_ping: terminal.segundos_sem_ping,
-        tipo_conexao: terminal.tipo_conexao,
+        sn: resp.sn || terminal.numero_serie,
+        modelo: resp.modelname || terminal.modelo,
+        firmware: resp.firmware, mac: resp.mac,
+        utilizadores: `${resp.useduser || 0}/${resp.usersize || '?'}`,
+        logs: `${resp.usedlog || 0}/${resp.logsize || '?'}`,
+        novos_logs: resp.usednewlog,
       }
     };
   }
@@ -402,10 +386,9 @@ async function actionGetDevInfo(terminal) {
 }
 
 async function actionSetDoorStatus(terminal, params) {
-  const fuc = params?.fuc ?? 1;
+  const fuc = params?.fuc || 1;
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    // 3 tentativas para comandos críticos de controlo de porta
-    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc }, 3);
+    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc });
     const msgs = { 1: 'Porta forçada aberta (permanente)', 2: 'Porta forçada fechada', 3: 'Porta aberta temporariamente', 4: 'Relay resetado', 6: 'Alarme cancelado' };
     return { success: resp.result === true || resp.result === undefined, message: msgs[fuc] || `lockctrl fuc=${fuc}`, data: resp };
   }
@@ -419,27 +402,10 @@ async function actionAddUser(terminal, params) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    // Protocolo Timmy setuserinfo:
-    //   backupnum: 10=senha, 11=cartão RFID, 15=facial (apenas registo de credenciais básicas)
-    //   record: valor da credencial (número da senha, número do cartão)
-    // Prioridade: cartão > senha > sem credencial (o terminal regista biometria separadamente)
     let backupnum = 10;
-    let record = 0;
-    if (card && String(card).trim()) {
-      backupnum = 11;
-      record = Number(card) || 0;
-    } else if (password && String(password).trim()) {
-      backupnum = 10;
-      record = Number(password) || 0;
-    }
-    const resp = await sendTimmyCommand(terminal, {
-      cmd: 'setuserinfo',
-      enrollid: Number(enrollid),
-      name,
-      backupnum,
-      admin: Number(privilege),
-      record,
-    });
+    let record = password ? Number(password) : 0;
+    if (card) { backupnum = 11; record = Number(card); }
+    const resp = await sendTimmyCommand(terminal, { cmd: 'setuserinfo', enrollid: Number(enrollid), name, backupnum, admin: Number(privilege), record });
     return { success: resp.result === true, message: `Utilizador "${name}" (ID:${enrollid}) adicionado`, data: resp };
   }
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
@@ -495,8 +461,7 @@ async function actionDeleteUser(terminal, params) {
   const fab = terminal.fabricante || '';
 
   if (tipo === 'websocket_cloud') {
-    // Protocolo oficial Timmy: cmd = "deleteuser", backupnum=13 apaga tudo (fp+pwd+card+nome)
-    const resp = await sendTimmyCommand(terminal, { cmd: 'deleteuser', enrollid: Number(enrollid), backupnum: 13 });
+    const resp = await sendTimmyCommand(terminal, { cmd: 'deleteuserinfo', enrollid: Number(enrollid) });
     return { success: resp.result === true, message: `Utilizador ID:${enrollid} removido`, data: resp };
   }
   if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
@@ -518,28 +483,12 @@ async function actionDeleteUser(terminal, params) {
 // ─── Timmy-specific actions ──────────────────────────────────────────────────
 
 async function actionGetUserList(terminal, params) {
+  const { count = 100 } = params || {};
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getuserlist apenas suportado via WebSocket Cloud (Timmy)' };
-
-  // Protocolo Timmy: "getalluserinfo" devolve todos os utilizadores registados no terminal
-  // Fallback para "getalluser" em firmwares mais antigos
-  let lastError;
-  for (const cmd of ['getalluserinfo', 'getalluser']) {
-    try {
-      const resp = await sendTimmyCommand(terminal, { cmd });
-      const users = resp.record || [];
-      return {
-        success: resp.result === true,
-        message: `${users.length} utilizador(es) encontrado(s)`,
-        count: users.length,
-        data: { total: resp.count || users.length, users },
-        cmd_usado: cmd,
-      };
-    } catch (e) {
-      lastError = e;
-      console.warn(`[actionGetUserList] comando "${cmd}" falhou: ${e.message}`);
-    }
-  }
-  return { success: false, error: lastError?.message || 'Nenhum comando de listagem suportado por este terminal' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getuserlist', count });
+  if (!resp) return { success: false, message: 'Terminal não respondeu' };
+  const users = resp.record || [];
+  return { success: resp.result === true, message: `${users.length} utilizador(es) encontrado(s)`, count: users.length, data: { total: resp.count, users } };
 }
 
 async function actionGetUserInfo(terminal, params) {
@@ -554,61 +503,47 @@ async function actionGetUserInfo(terminal, params) {
 async function actionGetAllLogs(terminal, params) {
   const { count = 200, from, to } = params || {};
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getalllog apenas suportado via WebSocket Cloud (Timmy)' };
-
-  // Protocolo oficial Timmy:
-  //   getalllog (pág. 16): suporta filtro de datas (from/to opcionais), usa stn:true para paginação
-  //   getnewlog (pág. 15): apenas logs novos não lidos, sem filtro de datas
-  const cmdGetAll = { cmd: 'getalllog', stn: true };
-  if (from) cmdGetAll.from = from;
-  if (to)   cmdGetAll.to   = to;
-
-  let lastError;
-  for (const cmd of [cmdGetAll, { cmd: 'getnewlog', stn: true }]) {
-    try {
-      const resp = await sendTimmyCommand(terminal, cmd);
-      const records = resp.record || [];
-      return {
-        success: true,
-        message: `${records.length} marcações obtidas (total: ${resp.count || records.length})${from ? ` — de ${from}` : ''}${to ? ` até ${to}` : ''}`,
-        count: records.length,
-        records: records.slice(0, 200),
-        cmd_usado: cmd.cmd,
-      };
-    } catch (e) {
-      lastError = e;
-      console.warn(`[actionGetAllLogs] comando "${cmd.cmd}" falhou: ${e.message}`);
-    }
+  // Se datas fornecidas, usar getlog com from/to; caso contrário getalllog
+  let cmd;
+  if (from || to) {
+    cmd = { cmd: 'getlog', count, stn: true };
+    if (from) cmd.from = from; // formato: "YYYY-MM-DD HH:MM:SS"
+    if (to)   cmd.to   = to;
+  } else {
+    cmd = { cmd: 'getalllog', count };
   }
-  return { success: false, error: lastError?.message || 'Nenhum comando de log suportado por este terminal' };
+  const resp = await sendTimmyCommand(terminal, cmd);
+  const records = resp.record || [];
+  return {
+    success: resp.result === true,
+    message: `${records.length} marcações obtidas (total: ${resp.count || records.length})${from ? ` — de ${from}` : ''}${to ? ` até ${to}` : ''}`,
+    count: records.length,
+    records: records.slice(0, 200),
+  };
 }
 
 async function actionClearLogs(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'cleanlog apenas suportado via WebSocket Cloud (Timmy)' };
-  // Protocolo oficial Timmy: cmd = "cleanlog" (pág. 18 do protocolo)
-  const resp = await sendTimmyCommand(terminal, { cmd: 'cleanlog' });
-  return { success: resp.result === true, message: 'Todos os logs eliminados do terminal', data: resp };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearlog apenas suportado via WebSocket Cloud (Timmy)' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'clearlog' });
+  return { success: resp.result === true || resp.result === undefined, message: 'Todos os logs eliminados do terminal', data: resp };
 }
 
 async function actionClearUsers(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'cleanuser apenas suportado via WebSocket Cloud (Timmy)' };
-  // Protocolo oficial Timmy: cmd = "cleanuser" (pág. 14 do protocolo — "Clean all users")
-  const resp = await sendTimmyCommand(terminal, { cmd: 'cleanuser' });
-  return { success: resp.result === true, message: 'Todos os utilizadores eliminados do terminal', data: resp };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'clearuserdata apenas suportado via WebSocket Cloud (Timmy)' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'clearuserdata' });
+  return { success: resp.result === true || resp.result === undefined, message: 'Todos os utilizadores eliminados do terminal', data: resp };
 }
 
 async function actionGetParam(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getdevinfo apenas suportado via WebSocket Cloud (Timmy)' };
-  // Protocolo oficial Timmy: cmd = "getdevinfo" (pág. 22 — "Get terminal parameter")
-  const resp = await sendTimmyCommand(terminal, { cmd: 'getdevinfo' });
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getparam apenas suportado via WebSocket Cloud (Timmy)' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getterminalparameter' });
   return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
 }
 
 async function actionInitDevice(terminal) {
-  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initsys apenas suportado via WebSocket Cloud (Timmy)' };
-  // Protocolo oficial Timmy: cmd = "initsys" (pág. 19 — "Initialize system")
-  // Atenção: apaga todos os utilizadores e logs mas mantém configurações
-  const resp = await sendTimmyCommand(terminal, { cmd: 'initsys' });
-  return { success: resp.result === true, message: 'Sistema inicializado — utilizadores e logs eliminados (configurações mantidas)', data: resp };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initialize apenas suportado via WebSocket Cloud (Timmy)' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'initialize' });
+  return { success: resp.result === true || resp.result === undefined, message: 'Terminal inicializado (reset de fábrica)', data: resp };
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────

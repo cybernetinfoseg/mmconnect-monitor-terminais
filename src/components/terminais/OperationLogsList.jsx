@@ -5,7 +5,7 @@ import { CheckCircle2, XCircle, ChevronDown, ChevronUp, Terminal, RefreshCw } fr
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
+import moment from 'moment';
 
 const ACAO_LABELS = {
   settime:    'Acertar Relógio',
@@ -18,7 +18,7 @@ const ACAO_LABELS = {
   blockuser:  'Bloquear Utilizador',
 };
 
-function LogRow({ log, timezone }) {
+function LogRow({ log }) {
   const [expanded, setExpanded] = useState(false);
   let parsedRaw = null;
   if (log.resposta_raw) {
@@ -46,7 +46,7 @@ function LogRow({ log, timezone }) {
               {log.sucesso ? 'Sucesso' : 'Falha'}
             </span>
             <span className="text-xs text-slate-400 ml-auto shrink-0">
-              {new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: timezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              {moment(log.timestamp).format('DD/MM/YY HH:mm:ss')}
             </span>
           </div>
           <p className="text-xs text-slate-600">{log.mensagem}</p>
@@ -74,7 +74,6 @@ function LogRow({ log, timezone }) {
 }
 
 export default function OperationLogsList({ terminalId }) {
-  const { timezone: userTimezone } = useUserTimezone();
   const { data: logs = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['operation-logs', terminalId],
     queryFn: () => base44.entities.OperationLog.filter(
@@ -108,7 +107,7 @@ export default function OperationLogsList({ terminalId }) {
         </div>
       ) : (
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-          {logs.map(log => <LogRow key={log.id} log={log} timezone={userTimezone} />)}
+          {logs.map(log => <LogRow key={log.id} log={log} />)}
         </div>
       )}
     </div>

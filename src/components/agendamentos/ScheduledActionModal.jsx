@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +36,6 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [diasSelecionados, setDiasSelecionados] = useState([1, 2, 3, 4, 5]);
-  const { timezone: userTimezone } = useUserTimezone();
 
   const isAdmin = currentUser?.role === 'admin';
   const [filterUser, setFilterUser] = useState('');
@@ -94,17 +92,8 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
   const calcProxima = () => {
     if (!form.hora) return null;
     const [h, m] = form.hora.split(':').map(Number);
-    const tz = userTimezone || 'UTC';
     const now = new Date();
-    const localParts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
-    }).formatToParts(now);
-    const year  = parseInt(localParts.find(p => p.type === 'year').value, 10);
-    const month = parseInt(localParts.find(p => p.type === 'month').value, 10) - 1;
-    const day   = parseInt(localParts.find(p => p.type === 'day').value, 10);
-    const localStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`;
-    const tzDate = new Date(new Date(localStr).toLocaleString('en-US', { timeZone: tz }));
-    let next = new Date(now.getTime() + (new Date(localStr) - tzDate));
+    let next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, m));
     if (next <= now) next = new Date(next.getTime() + 86400000);
     return next.toISOString();
   };
@@ -203,7 +192,7 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
             </div>
             {form.frequencia !== 'unica' && (
               <div className="space-y-1">
-                <Label>Hora ({userTimezone || 'UTC'}) *</Label>
+                <Label>Hora (UTC) *</Label>
                 <Input type="time" value={form.hora} onChange={e => setForm(f => ({ ...f, hora: e.target.value }))} />
               </div>
             )}
@@ -244,7 +233,7 @@ export default function ScheduledActionModal({ open, onClose, onSaved, editItem,
           {/* Data única */}
           {form.frequencia === 'unica' && (
             <div className="space-y-1">
-              <Label>Data e Hora ({userTimezone || 'UTC'}) *</Label>
+              <Label>Data e Hora (UTC) *</Label>
               <Input type="datetime-local" value={form.data_unica} onChange={e => setForm(f => ({ ...f, data_unica: e.target.value }))} />
             </div>
           )}

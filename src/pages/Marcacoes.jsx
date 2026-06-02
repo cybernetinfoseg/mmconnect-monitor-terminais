@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
@@ -8,7 +7,7 @@ import {
   User, Loader2, Upload, CheckCircle2, XCircle, BarChart2
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +36,6 @@ export default function Marcacoes() {
   const [collectFabricante, setCollectFabricante] = useState('all');
   const [collectUser, setCollectUser] = useState('all');
 
-  const { timezone: userTimezone } = useUserTimezone();
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
@@ -83,16 +81,9 @@ export default function Marcacoes() {
   // Set of terminal IDs belonging to this user
   const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
 
-  // Mapa terminal_id → owner para evitar double find() em allOwners
-  const terminalOwnerMap = useMemo(() => {
-    const m = {};
-    terminals.forEach(t => { m[t.id] = t.usuario_email || t.created_by || ''; });
-    return m;
-  }, [terminals]);
-
   const allOwners = useMemo(() =>
-    [...new Set(marcacoes.map(m => terminalOwnerMap[m.terminal_id]).filter(Boolean))].sort(),
-    [marcacoes, terminalOwnerMap]
+    [...new Set(marcacoes.map(m => terminals.find(t => t.id === m.terminal_id)?.usuario_email || terminals.find(t => t.id === m.terminal_id)?.created_by).filter(Boolean))].sort(),
+    [marcacoes, terminals]
   );
 
   const filtered = useMemo(() => {
@@ -102,7 +93,9 @@ export default function Marcacoes() {
       // Ownership filter — non-admins only see own terminals' records
       if (!isAdmin && !myTerminalIds.has(m.terminal_id)) return false;
       if (isAdmin && ownerFilter !== 'all') {
-        if (terminalOwnerMap[m.terminal_id] !== ownerFilter) return false;
+        const t = terminals.find(t => t.id === m.terminal_id);
+        const owner = t?.usuario_email || t?.created_by;
+        if (owner !== ownerFilter) return false;
       }
       const ts = m.timestamp ? new Date(m.timestamp) : null;
       if (from && ts && ts < from) return false;
@@ -115,7 +108,7 @@ export default function Marcacoes() {
       }
       return true;
     });
-  }, [marcacoes, dateFrom, dateTo, terminalFilter, tipoFilter, search, userMap, isAdmin, myTerminalIds, ownerFilter, terminalOwnerMap]);
+  }, [marcacoes, dateFrom, dateTo, terminalFilter, tipoFilter, search, userMap, isAdmin, myTerminalIds, ownerFilter, terminals]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
@@ -138,8 +131,10 @@ export default function Marcacoes() {
   };
 
   const collectFromTerminal = async (terminal) => {
+    // TM-AI08 (face only) e outros: usar getnewlog que traz logs incrementais
+    // Para terminais FP-only: getlogs traz todos; para face: getnewlog é mais eficiente
     const cap = getTimmyCapabilities(terminal?.modelo);
-    const action = 'getlogs';
+    const action = terminal.tipo_conexao === 'websocket_cloud' ? 'getlogs' : 'getlogs';
     const resp = await base44.functions.invoke('terminalControl', { terminal_id: terminal.id, action });
     const data = resp.data;
     if (data?.success && data.records?.length) {
@@ -234,7 +229,7 @@ export default function Marcacoes() {
   const handleExportCSV = () => {
     const headers = ['Data/Hora', 'Terminal', 'ID', 'Utilizador', 'Tipo', 'Modo', 'Local', 'Exportado'];
     const rows = filtered.map(m => [
-      m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
+      m.timestamp ? format(new Date(m.timestamp), 'dd/MM/yyyy HH:mm:ss') : '',
       m.terminal_nome || '', m.enrollid, m.utilizador_nome || userMap[m.enrollid] || '',
       m.tipo || '', m.modo || '', m.local || '', m.exportado ? 'Sim' : 'Não',
     ]);
@@ -414,7 +409,6 @@ export default function Marcacoes() {
                 userMap={userMap}
                 dateFrom={dateFrom}
                 dateTo={dateTo}
-                userTimezone={userTimezone}
               />
             </div>
           </TabsContent>
@@ -480,7 +474,7 @@ export default function Marcacoes() {
                     const cap = terminal ? getTimmyCapabilities(terminal.modelo) : null;
                     return (
                       <tr key={m.id || i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? format(new Date(m.timestamp), 'dd/MM/yy HH:mm:ss') : '—'}</td>
                         <td className="px-4 py-2.5">
                           <p className="text-xs font-medium text-slate-800 truncate max-w-[100px] lg:max-w-[160px]">{m.terminal_nome || '—'}</p>
                           {m.local && <p className="text-xs text-slate-400 truncate">{m.local}</p>}

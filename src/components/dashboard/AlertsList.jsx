@@ -2,10 +2,9 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, CheckCircle, Clock, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useUserTimezone } from '@/hooks/useUserTimezone';
+import moment from 'moment';
 
 export default function AlertsList({ alerts, maxItems = 5 }) {
-  const { timezone: userTimezone } = useUserTimezone();
   const recentAlerts = [...alerts]
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .slice(0, maxItems);
@@ -78,7 +77,7 @@ export default function AlertsList({ alerts, maxItems = 5 }) {
                 
                 <div className="flex items-center gap-1 mt-2 text-xs text-slate-400">
                   <Clock className="h-3 w-3" />
-                  {alert.timestamp ? new Date(alert.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
+                  {moment(alert.timestamp).format('DD/MM HH:mm:ss')}
                   {alert.duracao_minutos && (
                     <span className="ml-2">
                       • Duração: {alert.duracao_minutos}min
