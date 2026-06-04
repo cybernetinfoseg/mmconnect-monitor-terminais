@@ -206,17 +206,17 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
-            {currentUser &&
-              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap">
-                <User className="h-4 w-4 text-slate-400 shrink-0 hidden" />
-                <span className="truncate hidden">{currentUser.full_name || currentUser.email}</span>
-              </div>
-              }
+            
+
+
+
+
+              
             <div className="text-right hidden sm:block whitespace-nowrap">
-              <p className="text-xs text-slate-400 hidden">Última atualização</p>
-              <p className="text-xs sm:text-sm font-mono text-slate-200 hidden">
-                {lastRefresh.toLocaleTimeString('pt-PT')}
-              </p>
+              
+              
+
+                
             </div>
             {/* Mobile: single refresh button + menu; Desktop: full buttons */}
             <Button
@@ -238,16 +238,16 @@ export default function Dashboard() {
               <Settings2 className="h-4 w-4" />
               Widgets
             </Button>
-            <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => base44.auth.logout()}
-                className="hidden sm:flex text-slate-300 hover:text-white hover:bg-white/10 gap-1"
-                title="Sair">
-                
-              <LogOut className="h-4 w-4" />
-              Sair
-            </Button>
+            
+
+
+
+
+
+
+
+
+              
           </div>
         </div>
       </div>
