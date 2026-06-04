@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-export default function KPICard({ title, value, icon: Icon, color, trend, trendValue }) {
+export default function KPICard({ title, value, icon: Icon, color, trend, trendValue, onClick, active }) {
   const colorClasses = {
     blue: 'from-blue-500/10 to-blue-600/5 border-blue-500/20',
     green: 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20',
@@ -31,9 +31,15 @@ export default function KPICard({ title, value, icon: Icon, color, trend, trendV
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
+      onClick={onClick}
       className={cn(
         'relative overflow-hidden rounded-2xl border bg-gradient-to-br p-3 sm:p-6',
         'backdrop-blur-sm transition-all duration-300 hover:shadow-lg',
+        onClick && 'cursor-pointer',
+        active && 'ring-2 ring-offset-1',
+        active && color === 'blue' && 'ring-blue-400',
+        active && color === 'green' && 'ring-emerald-400',
+        active && color === 'red' && 'ring-red-400',
         colorClasses[color] || colorClasses.blue
       )}
     >

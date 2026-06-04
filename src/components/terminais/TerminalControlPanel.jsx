@@ -17,7 +17,6 @@ import {
   RefreshCw,
   Info,
   LockOpen,
-  Lock,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -28,6 +27,11 @@ import {
   UserPlus,
   UserX,
   UserMinus,
+  Users,
+  Trash2,
+  Settings2,
+  RotateCcw,
+  ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UserActionForm from './UserActionForm';
@@ -38,19 +42,25 @@ function getSupportedActions(terminal) {
   const fab = terminal.fabricante || '';
 
   const all = {
-    settime:    { label: 'Acertar Relógio',       icon: Clock,        color: 'blue',    desc: 'Sincronizar hora do terminal com o servidor' },
-    getlogs:    { label: 'Recolher Marcações',     icon: ClipboardList,color: 'emerald', desc: 'Obter registos de ponto do terminal' },
-    opendoor:   { label: 'Abrir Porta',            icon: DoorOpen,     color: 'amber',   desc: 'Acionar abertura de porta remotamente', confirm: true },
-    reboot:     { label: 'Reiniciar Terminal',     icon: RefreshCw,    color: 'orange',  desc: 'Reiniciar o terminal imediatamente', confirm: true, danger: true },
-    getdevinfo: { label: 'Info do Dispositivo',    icon: Info,         color: 'slate',   desc: 'Obter capacidades e estado do hardware' },
-    lockctrl:   { label: 'Estado da Porta',          icon: LockOpen,     color: 'violet',  desc: 'Forçar porta aberta, fechada ou abrir momentaneamente', form: true },
-    adduser:    { label: 'Adicionar Utilizador',   icon: UserPlus,     color: 'teal',    desc: 'Registar novo utilizador no terminal', form: true },
-    blockuser:  { label: 'Bloquear Utilizador',    icon: UserX,        color: 'rose',    desc: 'Bloquear ou desbloquear acesso de utilizador', form: true },
-    deleteuser: { label: 'Remover Utilizador',     icon: UserMinus,    color: 'red',     desc: 'Eliminar utilizador do terminal', form: true },
+    settime:     { label: 'Acertar Relógio',        icon: Clock,        color: 'blue',    desc: 'Sincronizar hora do terminal com o servidor' },
+    getlogs:     { label: 'Recolher Marcações',      icon: ClipboardList,color: 'emerald', desc: 'Obter novos registos de ponto do terminal' },
+    getalllog:   { label: 'Todos os Logs',           icon: ListChecks,   color: 'emerald', desc: 'Obter todos os registos de ponto (incluindo já recolhidos)' },
+    opendoor:    { label: 'Abrir Porta',             icon: DoorOpen,     color: 'amber',   desc: 'Acionar abertura de porta remotamente', confirm: true },
+    reboot:      { label: 'Reiniciar Terminal',      icon: RefreshCw,    color: 'orange',  desc: 'Reiniciar o terminal imediatamente', confirm: true, danger: true },
+    getdevinfo:  { label: 'Info do Dispositivo',     icon: Info,         color: 'slate',   desc: 'Obter capacidades e estado do hardware' },
+    getparam:    { label: 'Parâmetros',              icon: Settings2,    color: 'slate',   desc: 'Ler configurações actuais do terminal' },
+    lockctrl:    { label: 'Estado da Porta',         icon: LockOpen,     color: 'violet',  desc: 'Forçar porta aberta, fechada ou abrir momentaneamente', form: true },
+    getuserlist: { label: 'Listar Utilizadores',     icon: Users,        color: 'teal',    desc: 'Ver todos os utilizadores registados no terminal' },
+    adduser:     { label: 'Adicionar Utilizador',    icon: UserPlus,     color: 'teal',    desc: 'Registar novo utilizador no terminal', form: true },
+    blockuser:   { label: 'Bloquear Utilizador',     icon: UserX,        color: 'rose',    desc: 'Bloquear ou desbloquear acesso de utilizador', form: true },
+    deleteuser:  { label: 'Remover Utilizador',      icon: UserMinus,    color: 'red',     desc: 'Eliminar utilizador do terminal', form: true },
+    clearlog:    { label: 'Limpar Logs',             icon: Trash2,       color: 'orange',  desc: 'Apagar todos os registos de ponto do terminal', confirm: true, danger: true },
+    clearusers:  { label: 'Limpar Utilizadores',     icon: Trash2,       color: 'red',     desc: 'Apagar TODOS os utilizadores e dados biométricos', confirm: true, danger: true },
+    initdevice:  { label: 'Reset de Fábrica',        icon: RotateCcw,    color: 'red',     desc: 'Inicializar terminal — apaga tudo e repõe configurações de fábrica', confirm: true, danger: true },
   };
 
   if (tipo === 'websocket_cloud') {
-    return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'lockctrl', 'adduser', 'blockuser', 'deleteuser'].map(k => ({ key: k, ...all[k] }));
+    return ['settime', 'getlogs', 'getalllog', 'opendoor', 'reboot', 'getdevinfo', 'getparam', 'lockctrl', 'getuserlist', 'adduser', 'blockuser', 'deleteuser', 'clearlog', 'clearusers', 'initdevice'].map(k => ({ key: k, ...all[k] }));
   }
   if (tipo === 'adms_push') {
     return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser', 'deleteuser'].map(k => ({ key: k, ...all[k] }));
@@ -112,9 +122,27 @@ function ResultBox({ result }) {
               <div className="space-y-1 max-h-32 overflow-y-auto">
                 {result.records.slice(0, 10).map((r, i) => (
                   <div key={i} className="text-xs font-mono bg-white rounded px-2 py-0.5 border border-emerald-100">
-                    ID:{r.enrollid} | {r.time} | {r.mode === 1 ? '🖐️ FP' : r.mode === 3 ? '💳 Card' : r.mode === 8 ? '😊 Face' : `mode:${r.mode}`}
+                    ID:{r.enrollid} | {r.time} | {r.mode === 1 ? '🖐️ FP' : r.mode === 3 ? '💳 Card' : r.mode === 8 ? '😊 Face' : r.mode === 10 ? '🤖 Face AI' : `mode:${r.mode}`}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+          {/* Lista de utilizadores do terminal (getuserlist) */}
+          {result.data?.users && result.data.users.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs text-slate-600 font-medium mb-1">Utilizadores no terminal ({result.data.users.length}):</p>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {result.data.users.slice(0, 20).map((u, i) => (
+                  <div key={i} className="text-xs bg-white rounded px-2 py-0.5 border border-teal-100 flex gap-2">
+                    <span className="font-mono text-slate-400">#{u.enrollid}</span>
+                    <span className="font-medium">{u.name || '—'}</span>
+                    {u.admin > 0 && <span className="text-amber-600 text-[10px]">admin</span>}
+                  </div>
+                ))}
+                {result.data.total > 20 && (
+                  <p className="text-[10px] text-slate-400 text-center">...e mais {result.data.total - 20}</p>
+                )}
               </div>
             </div>
           )}
@@ -203,7 +231,7 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg md:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-amber-500" />

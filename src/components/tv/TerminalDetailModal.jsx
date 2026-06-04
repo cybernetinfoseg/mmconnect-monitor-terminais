@@ -16,7 +16,7 @@ import {
   FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import StatusBadge from '../dashboard/StatusBadge';
 
 const formatTimeSince = (seconds) => {
@@ -38,6 +38,7 @@ const InfoRow = ({ icon: Icon, label, value, mono }) => (
 );
 
 export default function TerminalDetailModal({ terminal, onClose }) {
+  const { timezone: userTimezone } = useUserTimezone();
   const { data: history = [] } = useQuery({
     queryKey: ['terminal-history', terminal.id],
     queryFn: () => base44.entities.StatusHistory.filter(
@@ -165,7 +166,7 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                 <InfoRow key={label} icon={Server} label={label} value={value} mono />
               ))}
               {terminal.ultimo_ping && (
-                <InfoRow icon={Clock} label="Último Ping" value={moment(terminal.ultimo_ping).format('DD/MM/YY HH:mm:ss')} mono />
+                <InfoRow icon={Clock} label="Último Ping" value={new Date(terminal.ultimo_ping).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })} mono />
               )}
               {terminal.observacoes && (
                 <InfoRow icon={FileText} label="Observações" value={terminal.observacoes} />
@@ -203,7 +204,7 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                         )}
                       </div>
                       <span className="text-slate-400 text-xs font-mono">
-                        {moment(inc.timestamp).format('DD/MM HH:mm')}
+                        {new Date(inc.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   ))}
@@ -233,7 +234,7 @@ export default function TerminalDetailModal({ terminal, onClose }) {
                         </span>
                       </div>
                       <span className="text-slate-500 font-mono">
-                        {moment(h.timestamp).format('DD/MM/YY HH:mm:ss')}
+                        {new Date(h.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
                   ))}

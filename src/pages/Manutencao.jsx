@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Plus, Wrench, Calendar, Clock, Trash2, Pencil, AlertTriangle, User } from 'lucide-react';
-import { format, isAfter, isBefore } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { isAfter, isBefore } from 'date-fns';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import MaintenanceModal from '@/components/manutencao/MaintenanceModal';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 
@@ -29,6 +29,7 @@ const STATUS_CONFIG = {
 
 export default function Manutencao() {
     const queryClient = useQueryClient();
+    const { timezone: userTimezone } = useUserTimezone();
     const [modalOpen, setModalOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [userFilter, setUserFilter] = useState('all');
@@ -128,12 +129,12 @@ export default function Manutencao() {
                             <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 flex-wrap">
                                 <span className="flex items-center gap-1">
                                     <Calendar className="h-3 w-3" />
-                                    {format(new Date(item.inicio), "dd/MM/yy HH:mm", { locale: ptBR })}
+                                    {new Date(item.inicio).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                                 <span>→</span>
                                 <span className="flex items-center gap-1">
                                     <Clock className="h-3 w-3" />
-                                    {format(new Date(item.fim), "dd/MM/yy HH:mm", { locale: ptBR })}
+                                    {new Date(item.fim).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             </div>
                             {item.criado_por && (

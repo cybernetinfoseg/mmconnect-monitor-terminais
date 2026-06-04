@@ -1,25 +1,32 @@
 // Portugal localization configuration
-import { format, formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import pt from 'date-fns/locale/pt';
 
 export const PT_LOCALE = 'pt-PT';
 
-// Format date as DD/MM/YYYY using date-fns
-export function formatDatePT(date) {
+// Format date as DD/MM/YYYY — uses browser locale (respects user timezone via toLocaleDateString)
+export function formatDatePT(date, timezone) {
   if (!date) return '';
-  return format(new Date(date), 'dd/MM/yyyy', { locale: pt });
+  return new Date(date).toLocaleDateString('pt-PT', timezone ? { timeZone: timezone } : undefined);
 }
 
-// Format date and time as DD/MM/YYYY HH:mm using date-fns
-export function formatDateTimePT(date) {
+// Format date and time as DD/MM/YYYY HH:mm — timezone-aware
+export function formatDateTimePT(date, timezone) {
   if (!date) return '';
-  return format(new Date(date), 'dd/MM/yyyy HH:mm', { locale: pt });
+  return new Date(date).toLocaleString('pt-PT', {
+    ...(timezone ? { timeZone: timezone } : {}),
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
-// Format time as HH:mm:ss
-export function formatTimePT(date) {
+// Format time as HH:mm:ss — timezone-aware
+export function formatTimePT(date, timezone) {
   if (!date) return '';
-  return format(new Date(date), 'HH:mm:ss', { locale: pt });
+  return new Date(date).toLocaleTimeString('pt-PT', {
+    ...(timezone ? { timeZone: timezone } : {}),
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
 }
 
 // Format relative time (e.g., "há 2 horas")

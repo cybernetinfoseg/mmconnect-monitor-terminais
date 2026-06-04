@@ -27,7 +27,8 @@ Deno.serve(async (req) => {
         console.log(`nocServerGetTerminals: autenticado como ${ownerEmail}`);
 
         // Verificar se o utilizador é admin
-        const allUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail });
+        // User.filter requer autenticação — usar asServiceRole para evitar 401
+        const allUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail }).catch(() => []);
         const ownerUser = allUsers[0];
         const isAdmin = ownerUser?.role === 'admin';
 
@@ -59,14 +60,16 @@ Deno.serve(async (req) => {
         const result = terminals.map(t => ({
             id: t.id,
             nome: t.nome,
-            local: t.local,
+            local: t.local || '',
             tipo_conexao: t.tipo_conexao,
-            ip_publico: t.ip_publico,
-            ip_local: t.ip_local,
-            dns: t.dns,
+            ip_publico: t.ip_publico || '',
+            ip_local: t.ip_local || '',
+            dns: t.dns || '',
             porta: t.porta || 5005,
             numero_serie: t.numero_serie || '',
             fabricante: t.fabricante || 'zkteco',
+            modelo: t.modelo || '',
+            cliente_nome: t.cliente_nome || '',
             ativo: t.ativo,
         }));
 

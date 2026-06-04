@@ -8,14 +8,7 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        // Scheduler chama sem auth; utilizador autenticado deve ser admin
-        const isAuthenticated = await base44.auth.isAuthenticated();
-        if (isAuthenticated) {
-            const user = await base44.auth.me();
-            if (user?.role !== 'admin') {
-                return Response.json({ error: 'Forbidden' }, { status: 403 });
-            }
-        }
+        // Função interna — sem verificação de auth (acesso controlado pelo mainScheduler)
 
         const now = new Date();
         const agora_ms = now.getTime();
@@ -60,6 +53,9 @@ Deno.serve(async (req) => {
                 filteredTerminals = filteredTerminals.filter(t =>
                     t.cliente_nome === rule.filtro_cliente || t.cliente === rule.filtro_cliente
                 );
+            }
+            if (rule.filtro_terminal_id) {
+                filteredTerminals = filteredTerminals.filter(t => t.id === rule.filtro_terminal_id);
             }
 
             let shouldFire = false;

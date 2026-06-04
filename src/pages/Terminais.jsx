@@ -61,17 +61,6 @@ export default function Terminais() {
   const [userFilter, setUserFilter] = useState('all');
   const [fabricanteFilter, setFabricanteFilter] = useState('all');
   const [localFilter, setLocalFilter] = useState('all');
-  const [showExtraFilters, setShowExtraFilters] = useState(false);
-
-  // Limpar filtros ao montar a página (evita persistência ao navegar)
-  useEffect(() => {
-    setSearchTerm('');
-    setTipoFilter('all');
-    setStatusFilter('all');
-    setUserFilter('all');
-    setFabricanteFilter('all');
-    setLocalFilter('all');
-  }, []);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTerminal, setEditingTerminal] = useState(null);
@@ -102,26 +91,14 @@ export default function Terminais() {
       .catch(() => setRefreshInterval(5000));
   }, []);
 
-  // Fetch terminals with server-side filtering for security
+  // Fetch terminals via backend function to bypass RLS limitations on custom fields
   const { data: terminals = [], isLoading } = useQuery({
     queryKey: ['terminals-manage', currentUser?.email, isAdmin],
     queryFn: async () => {
-      if (isAdmin) {
-        return await base44.entities.Terminal.list('-created_date');
-      }
-      // Non-admins: terminais onde são o dono (usuario_email) OU criador (created_by)
-      const [byOwner, byCreated] = await Promise.all([
-        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }, '-created_date'),
-        base44.entities.Terminal.filter({ created_by: currentUser?.email }, '-created_date'),
-      ]);
-      const seen = new Set();
-      return [...byOwner, ...byCreated].filter(t => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return true;
-      });
+      const res = await base44.functions.invoke('getMyTerminals', {});
+      return res.data?.terminals || [];
     },
-    enabled: !!currentUser, // Only run when user is loaded
+    enabled: !!currentUser,
     refetchInterval: refreshInterval,
   });
 
@@ -134,9 +111,29 @@ export default function Terminais() {
   const saveMutation = useMutation({
     mutationFn: async (data) => {
       if (editingTerminal) {
-        return base44.entities.Terminal.update(editingTerminal.id, data);
+        if (isAdmin) {
+          // Check if admin is changing ownership (usuario_email changed)
+          const previousOwner = editingTerminal.usuario_email || editingTerminal.created_by;
+          const newOwner = data.usuario_email;
+          if (newOwner && newOwner !== previousOwner) {
+            // Full ownership transfer: update all fields then reassign via backend
+            await base44.entities.Terminal.update(editingTerminal.id, data);
+            await base44.functions.invoke('assignTerminal', { terminalId: editingTerminal.id, targetEmail: newOwner });
+            return;
+          }
+          return base44.entities.Terminal.update(editingTerminal.id, data);
+        }
+        // Non-admins: preserve ownership, update everything else
+        const { usuario_email: _ignored, ...rest } = data;
+        return base44.entities.Terminal.update(editingTerminal.id, rest);
       }
-      return base44.entities.Terminal.create({ ...data, usuario_email: data.usuario_email || currentUser?.email });
+      // On create: admin sets usuario_email, then transfer ownership via backend
+      const targetEmail = data.usuario_email || currentUser?.email;
+      const result = await base44.entities.Terminal.create({ ...data, usuario_email: targetEmail });
+      if (isAdmin && targetEmail !== currentUser?.email && result?.id) {
+        await base44.functions.invoke('assignTerminal', { terminalId: result.id, targetEmail });
+      }
+      return result;
     },
     onMutate: async (data) => {
       await queryClient.cancelQueries(['terminals-manage']);
@@ -208,27 +205,29 @@ export default function Terminais() {
       return response.data;
     },
     onMutate: async (terminal) => {
-      // Optimistically show a "checking" state by clearing latency to indicate pending
+      // Save previous data for rollback
+      const previousData = queryClient.getQueryData(['terminals-manage']) || [];
       queryClient.setQueryData(['terminals-manage'], (old = []) =>
         old.map(t => t.id === terminal.id ? { ...t, ultimo_check: new Date().toISOString() } : t)
       );
+      return { previousData };
     },
-    onSuccess: (data, terminal) => {
+    onSuccess: (data, terminal, context) => {
       setRefreshingTerminalId(null);
-      if (data?.success && data.status) {
-        // Apply result optimistically before refetch
+      if (data?.status) {
+        // Update cache with backend response (not temporary data)
         queryClient.setQueryData(['terminals-manage'], (old = []) =>
-          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia ?? t.latencia_ms } : t)
+          old.map(t => t.id === terminal.id ? { ...t, status: data.status, latencia_ms: data.latencia_ms ?? data.latencia ?? t.latencia_ms, ultimo_check: new Date().toISOString() } : t)
         );
         if (data.status === 'online') {
-          toast.success(`${terminal.nome}: ✅ ONLINE${data.latencia ? ' (' + data.latencia + 'ms)' : ''}`);
+          toast.success(`${terminal.nome}: ✅ ONLINE`);
         } else {
-          toast.error(`${terminal.nome}: ❌ OFFLINE${data.error ? ' - ' + data.error : ''}`);
+          toast.error(`${terminal.nome}: ❌ OFFLINE`);
         }
       } else if (data?.error) {
         toast.info(`${terminal.nome}: ${data.error}`);
       }
-      queryClient.invalidateQueries(['terminals-manage']);
+      // Don't invalidate — just use the response data
     },
     onError: (error) => { setRefreshingTerminalId(null); toast.error(`Erro: ${error.message}`); },
   });
@@ -253,10 +252,20 @@ export default function Terminais() {
   const [verificandoTodos, setVerificandoTodos] = useState(false);
   const verificarTodos = async () => {
     setVerificandoTodos(true);
-    const terminaisAtivos = terminals.filter(t => t.ativo);
-    for (const terminal of terminaisAtivos) {
-      await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id }).catch(() => {});
-    }
+    const terminaisAtivos = terminals.filter(t => t.ativo && t.tipo_conexao !== 'ip_local');
+    await Promise.all(
+      terminaisAtivos.map(async (terminal) => {
+        try {
+          const res = await base44.functions.invoke('monitorTerminal', { terminalId: terminal.id });
+          const data = res.data;
+          if (data?.status) {
+            queryClient.setQueryData(['terminals-manage'], (old = []) =>
+              old.map(t => t.id === terminal.id ? { ...t, status: data.status } : t)
+            );
+          }
+        } catch {}
+      })
+    );
     queryClient.invalidateQueries(['terminals-manage']);
     setVerificandoTodos(false);
     toast.success('Verificação concluída!');
@@ -296,7 +305,8 @@ export default function Terminais() {
         t.ip_local?.toLowerCase().includes(q) ||
         t.ip_publico?.toLowerCase().includes(q) ||
         t.dns?.toLowerCase().includes(q) ||
-        t.modelo?.toLowerCase().includes(q);
+        t.modelo?.toLowerCase().includes(q) ||
+        String(t.porta || '').includes(q);
       const matchTipo = tipoFilter === 'all' || t.tipo_conexao === tipoFilter;
       const matchStatus = statusFilter === 'all' || t.status === statusFilter;
       const matchUser = userFilter === 'all' || (t.usuario_email || t.created_by) === userFilter;
@@ -412,20 +422,19 @@ export default function Terminais() {
 
         {/* Filters */}
         <Card className="bg-white/80 backdrop-blur-sm border-slate-200/50">
-          <CardContent className="p-3 sm:p-4 space-y-2">
-            {/* Row 1: search + primary filters */}
+          <CardContent className="p-3 sm:p-4">
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-              <div className="w-full sm:flex-1 sm:min-w-[200px] relative">
+              <div className="w-full sm:w-[200px] relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
-                  placeholder="Nome, local, SN, IP, DNS, modelo..."
+                  placeholder="Nome, SN, IP, porta..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
               <Select value={tipoFilter} onValueChange={setTipoFilter}>
-                <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue placeholder="Tipo de conexão" />
                 </SelectTrigger>
                 <SelectContent>
@@ -451,67 +460,42 @@ export default function Terminais() {
                   <SelectItem value="offline">Offline</SelectItem>
                 </SelectContent>
               </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 gap-1.5 text-xs shrink-0"
-                onClick={() => setShowExtraFilters(v => !v)}
-              >
-                <Search className="h-3.5 w-3.5" />
-                {showExtraFilters ? 'Menos filtros' : 'Mais filtros'}
-                {(fabricanteFilter !== 'all' || localFilter !== 'all' || userFilter !== 'all') && (
-                  <span className="w-2 h-2 bg-blue-500 rounded-full" />
-                )}
-              </Button>
-            </div>
-
-            {/* Row 2: extra filters */}
-            {showExtraFilters && (
-              <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 pt-1 border-t border-slate-100">
-                {/* Local */}
-                <Select value={localFilter} onValueChange={setLocalFilter}>
-                  <SelectTrigger className="w-full sm:w-[160px]">
-                    <SelectValue placeholder="Local" />
+              <Select value={localFilter} onValueChange={setLocalFilter}>
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue placeholder="Local" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os locais</SelectItem>
+                  {locaisDisponiveis.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {fabricantes.length > 0 && (
+                <Select value={fabricanteFilter} onValueChange={setFabricanteFilter}>
+                  <SelectTrigger className="w-full sm:w-[150px]">
+                    <SelectValue placeholder="Fabricante" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos os locais</SelectItem>
-                    {locaisDisponiveis.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                    <SelectItem value="all">Todos os fabricantes</SelectItem>
+                    {fabricantes.map(f => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
                   </SelectContent>
                 </Select>
-
-                {/* Fabricante */}
-                {fabricantes.length > 0 && (
-                  <Select value={fabricanteFilter} onValueChange={setFabricanteFilter}>
-                    <SelectTrigger className="w-full sm:w-[160px]">
-                      <SelectValue placeholder="Fabricante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os fabricantes</SelectItem>
-                      {fabricantes.map(f => <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {/* Utilizador (admin only) */}
-                {isAdmin && (
-                  <select
-                    value={userFilter}
-                    onChange={(e) => setUserFilter(e.target.value)}
-                    className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="all">Todos os utilizadores</option>
-                    {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                )}
-
-                {/* Clear extra filters */}
-                {(fabricanteFilter !== 'all' || localFilter !== 'all' || userFilter !== 'all') && (
-                  <Button variant="ghost" size="sm" className="h-9 text-xs text-slate-400" onClick={() => { setFabricanteFilter('all'); setLocalFilter('all'); setUserFilter('all'); }}>
-                    Limpar
-                  </Button>
-                )}
-              </div>
-            )}
+              )}
+              {isAdmin && (
+                <select
+                  value={userFilter}
+                  onChange={(e) => setUserFilter(e.target.value)}
+                  className="h-9 w-full sm:w-auto rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="all">Todos os utilizadores</option>
+                  {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              )}
+              {(searchTerm || tipoFilter !== 'all' || statusFilter !== 'all' || localFilter !== 'all' || fabricanteFilter !== 'all' || userFilter !== 'all') && (
+                <Button variant="ghost" size="sm" className="h-9 text-xs text-slate-400" onClick={() => { setSearchTerm(''); setTipoFilter('all'); setStatusFilter('all'); setLocalFilter('all'); setFabricanteFilter('all'); setUserFilter('all'); }}>
+                  Limpar
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -684,10 +668,10 @@ export default function Terminais() {
               ) : (
                 <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-slate-50 text-sm text-slate-600">
                   <UserIcon className="h-4 w-4 text-slate-400 shrink-0" />
-                  {currentUser?.email || '—'}
+                  {(editingTerminal ? (editingTerminal.usuario_email || editingTerminal.created_by) : currentUser?.email) || '—'}
                 </div>
               )}
-              <p className="text-xs text-slate-400">{isAdmin ? 'Selecione o utilizador responsável pelo terminal' : 'Preenchido automaticamente — identifica o responsável pelo terminal'}</p>
+              <p className="text-xs text-slate-400">{isAdmin ? 'Selecione o utilizador responsável pelo terminal' : 'Responsável pelo terminal'}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -876,8 +860,7 @@ export default function Terminais() {
               <div className="space-y-3">
                 <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg text-xs text-violet-700 space-y-1">
                   <p className="font-semibold">📡 WebSocket Cloud — Timmy / THbio</p>
-                  <p>O terminal conecta-se ao servidor via <strong>WebSocket persistente</strong> (protocolo JSON). Compatível com: <strong>Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50</strong> e outros modelos THbio.</p>
-                  <p>O servidor <code className="bg-violet-100 px-1 rounded">timmy_ws_server.py</code> corre no Windows Server e escuta na porta configurada (padrão: 7788).</p>
+                  <p>O terminal conecta-se ao servidor via <strong>WebSocket persistente</strong>. Compatível com: <strong>Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50</strong> e outros modelos THbio.</p>
                   <p className="text-violet-600">⚠️ O <strong>Número de Série (SN)</strong> é obrigatório — é como o servidor identifica o terminal. Aceda via: <em>MENU → Sys Info → Info → SN</em></p>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -891,35 +874,12 @@ export default function Terminais() {
                     <p className="text-xs text-slate-500">Visível em: MENU → Sys Info → Info → SN</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Porta WebSocket</Label>
-                    <Input
-                      type="number"
-                      value={formData.porta || 7788}
-                      onChange={(e) => setFormData({...formData, porta: parseInt(e.target.value)})}
-                      placeholder="7788"
-                    />
-                    <p className="text-xs text-slate-500">Porta configurada no timmy_ws_server.py (padrão: 7788)</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
                     <Label>Modelo do Terminal</Label>
                     <Input
                       value={formData.modelo || ''}
                       onChange={(e) => setFormData({...formData, modelo: e.target.value})}
                       placeholder="TM-AI07F, TM-AIFace11F, TFS30..."
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Fabricante</Label>
-                    <select
-                      value={formData.fabricante || 'timmy'}
-                      onChange={(e) => setFormData({...formData, fabricante: e.target.value})}
-                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                    >
-                      <option value="timmy">Timmy / THbio</option>
-                      <option value="outro">Outro</option>
-                    </select>
                   </div>
                 </div>
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">

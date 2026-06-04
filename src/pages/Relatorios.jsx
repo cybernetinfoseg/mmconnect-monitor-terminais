@@ -24,7 +24,7 @@ import AvailabilityHeatmap from '@/components/relatorios/AvailabilityHeatmap';
 import { jsPDF } from 'jspdf';
 
 export default function Relatorios() {
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = new Date().toLocaleDateString('en-CA');
     const sevenDaysAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
     const [dataInicio, setDataInicio] = useState(sevenDaysAgo);
@@ -225,7 +225,7 @@ export default function Relatorios() {
 
     const handleExportPDF = () => {
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const now = format(new Date(), "dd/MM/yyyy HH:mm");
+        const now = new Date().toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
         doc.setFillColor(15, 23, 42);
         doc.rect(0, 0, 210, 28, 'F');

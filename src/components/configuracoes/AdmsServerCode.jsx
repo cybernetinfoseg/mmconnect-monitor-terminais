@@ -276,16 +276,18 @@ export default function AdmsServerCode() {
         </div>
       </div>
 
-      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
-        <p><strong>Responsabilidade:</strong> recebe os HTTP POST/GET dos terminais <strong>ZKTeco e Anviz</strong> (protocolo iClock/ADMS) e reporta o ping ao NOC Monitor.</p>
-        <p><strong>Porta padrão:</strong> <code className="bg-blue-100 px-1 rounded font-mono">8080</code> — configurar nos terminais como "Endereço do Servidor ADMS".</p>
-        <p><strong>Configuração:</strong> partilha o <code className="bg-blue-100 px-1 rounded font-mono">config.json</code> do Agente Local (<code className="bg-blue-100 px-1 rounded font-mono">C:\ProgramData\Base44Agent\</code>).</p>
-        <p><strong>Terminais suportados:</strong> ZKTeco MA300, F22, UA860, SpeedFace · Anviz C2 Pro, EP300, W2 · qualquer terminal com protocolo ADMS/iClock.</p>
-        <p><strong>Lookup automático:</strong> identifica o terminal pelo <code className="bg-blue-100 px-1 rounded font-mono">Número de Série (SN)</code> configurado no terminal do NOC Monitor.</p>
+      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
+        <p className="font-semibold">⚠️ Servidor Legado — Use o noc_server.py</p>
+        <p>Este <code className="bg-amber-100 px-1 rounded font-mono">adms_server.py</code> é a versão standalone original. O <strong>noc_server.py</strong> já inclui todas estas funcionalidades de forma integrada, incluindo gravação automática de marcações ATTLOG na BD.</p>
+        <p>Use este ficheiro apenas se precisar de um servidor ADMS isolado, sem as outras funcionalidades do noc_server (Heartbeat TCP, SDK-TCP, controlo remoto).</p>
       </div>
 
-      <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
-        <p><strong>⚠️ Pré-requisito:</strong> o campo <strong>"Número de Série"</strong> do terminal no NOC Monitor deve corresponder exatamente ao SN do equipamento físico.</p>
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
+        <p><strong>Responsabilidade:</strong> recebe HTTP POST/GET dos terminais <strong>ZKTeco e Anviz</strong> (protocolo iClock/ADMS).</p>
+        <p><strong>Porta padrão:</strong> <code className="bg-blue-100 px-1 rounded font-mono">8080</code> — configurar nos terminais como "Endereço do Servidor ADMS".</p>
+        <p><strong>Terminais suportados:</strong> ZKTeco MA300, F22, UA860, SpeedFace · Anviz C2 Pro, EP300, W2 · qualquer terminal com protocolo ADMS/iClock.</p>
+        <p><strong>Lookup:</strong> identifica o terminal pelo <code className="bg-blue-100 px-1 rounded font-mono">Número de Série (SN)</code> registado no NOC Monitor.</p>
+        <p><strong>⚠️ Nota:</strong> este standalone apenas reporta ping — <strong>não grava marcações ATTLOG</strong>. Para gravação automática use o <strong>noc_server.py</strong>.</p>
       </div>
 
       {expanded && (

@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 
 const ACAO_LABELS = {
   // Terminais
@@ -76,6 +76,7 @@ export default function Auditoria() {
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
+  const { timezone: userTimezone } = useUserTimezone();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -306,7 +307,7 @@ export default function Auditoria() {
                     <CardContent className="p-3 space-y-1.5">
                       <div className="flex items-center justify-between gap-2">
                         <Badge className={cn("text-xs shrink-0", acaoInfo.color)}>{acaoInfo.label}</Badge>
-                        <span className="font-mono text-xs text-slate-400">{moment(log.timestamp).format('DD/MM/YY HH:mm')}</span>
+                        <span className="font-mono text-xs text-slate-400">{log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
                       </div>
                       <p className="text-xs text-slate-600 truncate">{log.usuario_email}</p>
                       {log.descricao && <p className="text-xs text-slate-500 line-clamp-2">{log.descricao}</p>}
@@ -335,7 +336,7 @@ export default function Auditoria() {
                         return (
                           <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-3 font-mono text-xs text-slate-500 whitespace-nowrap">
-                              {moment(log.timestamp).format('DD/MM/YY HH:mm:ss')}
+                              {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
                             </td>
                             <td className="px-4 py-3 text-slate-700 max-w-[160px] truncate">{log.usuario_email}</td>
                             <td className="px-4 py-3">

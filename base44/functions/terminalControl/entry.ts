@@ -1,45 +1,56 @@
 /**
  * terminalControl.js — Controlo Remoto de Terminais Biométricos
- * 
+ *
  * Suporte por tipo de conexão:
- *   - websocket_cloud (Timmy/THbio): WebSocket JSON Protocol 3.0
- *   - adms_push / sdk_tcp (ZKTeco): Comandos via ADMS/iClock HTTP
- *   - ip_publico / dns / ip_local + fabricante hikvision: Hikvision ISAPI REST
- *   - ip_publico / dns / ip_local + fabricante dahua: Dahua HTTP API
- * 
- * Ações suportadas:
- *   settime, getlogs, opendoor, reboot, getdevinfo, adduser, deleteuser
+ *   - websocket_cloud (Timmy/THbio): relay via timmy_ws_server.py (HTTP → WS → Terminal)
+ *   - adms_push / sdk_tcp (ZKTeco): relay via noc_server.py (HTTP → ADMS → Terminal)
+ *   - ip_publico / dns + hikvision: Hikvision ISAPI REST direto
+ *   - ip_publico / dns + dahua: Dahua HTTP CGI API direto
+ *
+ * Servidor NOC configurável via variável de ambiente NOC_SERVER_HOST.
+ * Nunca use IPs hardcoded — configure NOC_SERVER_HOST no painel de secrets.
  */
 
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Config ──────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve o host do servidor NOC.
+ * Prioridade: campo ip_publico/dns do terminal (se preenchido para ADMS) → NOC_SERVER_HOST (env var) → erro
+ * Para Timmy WS, o servidor central é sempre NOC_SERVER_HOST.
+ */
+function getNocServerHost() {
+  const host = Deno.env.get('NOC_SERVER_HOST');
+  if (!host) {
+    throw new Error(
+      'Variável de ambiente NOC_SERVER_HOST não configurada.\n' +
+      'Aceda ao painel de Configurações → Secrets e defina NOC_SERVER_HOST com o IP público ou hostname do servidor NOC.\n' +
+      'Exemplo: 51.91.219.145 ou noc.meudominio.com'
+    );
+  }
+  return host;
+}
 
 function nowStr() {
   return new Date().toISOString().replace('T', ' ').substring(0, 19);
 }
 
+// ─── Helpers de comunicação ──────────────────────────────────────────────────
+
 /**
- * sendAdmsCommand — envia comando ao noc_server.py via HTTP interno (porta 7790).
- * O noc_server.py expõe um servidor HTTP de controlo que recebe comandos e os envia
- * ao terminal ZKTeco/Anviz via protocolo ADMS (como resposta ao próximo getrequest).
- *
- * Fluxo: Base44 → POST http://<servidor>:7790/cmd → noc_server.py → ADMS → Terminal → resposta
- *
- * O campo "ip_publico" ou "dns" deve apontar para o Windows Server onde o noc_server.py corre.
- * O campo "numero_serie" (SN) é obrigatório para identificar o terminal no servidor ADMS.
+ * sendAdmsCommand — envia comando ao noc_server.py via HTTP (porta 7790).
+ * O campo ip_publico/dns do terminal deve apontar para o servidor NOC se diferente do padrão,
+ * caso contrário usa NOC_SERVER_HOST.
  */
 async function sendAdmsCommand(terminal, action, params = {}) {
-  const host = terminal.ip_publico || terminal.dns;
-  if (!host) {
-    return { success: false, error: 'IP/DNS do servidor NOC (noc_server.py) não configurado. Preencha o campo "IP Público" com o IP do Windows Server.' };
-  }
+  const host = terminal.ip_publico || terminal.dns || getNocServerHost();
   const sn = terminal.numero_serie || '';
   if (!sn) {
-    return { success: false, error: 'Número de série (SN) não configurado no terminal — obrigatório para terminais ADMS/ZKTeco.' };
+    return { success: false, error: 'Número de série (SN) não configurado — obrigatório para terminais ADMS/ZKTeco.' };
   }
 
-  const ctrlPort = 7790; // porta HTTP de controlo do noc_server.py
+  const ctrlPort = 7790;
   const url = `http://${host}:${ctrlPort}/cmd`;
 
   const resp = await fetch(url, {
@@ -47,7 +58,7 @@ async function sendAdmsCommand(terminal, action, params = {}) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sn, action, params }),
     signal: AbortSignal.timeout(15000),
-  }).catch(e => { throw new Error(`Não foi possível contactar o noc_server.py em ${host}:${ctrlPort} — ${e.message}`); });
+  }).catch(e => { throw new Error(`Não foi possível contactar noc_server.py em ${host}:${ctrlPort} — ${e.message}`); });
 
   if (!resp.ok) {
     const errBody = await resp.text().catch(() => '');
@@ -57,7 +68,7 @@ async function sendAdmsCommand(terminal, action, params = {}) {
   const data = await resp.json();
   return {
     success: data.success !== false,
-    message: data.message || (data.success ? 'Comando executado pelo servidor ADMS' : 'Falha no servidor ADMS'),
+    message: data.message || (data.success ? 'Comando executado' : 'Falha no servidor ADMS'),
     data: data.result || data,
     note: data.note,
   };
@@ -65,53 +76,62 @@ async function sendAdmsCommand(terminal, action, params = {}) {
 
 /**
  * sendTimmyCommand — envia comando ao timmy_ws_server.py via HTTP (porta 7789).
- * O servidor mantém a sessão WebSocket com o terminal e faz o relay do comando.
- * 
- * Fluxo: Base44 → POST http://51.91.219.145:7789/cmd → timmy_ws_server.py → WS → Terminal → resposta
- * 
- * O servidor Timmy corre sempre em 51.91.219.145:7789 (IP público do NOC Server).
- * O campo "Número de Série (SN)" é obrigatório para identificar o terminal.
+ * Prioridade: ip_publico do terminal → dns → NOC_SERVER_HOST global.
+ * Isto permite servidores Timmy locais/diferentes por terminal.
  */
-async function sendTimmyCommand(terminal, command) {
-  const ctrlPort = 7789; // porta HTTP de controlo do timmy_ws_server.py
-  const host = '51.91.219.145'; // Servidor Timmy central (NOC Server IP público)
+async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
+  // Usar IP/host específico do terminal se disponível, caso contrário usar o servidor global
+  const host = terminal.ip_publico || terminal.dns || getNocServerHost();
+  const ctrlPort = 7789;
   const sn = terminal.numero_serie || '';
-  
+
   if (!sn) {
-    throw new Error(`[Timmy WebSocket Cloud] Número de série (SN) não configurado.\n\n` +
-      `O terminal "${terminal.nome}" não tem o Número de Série preenchido.\n` +
-      `Este campo é obrigatório para controlo remoto via WebSocket Cloud.\n\n` +
-      `SOLUÇÃO:\n` +
-      `1. Aceda ao terminal: MENU → Sys Info → Info → SN\n` +
-      `2. Copie o número de série (ex: AYSK02012617)\n` +
-      `3. Coloque-o no campo "Número de Série (SN)" do terminal no NOC Monitor`);
+    throw new Error(
+      `[Timmy WebSocket Cloud] Número de série (SN) não configurado no terminal "${terminal.nome}".\n` +
+      `Aceda ao terminal: MENU → Sys Info → Info → SN e preencha o campo no NOC Monitor.`
+    );
   }
 
   const url = `http://${host}:${ctrlPort}/cmd`;
-  
-  // Estruturar o comando correctamente para o formato Timmy
-  const payload = {
-    sn: sn,
-    command: command
-  };
-  
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(12000),
-  });
+  let lastError;
 
-  if (!resp.ok) {
-    const errBody = await resp.text().catch(() => '');
-    throw new Error(`Servidor Timmy (${host}:${ctrlPort}) respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
-  }
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sn, command }),
+        signal: AbortSignal.timeout(20000), // 20s por tentativa
+      });
 
-  const data = await resp.json();
-  if (!data.success) {
-    throw new Error(data.error || 'Servidor Timmy não conseguiu enviar o comando ao terminal');
+      if (!resp.ok) {
+        const errBody = await resp.text().catch(() => '');
+        throw new Error(`Servidor Timmy respondeu ${resp.status}: ${errBody || 'erro desconhecido'}`);
+      }
+
+      const data = await resp.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Servidor Timmy não conseguiu enviar o comando ao terminal');
+      }
+
+      const result = data.result || { result: true };
+
+      // Detectar "can not find this command" — o firmware não suporta este comando
+      if (result.result === false && result.msg && result.msg.toLowerCase().includes('can not find this command')) {
+        throw new Error(`O terminal "${terminal.nome}" (modelo: ${terminal.modelo || 'desconhecido'}) não suporta o comando "${command.cmd}". Este firmware não implementa esta função.`);
+      }
+
+      return result;
+
+    } catch (e) {
+      lastError = e;
+      if (attempt < maxAttempts) {
+        console.warn(`[sendTimmyCommand] tentativa ${attempt}/${maxAttempts} falhou (${command.cmd}) — retry em 3s: ${e.message}`);
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    }
   }
-  return data.result || { result: true };
+  throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível após ${maxAttempts} tentativa(s) — ${lastError?.message}`);
 }
 
 function buildTerminalBaseUrl(terminal) {
@@ -122,299 +142,270 @@ function buildTerminalBaseUrl(terminal) {
 
 async function hikvisionRequest(terminal, method, path, body = null) {
   const base = buildTerminalBaseUrl(terminal);
-  const url = `${base}${path}`;
-  // Hikvision uses HTTP Digest auth — simplified with Basic for compatibility
   const creds = btoa(`admin:${terminal.observacoes || 'admin'}`);
   const opts = {
     method,
-    headers: {
-      'Authorization': `Basic ${creds}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Authorization': `Basic ${creds}`, 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(10000),
   };
   if (body) opts.body = JSON.stringify(body);
-  const resp = await fetch(url, opts);
+  const resp = await fetch(`${base}${path}`, opts);
   const text = await resp.text();
   try { return JSON.parse(text); } catch { return { raw: text, status: resp.status }; }
 }
 
+/**
+ * dahuaRequest — Digest Auth (MD5) para Dahua CGI.
+ * A Dahua requer Digest Auth na maioria dos endpoints (Basic retorna 401).
+ */
 async function dahuaRequest(terminal, cgiPath) {
   const base = buildTerminalBaseUrl(terminal);
-  const creds = btoa(`admin:${terminal.observacoes || 'admin'}`);
-  const resp = await fetch(`${base}${cgiPath}`, {
-    headers: { 'Authorization': `Basic ${creds}` },
-  });
-  const text = await resp.text();
-  return { status: resp.status, body: text };
+  const user = 'admin';
+  const pass = terminal.observacoes || 'admin';
+  const url = `${base}${cgiPath}`;
+
+  // 1ª tentativa — sem auth (obter WWW-Authenticate com nonce)
+  const r1 = await fetch(url, { signal: AbortSignal.timeout(10000) }).catch(() => null);
+  if (!r1 || r1.status !== 401) {
+    // Sem autenticação ou resposta directa
+    return { status: r1?.status || 0, body: await r1?.text().catch(() => '') };
+  }
+
+  // Extrair parâmetros Digest do header WWW-Authenticate
+  const wwwAuth = r1.headers.get('www-authenticate') || '';
+  const realm  = (wwwAuth.match(/realm="([^"]*)"/)  || [])[1] || '';
+  const nonce  = (wwwAuth.match(/nonce="([^"]*)"/)  || [])[1] || '';
+  const qop    = (wwwAuth.match(/qop="([^"]*)"/)    || [])[1] || '';
+  const opaque = (wwwAuth.match(/opaque="([^"]*)"/) || [])[1] || '';
+
+  // Calcular HA1, HA2, response (MD5 via SubtleCrypto)
+  const md5 = async (str) => {
+    const buf = await crypto.subtle.digest('MD5', new TextEncoder().encode(str)).catch(() => null);
+    if (!buf) return str; // fallback se MD5 não disponível
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const nc = '00000001';
+  const cnonce = Math.random().toString(36).substring(2, 10);
+  const ha1 = await md5(`${user}:${realm}:${pass}`);
+  const ha2 = await md5(`GET:${cgiPath.split('?')[0]}`);
+  const response = qop
+    ? await md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`)
+    : await md5(`${ha1}:${nonce}:${ha2}`);
+
+  const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${cgiPath.split('?')[0]}", ` +
+    (qop ? `qop=${qop}, nc=${nc}, cnonce="${cnonce}", ` : '') +
+    `response="${response}"` +
+    (opaque ? `, opaque="${opaque}"` : '');
+
+  const r2 = await fetch(url, {
+    headers: { 'Authorization': authHeader },
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => null);
+  return { status: r2?.status || 0, body: await r2?.text().catch(() => '') };
 }
 
-// ─── Action Handlers ────────────────────────────────────────────────────────
+// ─── Action Handlers ─────────────────────────────────────────────────────────
 
 async function actionSetTime(terminal) {
   const now = nowStr();
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
 
-  if (terminal.tipo_conexao === 'websocket_cloud') {
+  if (tipo === 'websocket_cloud') {
     const resp = await sendTimmyCommand(terminal, { cmd: 'settime', cloudtime: now });
     return { success: resp.result === true, message: `Relógio acertado para ${now}`, data: resp };
   }
-
-  if (terminal.tipo_conexao === 'adms_push') {
-    // ZKTeco ADMS: o servidor local (noc_server.py) encaminha o comando via HTTP interno
-    const result = await sendAdmsCommand(terminal, 'settime', { time: now });
-    return result;
+  if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
+    return await sendAdmsCommand(terminal, 'settime', { time: now });
   }
-
-  if (terminal.tipo_conexao === 'sdk_tcp') {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/time', {
-        timeMode: 'manual', localTime: now, timeZone: 'UTC+0:00'
-      });
-      return { success: true, message: `Relógio acertado (Hikvision)`, data: resp };
-    }
-    if (terminal.fabricante === 'dahua') {
-      // Dahua CGI: setCurrentTime via magicBox
-      const resp = await dahuaRequest(terminal, `/cgi-bin/global.cgi?action=setCurrentTime&time=${encodeURIComponent(now)}`);
-      return { success: resp.status === 200, message: `Relógio acertado (Dahua)`, data: resp };
-    }
-    // ZKTeco SDK: tenta via noc_server.py local
-    const result = await sendAdmsCommand(terminal, 'settime', { time: now });
-    return result;
+  if (fab === 'hikvision') {
+    const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/time', { timeMode: 'manual', localTime: now, timeZone: 'UTC+0:00' });
+    return { success: true, message: `Relógio acertado (Hikvision)`, data: resp };
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/time', {
-        timeMode: 'manual', localTime: now
-      });
-      return { success: true, message: `Relógio acertado (Hikvision ISAPI)`, data: resp };
-    }
-    if (terminal.fabricante === 'dahua') {
-      const resp = await dahuaRequest(terminal, `/cgi-bin/global.cgi?action=setCurrentTime&time=${encodeURIComponent(now)}`);
-      return { success: resp.status === 200, message: `Relógio acertado (Dahua)`, data: resp };
-    }
-    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
-      const result = await sendAdmsCommand(terminal, 'settime', { time: now });
-      return result;
-    }
+  if (fab === 'dahua') {
+    const resp = await dahuaRequest(terminal, `/cgi-bin/global.cgi?action=setCurrentTime&time=${encodeURIComponent(now)}`);
+    return { success: resp.status === 200, message: `Relógio acertado (Dahua)`, data: resp };
   }
-
-  return { success: false, error: `Ação settime não suportada para tipo: ${terminal.tipo_conexao} / fabricante: ${terminal.fabricante || 'desconhecido'}` };
+  if (fab === 'zkteco' || fab === 'anviz') {
+    return await sendAdmsCommand(terminal, 'settime', { time: now });
+  }
+  return { success: false, error: `settime não suportado para tipo: ${tipo} / fabricante: ${fab}` };
 }
 
 async function actionGetLogs(terminal) {
-  if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getnewlog', stn: true }).catch(() => null);
-    if (!resp) {
-      return { success: false, message: 'Terminal não respondeu ao pedido de logs. Verifique se o terminal está online e ligado ao servidor WebSocket.' };
-    }
-    const count = resp.count || 0;
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
+
+  if (tipo === 'websocket_cloud') {
+    const resp = await sendTimmyCommand(terminal, { cmd: 'getnewlog', stn: true });
     const records = resp.record || [];
-    return { success: resp.result === true, message: `${count} marcações recolhidas`, count, records: records.slice(0, 50) };
+    return { success: resp.result === true, message: `${resp.count || 0} marcações recolhidas`, count: resp.count || 0, records: records.slice(0, 50) };
   }
-
-  if (terminal.tipo_conexao === 'adms_push') {
-    return { success: true, message: 'Terminais ADMS enviam marcações automaticamente ao servidor noc_server.py.', note: 'Os logs chegam em tempo real via POST /iclock/cdata. Consulte o histórico no painel.' };
+  if (tipo === 'adms_push') {
+    return { success: true, message: 'Terminais ADMS enviam marcações automaticamente via POST /iclock/cdata.', note: 'Consulte o histórico no painel.' };
   }
-
-  if (terminal.tipo_conexao === 'sdk_tcp') {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', {
-        AcsEventCond: { searchID: '1', searchResultPosition: 0, maxResults: 50 }
-      });
+  if (tipo === 'sdk_tcp') {
+    if (fab === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', { AcsEventCond: { searchID: '1', searchResultPosition: 0, maxResults: 50 } });
       return { success: true, message: 'Marcações Hikvision recolhidas', data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
-      // Dahua: GET com recordFinder para registos de acesso
+    if (fab === 'dahua') {
       const resp = await dahuaRequest(terminal, '/cgi-bin/recordFinder.cgi?action=find&name=AccessControlCardRec&StartTime=2000-01-01%2000%3A00%3A00&EndTime=2099-12-31%2023%3A59%3A59&count=50');
       return { success: resp.status === 200, message: 'Marcações Dahua recolhidas', data: resp.body };
     }
-    // ZKTeco SDK-TCP: solicitar ao noc_server.py local para fazer upload de logs
     return await sendAdmsCommand(terminal, 'getlogs', {});
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', {
-        AcsEventCond: { searchID: '1', searchResultPosition: 0, maxResults: 50 }
-      });
+  if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+    if (fab === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/AcsEvent?format=json', { AcsEventCond: { searchID: '1', searchResultPosition: 0, maxResults: 50 } });
       return { success: true, message: 'Marcações Hikvision recolhidas', data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
+    if (fab === 'dahua') {
       const resp = await dahuaRequest(terminal, '/cgi-bin/recordFinder.cgi?action=find&name=AccessControlCardRec&StartTime=2000-01-01%2000%3A00%3A00&EndTime=2099-12-31%2023%3A59%3A59&count=50');
       return { success: resp.status === 200, message: 'Marcações Dahua recolhidas', data: resp.body };
     }
-    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+    if (fab === 'zkteco' || fab === 'anviz') {
       return await sendAdmsCommand(terminal, 'getlogs', {});
     }
   }
-
-  return { success: false, error: `getlogs não suportado para ${terminal.tipo_conexao}` };
+  return { success: false, error: `getlogs não suportado para ${tipo}` };
 }
 
 async function actionOpenDoor(terminal) {
-  if (terminal.tipo_conexao === 'websocket_cloud') {
-    // opendoor: o terminal responde com ret:"opendoor" result:true
-    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' }).catch(() => ({ result: true }));
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
+
+  if (tipo === 'websocket_cloud') {
+    // 3 tentativas para comandos críticos de acesso
+    const resp = await sendTimmyCommand(terminal, { cmd: 'opendoor' }, 3);
     return { success: resp.result === true || resp.result === undefined, message: 'Porta aberta remotamente', data: resp };
   }
 
-  if (terminal.tipo_conexao === 'adms_push') {
-    // ZKTeco ADMS: o noc_server.py encaminha o comando "OPEN DOOR" como resposta ao próximo getrequest do terminal
+  // Hikvision ISAPI: PUT /ISAPI/AccessControl/RemoteControl/door/1 com body JSON
+  // Ref: Hikvision ISAPI v2.0 — Access Control Remote Control
+  const hikvisionOpenDoor = async () => {
+    const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1',
+      { RemoteControlDoorParam: { door: 1, controlType: 'open' } });
+    return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
+  };
+
+  // Dahua CGI: openDoor via accessControl.cgi
+  // Ref: Dahua HTTP API — Access Control
+  const dahuaOpenDoor = async () => {
+    const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
+    return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
+  };
+
+  if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
+    if (fab === 'hikvision') return await hikvisionOpenDoor();
+    if (fab === 'dahua') return await dahuaOpenDoor();
     return await sendAdmsCommand(terminal, 'opendoor', {});
   }
-
-  if (terminal.tipo_conexao === 'sdk_tcp') {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
-      return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
-    }
-    if (terminal.fabricante === 'dahua') {
-      // Dahua CGI: GET com openDoor (método correto conforme documentação oficial)
-      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
-      return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
-    }
-    // ZKTeco SDK-TCP: via noc_server.py
-    return await sendAdmsCommand(terminal, 'opendoor', {});
+  if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+    if (fab === 'hikvision') return await hikvisionOpenDoor();
+    if (fab === 'dahua') return await dahuaOpenDoor();
+    if (fab === 'zkteco' || fab === 'anviz') return await sendAdmsCommand(terminal, 'opendoor', {});
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/RemoteControl/door/1');
-      return { success: true, message: 'Porta aberta (Hikvision ISAPI)', data: resp };
-    }
-    if (terminal.fabricante === 'dahua') {
-      const resp = await dahuaRequest(terminal, '/cgi-bin/accessControl.cgi?action=openDoor&channel=1&Type=Remote');
-      return { success: resp.status === 200, message: 'Porta aberta (Dahua)', data: resp };
-    }
-    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
-      return await sendAdmsCommand(terminal, 'opendoor', {});
-    }
-  }
-
-  return { success: false, error: `opendoor não suportado para ${terminal.tipo_conexao}` };
+  return { success: false, error: `opendoor não suportado para ${tipo}` };
 }
 
 async function actionReboot(terminal) {
-  if (terminal.tipo_conexao === 'websocket_cloud') {
-    // reboot: terminal fecha WS após receber, por isso pode não haver resposta — aceitamos sempre como sucesso
-    const resp = await sendTimmyCommand(terminal, { cmd: 'reboot' }).catch(() => ({ result: true }));
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
+
+  if (tipo === 'websocket_cloud') {
+    const resp = await sendTimmyCommand(terminal, { cmd: 'reboot' });
     return { success: true, message: 'Comando de reinício enviado. Terminal reiniciará imediatamente.', data: resp };
   }
-
-  if (terminal.tipo_conexao === 'adms_push') {
-    // ZKTeco ADMS: noc_server.py envia "REBOOT" como resposta ao próximo getrequest
-    return await sendAdmsCommand(terminal, 'reboot', {});
-  }
-
-  if (terminal.tipo_conexao === 'sdk_tcp') {
-    if (terminal.fabricante === 'hikvision') {
+  if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
+    if (fab === 'hikvision') {
       const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/reboot');
       return { success: true, message: 'Reinício enviado (Hikvision)', data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
-      // Dahua: reboot via magicBox CGI
+    if (fab === 'dahua') {
       const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=reboot');
       return { success: resp.status === 200, message: 'Reinício enviado (Dahua)' };
     }
     return await sendAdmsCommand(terminal, 'reboot', {});
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
+  if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+    if (fab === 'hikvision') {
       const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/System/reboot');
       return { success: true, message: 'Reinício enviado (Hikvision)', data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
+    if (fab === 'dahua') {
       const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=reboot');
       return { success: resp.status === 200, message: 'Reinício enviado (Dahua)' };
     }
-    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+    if (fab === 'zkteco' || fab === 'anviz') {
       return await sendAdmsCommand(terminal, 'reboot', {});
     }
   }
-
-  return { success: false, error: `reboot não suportado para ${terminal.tipo_conexao}` };
+  return { success: false, error: `reboot não suportado para ${tipo}` };
 }
 
 async function actionGetDevInfo(terminal) {
-  if (terminal.tipo_conexao === 'websocket_cloud') {
-    // getdevcap: retorna capacidades do dispositivo (protocol v3.0 section 36)
-    const resp = await sendTimmyCommand(terminal, { cmd: 'getdevcap' }).catch(() => null);
-    if (!resp) {
-      return {
-        success: true,
-        message: 'Terminal não respondeu ao pedido de info. Dados do registo:',
-        data: { sn: terminal.numero_serie, modelo: terminal.modelo, fabricante: terminal.fabricante, tipo_conexao: terminal.tipo_conexao }
-      };
-    }
-    // Formatar dados para exibição amigável
-    const info = resp.result ? {
-      sn: resp.sn || terminal.numero_serie,
-      modelo: terminal.modelo,
-      capacidade_utilizadores: resp.usersize,
-      utilizadores_registados: resp.useduser,
-      capacidade_faces: resp.facesize,
-      faces_registadas: resp.usedface,
-      capacidade_impressoes: resp.fpsize,
-      impressoes_registadas: resp.usedfp,
-      capacidade_cartoes: resp.cardsize,
-      cartoes_registados: resp.usedcard,
-      capacidade_logs: resp.logsize,
-      logs_armazenados: resp.usedlog,
-      novos_logs: resp.usednewlog,
-    } : resp;
-    return { success: resp.result === true, message: 'Informação do dispositivo obtida', data: info };
-  }
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
 
-  if (terminal.tipo_conexao === 'adms_push') {
-    // ZKTeco ADMS: devolver info registada no sistema e solicitar info ao noc_server.py
-    const result = await sendAdmsCommand(terminal, 'getdevinfo', {});
-    if (result.success) return result;
-    // Fallback: devolver dados do registo
+  if (tipo === 'websocket_cloud') {
+    // "Info do Dispositivo" — devolve dados já guardados em BD (sem chamar o terminal)
+    // Os dados de hardware (SN, modelo, firmware) chegam no heartbeat de registo (cmd=reg)
     return {
       success: true,
-      message: 'Informação do terminal (registo NOC Monitor)',
-      data: { sn: terminal.numero_serie, modelo: terminal.modelo, fabricante: terminal.fabricante, tipo_conexao: terminal.tipo_conexao }
+      message: 'Informação do dispositivo obtida',
+      data: {
+        sn: terminal.numero_serie,
+        modelo: terminal.modelo,
+        fabricante: terminal.fabricante,
+        local: terminal.local,
+        status: terminal.status,
+        ultimo_ping: terminal.ultimo_ping,
+        latencia_ms: terminal.latencia_ms,
+        segundos_sem_ping: terminal.segundos_sem_ping,
+        tipo_conexao: terminal.tipo_conexao,
+      }
     };
   }
-
-  if (terminal.tipo_conexao === 'sdk_tcp') {
-    if (terminal.fabricante === 'hikvision') {
+  if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
+    if (fab === 'hikvision') {
       const resp = await hikvisionRequest(terminal, 'GET', '/ISAPI/System/deviceInfo');
       return { success: true, message: 'Info Hikvision obtida', data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
-      // Dahua: getSystemInfo + getSoftwareVersion
-      const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo');
-      const resp2 = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSoftwareVersion');
-      return { success: resp.status === 200, message: 'Info Dahua obtida', data: { system: resp.body, version: resp2.body } };
+    if (fab === 'dahua') {
+      const [r1, r2] = await Promise.all([
+        dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo'),
+        dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSoftwareVersion'),
+      ]);
+      return { success: r1.status === 200, message: 'Info Dahua obtida', data: { system: r1.body, version: r2.body } };
     }
     return await sendAdmsCommand(terminal, 'getdevinfo', {});
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
+  if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+    if (fab === 'hikvision') {
       const resp = await hikvisionRequest(terminal, 'GET', '/ISAPI/System/deviceInfo');
       return { success: true, message: 'Info Hikvision obtida', data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
-      const resp = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo');
-      const resp2 = await dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSoftwareVersion');
-      return { success: resp.status === 200, message: 'Info Dahua obtida', data: { system: resp.body, version: resp2.body } };
+    if (fab === 'dahua') {
+      const [r1, r2] = await Promise.all([
+        dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSystemInfo'),
+        dahuaRequest(terminal, '/cgi-bin/magicBox.cgi?action=getSoftwareVersion'),
+      ]);
+      return { success: r1.status === 200, message: 'Info Dahua obtida', data: { system: r1.body, version: r2.body } };
     }
-    if (terminal.fabricante === 'zkteco' || terminal.fabricante === 'anviz') {
+    if (fab === 'zkteco' || fab === 'anviz') {
       return await sendAdmsCommand(terminal, 'getdevinfo', {});
     }
   }
-
-  return { success: false, error: `getdevinfo não suportado para ${terminal.tipo_conexao}` };
+  return { success: false, error: `getdevinfo não suportado para ${tipo}` };
 }
 
 async function actionSetDoorStatus(terminal, params) {
-  // fuc: 1=Forçar porta aberta (mantém aberta), 2=Forçar porta fechada, 3=Abrir software (abre e fecha), 4=Relay inicial, 6=Cancelar alarme
-  const fuc = params?.fuc || 1;
+  const fuc = params?.fuc ?? 1;
   if (terminal.tipo_conexao === 'websocket_cloud') {
-    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc }).catch(() => ({ result: true }));
+    // 3 tentativas para comandos críticos de controlo de porta
+    const resp = await sendTimmyCommand(terminal, { cmd: 'lockctrl', fuc }, 3);
     const msgs = { 1: 'Porta forçada aberta (permanente)', 2: 'Porta forçada fechada', 3: 'Porta aberta temporariamente', 4: 'Relay resetado', 6: 'Alarme cancelado' };
     return { success: resp.result === true || resp.result === undefined, message: msgs[fuc] || `lockctrl fuc=${fuc}`, data: resp };
   }
@@ -424,133 +415,203 @@ async function actionSetDoorStatus(terminal, params) {
 async function actionAddUser(terminal, params) {
   const { enrollid, name, password = '', card = '', privilege = 0 } = params || {};
   if (!enrollid || !name) return { success: false, error: 'enrollid e name são obrigatórios' };
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
 
-  if (terminal.tipo_conexao === 'websocket_cloud') {
-    // Protocolo v3.0 secção 6 "Send user information": cmd:"setuserinfo"
-    // backupnum: 10=password, 11=card — para criar apenas o utilizador com nome usamos password
-    // Se não tiver password nem card, cria apenas com nome (backupnum=10, record=0)
-    let backupnum = 10; // password por defeito
-    let record = password ? Number(password) : 0;
-
-    if (card) {
+  if (tipo === 'websocket_cloud') {
+    // Protocolo Timmy setuserinfo:
+    //   backupnum: 10=senha, 11=cartão RFID, 15=facial (apenas registo de credenciais básicas)
+    //   record: valor da credencial (número da senha, número do cartão)
+    // Prioridade: cartão > senha > sem credencial (o terminal regista biometria separadamente)
+    let backupnum = 10;
+    let record = 0;
+    if (card && String(card).trim()) {
       backupnum = 11;
-      record = Number(card);
+      record = Number(card) || 0;
+    } else if (password && String(password).trim()) {
+      backupnum = 10;
+      record = Number(password) || 0;
     }
-
-    const msg = {
+    const resp = await sendTimmyCommand(terminal, {
       cmd: 'setuserinfo',
       enrollid: Number(enrollid),
       name,
       backupnum,
       admin: Number(privilege),
       record,
-    };
-    const resp = await sendTimmyCommand(terminal, msg);
+    });
     return { success: resp.result === true, message: `Utilizador "${name}" (ID:${enrollid}) adicionado`, data: resp };
   }
-
-  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    // ZKTeco ADMS: via noc_server.py — envia DATA USER como resposta ao próximo getrequest
-    return await sendAdmsCommand(terminal, 'adduser', { enrollid, name, password, card, privilege, accgroup, timezone });
+  if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
+    return await sendAdmsCommand(terminal, 'adduser', { enrollid, name, password, card, privilege });
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
+  if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+    if (fab === 'hikvision') {
       const resp = await hikvisionRequest(terminal, 'POST', '/ISAPI/AccessControl/UserInfo/Record?format=json', {
-        UserInfo: {
-          employeeNo: String(enrollid),
-          name,
-          userType: Number(privilege) === 14 ? 'administrator' : 'normal',
-          Valid: { enable: true, beginTime: '2000-01-01T00:00:00', endTime: '2099-12-31T23:59:59', timeType: 'local' },
-          doorRight: '1',
-          RightPlan: [{ doorNo: 1, planTemplateNo: '1' }],
-        }
+        UserInfo: { employeeNo: String(enrollid), name, userType: Number(privilege) === 14 ? 'administrator' : 'normal', Valid: { enable: true, beginTime: '2000-01-01T00:00:00', endTime: '2099-12-31T23:59:59', timeType: 'local' }, doorRight: '1', RightPlan: [{ doorNo: 1, planTemplateNo: '1' }] }
       });
       return { success: true, message: `Utilizador "${name}" adicionado (Hikvision)`, data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
-      // Dahua CGI correto: recordUpdater.cgi?action=insert&name=AccessControlCard (documentação oficial Dahua v1.0)
+    if (fab === 'dahua') {
       const resp = await dahuaRequest(terminal, `/cgi-bin/recordUpdater.cgi?action=insert&name=AccessControlCard&CardName=${encodeURIComponent(name)}&CardNo=${enrollid}&UserID=${enrollid}&CardStatus=0&CardType=0&Password=${password}&Doors[0]=0`);
       return { success: resp.status === 200, message: `Utilizador "${name}" adicionado (Dahua)`, data: resp };
     }
   }
-
-  return { success: false, error: `adduser não suportado para ${terminal.tipo_conexao}/${terminal.fabricante}` };
+  return { success: false, error: `adduser não suportado para ${tipo}/${fab}` };
 }
 
 async function actionBlockUser(terminal, params) {
   const { enrollid, block = true } = params || {};
   if (!enrollid) return { success: false, error: 'enrollid é obrigatório' };
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
   const statusLabel = block ? 'bloqueado' : 'desbloqueado';
 
-  if (terminal.tipo_conexao === 'websocket_cloud') {
-    // Protocolo v3.0 secção 7/8: cmd:"enableuser" com enflag:1 (enable) ou enflag:0 (disable)
-    const resp = await sendTimmyCommand(terminal, {
-      cmd: 'enableuser',
-      enrollid: Number(enrollid),
-      enflag: block ? 0 : 1, // 0=desativar (bloquear), 1=ativar (desbloquear)
-    });
+  if (tipo === 'websocket_cloud') {
+    const resp = await sendTimmyCommand(terminal, { cmd: 'enableuser', enrollid: Number(enrollid), enflag: block ? 0 : 1 });
     return { success: resp.result === true, message: `Utilizador ID:${enrollid} ${statusLabel}`, data: resp };
   }
-
-  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    // ZKTeco ADMS: via noc_server.py — envia DATA USER com privilege=255 (bloquear) ou 0 (desbloquear)
+  if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
     return await sendAdmsCommand(terminal, 'adduser', { enrollid, privilege: block ? 255 : 0, name: '', password: '', card: '' });
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', `/ISAPI/AccessControl/UserInfo/Modify?format=json`, {
-        UserInfo: {
-          employeeNo: String(enrollid),
-          Valid: { enable: !block, beginTime: '2000-01-01T00:00:00', endTime: '2099-12-31T23:59:59', timeType: 'local' },
-        }
+  if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+    if (fab === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/UserInfo/Modify?format=json', {
+        UserInfo: { employeeNo: String(enrollid), Valid: { enable: !block, beginTime: '2000-01-01T00:00:00', endTime: '2099-12-31T23:59:59', timeType: 'local' } }
       });
       return { success: true, message: `Utilizador ID:${enrollid} ${statusLabel} (Hikvision)`, data: resp };
     }
-    // Dahua não suporta bloqueio direto via CGI simples
-    if (terminal.fabricante === 'dahua') {
+    if (fab === 'dahua') {
       return { success: false, error: 'Bloqueio de utilizador não suportado via API Dahua CGI' };
     }
   }
-
-  return { success: false, error: `blockuser não suportado para ${terminal.tipo_conexao}/${terminal.fabricante}` };
+  return { success: false, error: `blockuser não suportado para ${tipo}/${fab}` };
 }
 
 async function actionDeleteUser(terminal, params) {
   const { enrollid } = params || {};
   if (!enrollid) return { success: false, error: 'enrollid é obrigatório' };
+  const tipo = terminal.tipo_conexao;
+  const fab = terminal.fabricante || '';
 
-  if (terminal.tipo_conexao === 'websocket_cloud') {
-    // Protocolo v3.0: cmd:"deleteuserinfo" com enrollid
-    const resp = await sendTimmyCommand(terminal, {
-      cmd: 'deleteuserinfo',
-      enrollid: Number(enrollid),
-    });
+  if (tipo === 'websocket_cloud') {
+    // Protocolo oficial Timmy: cmd = "deleteuser", backupnum=13 apaga tudo (fp+pwd+card+nome)
+    const resp = await sendTimmyCommand(terminal, { cmd: 'deleteuser', enrollid: Number(enrollid), backupnum: 13 });
     return { success: resp.result === true, message: `Utilizador ID:${enrollid} removido`, data: resp };
   }
-
-  if (terminal.tipo_conexao === 'adms_push' || terminal.tipo_conexao === 'sdk_tcp') {
-    return await sendAdmsCommand(terminal, 'blockuser', { enrollid, block: true });
+  if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
+    return await sendAdmsCommand(terminal, 'deleteuser', { enrollid });
   }
-
-  if (['ip_publico', 'dns', 'ip_local'].includes(terminal.tipo_conexao)) {
-    if (terminal.fabricante === 'hikvision') {
-      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/UserInfo/Delete?format=json', {
-        UserInfoDelCond: { EmployeeNoList: [{ employeeNo: String(enrollid) }] }
-      });
+  if (['ip_publico', 'dns', 'ip_local'].includes(tipo)) {
+    if (fab === 'hikvision') {
+      const resp = await hikvisionRequest(terminal, 'PUT', '/ISAPI/AccessControl/UserInfo/Delete?format=json', { UserInfoDelCond: { EmployeeNoList: [{ employeeNo: String(enrollid) }] } });
       return { success: true, message: `Utilizador ID:${enrollid} removido (Hikvision)`, data: resp };
     }
-    if (terminal.fabricante === 'dahua') {
+    if (fab === 'dahua') {
       const resp = await dahuaRequest(terminal, `/cgi-bin/recordUpdater.cgi?action=remove&name=AccessControlCard&UserID=${enrollid}`);
       return { success: resp.status === 200, message: `Utilizador ID:${enrollid} removido (Dahua)`, data: resp };
     }
   }
-
-  return { success: false, error: `deleteuser não suportado para ${terminal.tipo_conexao}/${terminal.fabricante}` };
+  return { success: false, error: `deleteuser não suportado para ${tipo}/${fab}` };
 }
 
-// ─── Main Handler ────────────────────────────────────────────────────────────
+// ─── Timmy-specific actions ──────────────────────────────────────────────────
+
+async function actionGetUserList(terminal, params) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getuserlist apenas suportado via WebSocket Cloud (Timmy)' };
+
+  // Protocolo Timmy: "getalluserinfo" devolve todos os utilizadores registados no terminal
+  // Fallback para "getalluser" em firmwares mais antigos
+  let lastError;
+  for (const cmd of ['getalluserinfo', 'getalluser']) {
+    try {
+      const resp = await sendTimmyCommand(terminal, { cmd });
+      const users = resp.record || [];
+      return {
+        success: resp.result === true,
+        message: `${users.length} utilizador(es) encontrado(s)`,
+        count: users.length,
+        data: { total: resp.count || users.length, users },
+        cmd_usado: cmd,
+      };
+    } catch (e) {
+      lastError = e;
+      console.warn(`[actionGetUserList] comando "${cmd}" falhou: ${e.message}`);
+    }
+  }
+  return { success: false, error: lastError?.message || 'Nenhum comando de listagem suportado por este terminal' };
+}
+
+async function actionGetUserInfo(terminal, params) {
+  const { enrollid } = params || {};
+  if (!enrollid) return { success: false, error: 'enrollid é obrigatório' };
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getuserinfo apenas suportado via WebSocket Cloud (Timmy)' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getuserinfo', enrollid: Number(enrollid) });
+  if (!resp) return { success: false, message: 'Terminal não respondeu' };
+  return { success: resp.result === true, message: `Info do utilizador ID:${enrollid}`, data: resp };
+}
+
+async function actionGetAllLogs(terminal, params) {
+  const { count = 200, from, to } = params || {};
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getalllog apenas suportado via WebSocket Cloud (Timmy)' };
+
+  // Protocolo oficial Timmy:
+  //   getalllog (pág. 16): suporta filtro de datas (from/to opcionais), usa stn:true para paginação
+  //   getnewlog (pág. 15): apenas logs novos não lidos, sem filtro de datas
+  const cmdGetAll = { cmd: 'getalllog', stn: true };
+  if (from) cmdGetAll.from = from;
+  if (to)   cmdGetAll.to   = to;
+
+  let lastError;
+  for (const cmd of [cmdGetAll, { cmd: 'getnewlog', stn: true }]) {
+    try {
+      const resp = await sendTimmyCommand(terminal, cmd);
+      const records = resp.record || [];
+      return {
+        success: true,
+        message: `${records.length} marcações obtidas (total: ${resp.count || records.length})${from ? ` — de ${from}` : ''}${to ? ` até ${to}` : ''}`,
+        count: records.length,
+        records: records.slice(0, 200),
+        cmd_usado: cmd.cmd,
+      };
+    } catch (e) {
+      lastError = e;
+      console.warn(`[actionGetAllLogs] comando "${cmd.cmd}" falhou: ${e.message}`);
+    }
+  }
+  return { success: false, error: lastError?.message || 'Nenhum comando de log suportado por este terminal' };
+}
+
+async function actionClearLogs(terminal) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'cleanlog apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "cleanlog" (pág. 18 do protocolo)
+  const resp = await sendTimmyCommand(terminal, { cmd: 'cleanlog' });
+  return { success: resp.result === true, message: 'Todos os logs eliminados do terminal', data: resp };
+}
+
+async function actionClearUsers(terminal) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'cleanuser apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "cleanuser" (pág. 14 do protocolo — "Clean all users")
+  const resp = await sendTimmyCommand(terminal, { cmd: 'cleanuser' });
+  return { success: resp.result === true, message: 'Todos os utilizadores eliminados do terminal', data: resp };
+}
+
+async function actionGetParam(terminal) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getdevinfo apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "getdevinfo" (pág. 22 — "Get terminal parameter")
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getdevinfo' });
+  return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
+}
+
+async function actionInitDevice(terminal) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initsys apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "initsys" (pág. 19 — "Initialize system")
+  // Atenção: apaga todos os utilizadores e logs mas mantém configurações
+  const resp = await sendTimmyCommand(terminal, { cmd: 'initsys' });
+  return { success: resp.result === true, message: 'Sistema inicializado — utilizadores e logs eliminados (configurações mantidas)', data: resp };
+}
+
+// ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   try {
@@ -561,18 +622,15 @@ Deno.serve(async (req) => {
     }
 
     const { terminal_id, action, params } = await req.json();
-
     if (!terminal_id || !action) {
       return Response.json({ error: 'terminal_id e action são obrigatórios' }, { status: 400 });
     }
 
-    // Buscar terminal (admin vê todos, utilizador vê apenas os seus)
     const terminal = await base44.entities.Terminal.get(terminal_id);
     if (!terminal) {
       return Response.json({ error: 'Terminal não encontrado' }, { status: 404 });
     }
 
-    // Verificar permissão (dono ou admin)
     const isAdmin = user.role === 'admin';
     if (!isAdmin && terminal.created_by !== user.email && terminal.usuario_email !== user.email) {
       return Response.json({ error: 'Sem permissão para controlar este terminal' }, { status: 403 });
@@ -580,42 +638,42 @@ Deno.serve(async (req) => {
 
     let result;
     switch (action) {
-      case 'settime':    result = await actionSetTime(terminal); break;
-      case 'getlogs':   result = await actionGetLogs(terminal); break;
-      case 'opendoor':  result = await actionOpenDoor(terminal); break;
-      case 'reboot':    result = await actionReboot(terminal); break;
-      case 'getdevinfo':result = await actionGetDevInfo(terminal); break;
-      case 'lockctrl':   result = await actionSetDoorStatus(terminal, params); break;
-      case 'adduser':    result = await actionAddUser(terminal, params); break;
-      case 'blockuser':  result = await actionBlockUser(terminal, params); break;
-      case 'deleteuser': result = await actionDeleteUser(terminal, params); break;
+      case 'settime':     result = await actionSetTime(terminal); break;
+      case 'getlogs':     result = await actionGetLogs(terminal); break;
+      case 'getalllog':   result = await actionGetAllLogs(terminal, params); break;
+      case 'opendoor':    result = await actionOpenDoor(terminal); break;
+      case 'reboot':      result = await actionReboot(terminal); break;
+      case 'getdevinfo':  result = await actionGetDevInfo(terminal); break;
+      case 'lockctrl':    result = await actionSetDoorStatus(terminal, params); break;
+      case 'adduser':     result = await actionAddUser(terminal, params); break;
+      case 'blockuser':   result = await actionBlockUser(terminal, params); break;
+      case 'deleteuser':  result = await actionDeleteUser(terminal, params); break;
+      case 'getuserlist': result = await actionGetUserList(terminal, params); break;
+      case 'getuserinfo': result = await actionGetUserInfo(terminal, params); break;
+      case 'clearlog':    result = await actionClearLogs(terminal); break;
+      case 'clearusers':  result = await actionClearUsers(terminal); break;
+      case 'getparam':    result = await actionGetParam(terminal); break;
+      case 'initdevice':  result = await actionInitDevice(terminal); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }
 
     const ts = new Date().toISOString();
 
-    // Log de operação detalhado
-    await base44.asServiceRole.entities.OperationLog.create({
-      terminal_id,
-      terminal_nome: terminal.nome,
-      acao: action,
-      executado_por: user.email,
-      sucesso: result.success !== false,
-      mensagem: result.message || result.error || (result.success ? 'Operação executada' : 'Operação falhou'),
-      resposta_raw: JSON.stringify(result),
-      timestamp: ts,
-    }).catch(() => {});
-
-    // Log auditoria
-    await base44.asServiceRole.entities.AuditLog.create({
-      usuario_email: user.email,
-      acao: 'terminal_verificado',
-      entidade: 'Terminal',
-      entidade_id: terminal_id,
-      descricao: `Ação remota "${action}" no terminal "${terminal.nome}": ${result.success ? 'sucesso' : 'falha'}`,
-      timestamp: ts,
-    }).catch(() => {});
+    await Promise.all([
+      base44.asServiceRole.entities.OperationLog.create({
+        terminal_id, terminal_nome: terminal.nome, acao: action,
+        executado_por: user.email, sucesso: result.success !== false,
+        mensagem: result.message || result.error || (result.success ? 'Operação executada' : 'Operação falhou'),
+        resposta_raw: JSON.stringify(result), timestamp: ts,
+      }).catch(() => {}),
+      base44.asServiceRole.entities.AuditLog.create({
+        usuario_email: user.email, acao: 'terminal_verificado',
+        entidade: 'Terminal', entidade_id: terminal_id,
+        descricao: `Ação remota "${action}" no terminal "${terminal.nome}": ${result.success !== false ? 'sucesso' : 'falha'}`,
+        timestamp: ts,
+      }).catch(() => {}),
+    ]);
 
     return Response.json({ success: result.success, ...result });
 

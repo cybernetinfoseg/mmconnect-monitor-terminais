@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
 import {
   ClipboardList, Search, Download, RefreshCw,
-  User, Loader2, Upload, CheckCircle2, XCircle
+  User, Loader2, Upload, CheckCircle2, XCircle, BarChart2
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const MODO_LABELS = { fp: '🖐️ FP', face: '😊 Face', card: '💳 Cartão', pw: '🔑 Senha', 1: '🖐️ FP', 3: '💳 Cartão', 8: '😊 Face', 15: '🔑 Senha' };
+import { getModeInfo, getTimmyCapabilities } from '@/lib/timmyModels';
+import RelatorioPorColaborador from '@/components/marcacoes/RelatorioPorColaborador';
+
 const TIPO_COLORS = { entrada: 'bg-emerald-100 text-emerald-700 border-emerald-200', saida: 'bg-rose-100 text-rose-700 border-rose-200', desconhecido: 'bg-slate-100 text-slate-600 border-slate-200' };
 
 export default function Marcacoes() {
@@ -26,7 +30,14 @@ export default function Marcacoes() {
   const [dateTo, setDateTo] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [currentUser, setCurrentUser] = useState(null);
   const [collecting, setCollecting] = useState(null); // terminalId or 'all'
+  const [collectSearch, setCollectSearch] = useState('');
+  const [collectTipo, setCollectTipo] = useState('all');
+  const [collectStatus, setCollectStatus] = useState('all');
+  const [collectLocal, setCollectLocal] = useState('all');
+  const [collectFabricante, setCollectFabricante] = useState('all');
+  const [collectUser, setCollectUser] = useState('all');
 
+  const { timezone: userTimezone } = useUserTimezone();
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
@@ -72,9 +83,16 @@ export default function Marcacoes() {
   // Set of terminal IDs belonging to this user
   const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
 
+  // Mapa terminal_id → owner para evitar double find() em allOwners
+  const terminalOwnerMap = useMemo(() => {
+    const m = {};
+    terminals.forEach(t => { m[t.id] = t.usuario_email || t.created_by || ''; });
+    return m;
+  }, [terminals]);
+
   const allOwners = useMemo(() =>
-    [...new Set(marcacoes.map(m => terminals.find(t => t.id === m.terminal_id)?.usuario_email || terminals.find(t => t.id === m.terminal_id)?.created_by).filter(Boolean))].sort(),
-    [marcacoes, terminals]
+    [...new Set(marcacoes.map(m => terminalOwnerMap[m.terminal_id]).filter(Boolean))].sort(),
+    [marcacoes, terminalOwnerMap]
   );
 
   const filtered = useMemo(() => {
@@ -84,9 +102,7 @@ export default function Marcacoes() {
       // Ownership filter — non-admins only see own terminals' records
       if (!isAdmin && !myTerminalIds.has(m.terminal_id)) return false;
       if (isAdmin && ownerFilter !== 'all') {
-        const t = terminals.find(t => t.id === m.terminal_id);
-        const owner = t?.usuario_email || t?.created_by;
-        if (owner !== ownerFilter) return false;
+        if (terminalOwnerMap[m.terminal_id] !== ownerFilter) return false;
       }
       const ts = m.timestamp ? new Date(m.timestamp) : null;
       if (from && ts && ts < from) return false;
@@ -99,7 +115,7 @@ export default function Marcacoes() {
       }
       return true;
     });
-  }, [marcacoes, dateFrom, dateTo, terminalFilter, tipoFilter, search, userMap, isAdmin, myTerminalIds, ownerFilter, terminals]);
+  }, [marcacoes, dateFrom, dateTo, terminalFilter, tipoFilter, search, userMap, isAdmin, myTerminalIds, ownerFilter, terminalOwnerMap]);
 
   const stats = useMemo(() => ({
     total: filtered.length,
@@ -108,19 +124,85 @@ export default function Marcacoes() {
     naoExportadas: filtered.filter(m => !m.exportado).length,
   }), [filtered]);
 
+  // Converte raw_mode Timmy para string de modo e tipo de marcação
+  const resolveMode = (rawMode, terminal) => {
+    const cap = getTimmyCapabilities(terminal?.modelo);
+    // modo string legível
+    let modo = String(rawMode ?? '');
+    if (rawMode >= 1 && rawMode <= 9) modo = 'fp';
+    else if (rawMode === 10) modo = 'pw';
+    else if (rawMode === 11) modo = 'card';
+    else if (rawMode === 15) modo = 'face';
+    else if (rawMode === 20) modo = 'face'; // face+fp → face
+    return modo;
+  };
+
   const collectFromTerminal = async (terminal) => {
-    const resp = await base44.functions.invoke('terminalControl', { terminal_id: terminal.id, action: 'getlogs' });
+    const cap = getTimmyCapabilities(terminal?.modelo);
+    const action = 'getlogs';
+    const resp = await base44.functions.invoke('terminalControl', { terminal_id: terminal.id, action });
     const data = resp.data;
     if (data?.success && data.records?.length) {
-      const toSave = data.records.map(r => ({
-        terminal_id: terminal.id, terminal_nome: terminal.nome,
-        enrollid: r.enrollid, utilizador_nome: userMap[r.enrollid] || '',
-        timestamp: r.time || new Date().toISOString(),
-        modo: r.mode === 1 ? 'fp' : r.mode === 3 ? 'card' : r.mode === 8 ? 'face' : r.mode === 15 ? 'pw' : String(r.mode),
-        raw_mode: r.mode, tipo: 'desconhecido', local: terminal.local || '', exportado: false,
-      }));
-      await base44.entities.Marcacao.bulkCreate(toSave);
-      return toSave.length;
+      // Deduplicação: buscar marcações recentes deste terminal (últimas 2h) antes de guardar
+      const duasHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      const existentes = await base44.entities.Marcacao.filter({ terminal_id: terminal.id }, '-timestamp', 2000).catch(() => []);
+      const DEDUP_MS = 30000;
+      const dedupSet = new Set();
+      existentes.forEach(m => {
+        if (m.timestamp) {
+          const bucket = Math.floor(new Date(m.timestamp).getTime() / DEDUP_MS);
+          dedupSet.add(`${m.enrollid}|${bucket}`);
+        }
+      });
+
+      const toSave = data.records.map(r => {
+        const rawMode = r.mode ?? r.Mode ?? r.verifyType ?? r.verifytype;
+        const modo = resolveMode(rawMode, terminal);
+        // Converter timestamp "YYYY-MM-DD HH:MM:SS" → ISO 8601
+        const rawTs = r.time ?? r.Time ?? r.timestamp ?? '';
+        let ts = rawTs;
+        if (rawTs && rawTs.includes(' ') && rawTs.includes('-')) {
+          ts = rawTs.replace(' ', 'T');
+        }
+        const enrollid = r.enrollid ?? r.EnrollNumber ?? r.id;
+        
+        // Determinar tipo entrada/saída
+        let tipo = 'desconhecido';
+        const inoutVal = r.inout ?? r.InOutStatus;
+        if (inoutVal === 0 || inoutVal === 'entrada') {
+          tipo = 'entrada';
+        } else if (inoutVal === 1 || inoutVal === 'saida') {
+          tipo = 'saida';
+        } else if (ts) {
+          // Fallback: inferir por hora (7-12h entrada, 16-19h saída)
+          try {
+            const dt = new Date(ts.includes('T') ? ts : ts + 'T00:00:00');
+            const hora = dt.getHours();
+            if (hora >= 7 && hora <= 12) tipo = 'entrada';
+            else if (hora >= 16 && hora <= 19) tipo = 'saida';
+          } catch (e) {}
+        }
+        
+        return {
+          terminal_id: terminal.id, terminal_nome: terminal.nome,
+          enrollid: Number(enrollid) || 0,
+          utilizador_nome: userMap[enrollid] || '',
+          timestamp: ts || new Date().toISOString(),
+          modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo,
+          local: terminal.local || '', exportado: false,
+        };
+      });
+      // Filtrar duplicados
+      const novas = toSave.filter(r => {
+        if (!r.timestamp) return false;
+        const bucket = Math.floor(new Date(r.timestamp).getTime() / DEDUP_MS);
+        const key = `${r.enrollid}|${bucket}`;
+        if (dedupSet.has(key)) return false;
+        dedupSet.add(key);
+        return true;
+      });
+      if (novas.length > 0) await base44.entities.Marcacao.bulkCreate(novas);
+      return novas.length;
     }
     return 0;
   };
@@ -135,22 +217,37 @@ export default function Marcacoes() {
     finally { setCollecting(null); }
   };
 
+  const filteredCollectTerminals = useMemo(() => terminals.filter(t => {
+    if (collectTipo !== 'all' && t.tipo_conexao !== collectTipo) return false;
+    if (collectStatus !== 'all' && t.status !== collectStatus) return false;
+    if (collectLocal !== 'all' && t.local !== collectLocal) return false;
+    if (collectFabricante !== 'all' && t.fabricante !== collectFabricante) return false;
+    if (collectUser !== 'all' && (t.usuario_email || t.created_by) !== collectUser) return false;
+    if (collectSearch) {
+      const q = collectSearch.toLowerCase();
+      return t.nome?.toLowerCase().includes(q) || t.local?.toLowerCase().includes(q) ||
+        t.numero_serie?.toLowerCase().includes(q) || t.ip_local?.toLowerCase().includes(q) ||
+        t.ip_publico?.toLowerCase().includes(q) || String(t.porta || '').includes(q);
+    }
+    return true;
+  }), [terminals, collectTipo, collectStatus, collectLocal, collectFabricante, collectUser, collectSearch]);
+
   const handleCollectAll = async () => {
     setCollecting('all');
     let total = 0, errors = 0;
-    for (const t of terminals) {
+    for (const t of filteredCollectTerminals) {
       try { total += await collectFromTerminal(t); }
       catch { errors++; }
     }
     setCollecting(null);
     refetch();
-    errors === 0 ? toast.success(`${total} marcação(ões) recolhida(s) de ${terminals.length} terminal(is)`) : toast.error(`${total} OK / ${errors} erro(s)`);
+    errors === 0 ? toast.success(`${total} marcação(ões) recolhida(s) de ${filteredCollectTerminals.length} terminal(is)`) : toast.error(`${total} OK / ${errors} erro(s)`);
   };
 
   const handleExportCSV = () => {
     const headers = ['Data/Hora', 'Terminal', 'ID', 'Utilizador', 'Tipo', 'Modo', 'Local', 'Exportado'];
     const rows = filtered.map(m => [
-      m.timestamp ? format(new Date(m.timestamp), 'dd/MM/yyyy HH:mm:ss') : '',
+      m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
       m.terminal_nome || '', m.enrollid, m.utilizador_nome || userMap[m.enrollid] || '',
       m.tipo || '', m.modo || '', m.local || '', m.exportado ? 'Sim' : 'Não',
     ]);
@@ -209,29 +306,133 @@ export default function Marcacoes() {
         {/* Recolher */}
         {terminals.length > 0 && (
           <Card className="bg-white border-slate-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                   <Upload className="h-4 w-4 text-teal-600" /> Recolher Marcações
                 </p>
-                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-xs" onClick={handleCollectAll} disabled={collecting === 'all'}>
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-xs" onClick={handleCollectAll} disabled={collecting === 'all' || filteredCollectTerminals.length === 0}>
                   {collecting === 'all' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                  Recolher Todos os Terminais
+                  {filteredCollectTerminals.length < terminals.length
+                    ? `Recolher ${filteredCollectTerminals.length} Terminal(is)`
+                    : 'Recolher Todos os Terminais'}
                 </Button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {terminals.map(t => (
-                  <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
-                    className={cn('text-xs gap-1.5', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
-                    {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                    {t.nome}
-                    {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
+              {/* Filtros de terminal */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input
+                    placeholder="Nome, SN, IP, porta..."
+                    value={collectSearch}
+                    onChange={e => setCollectSearch(e.target.value)}
+                    className="pl-8 h-8 text-xs w-[180px]"
+                  />
+                </div>
+                <Select value={collectTipo} onValueChange={setCollectTipo}>
+                  <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Todos os tipos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="ip_local">IP Local</SelectItem>
+                    <SelectItem value="ip_publico">IP Público</SelectItem>
+                    <SelectItem value="dns">DNS/No-IP</SelectItem>
+                    <SelectItem value="p2s">P2S VPN</SelectItem>
+                    <SelectItem value="heartbeat">Heartbeat TCP</SelectItem>
+                    <SelectItem value="adms_push">ADMS / Push</SelectItem>
+                    <SelectItem value="sdk_tcp">SDK-TCP</SelectItem>
+                    <SelectItem value="websocket_cloud">WebSocket Cloud</SelectItem>
+                    <SelectItem value="api">API</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={collectStatus} onValueChange={setCollectStatus}>
+                  <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Todos os statu" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="online">Online</SelectItem>
+                    <SelectItem value="offline">Offline</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={collectLocal} onValueChange={setCollectLocal}>
+                  <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Todos os locais" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os locais</SelectItem>
+                    {[...new Set(terminals.map(t => t.local).filter(Boolean))].sort().map(l => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {[...new Set(terminals.map(t => t.fabricante).filter(Boolean))].length > 0 && (
+                  <Select value={collectFabricante} onValueChange={setCollectFabricante}>
+                    <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Todos os fabrican" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os fabricantes</SelectItem>
+                      {[...new Set(terminals.map(t => t.fabricante).filter(Boolean))].sort().map(f => (
+                        <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {isAdmin && (
+                  <Select value={collectUser} onValueChange={setCollectUser}>
+                    <SelectTrigger className="h-8 text-xs w-[170px]"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os utilizadores</SelectItem>
+                      {[...new Set(terminals.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort().map(u => (
+                        <SelectItem key={u} value={u}>{u}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {(collectSearch || collectTipo !== 'all' || collectStatus !== 'all' || collectLocal !== 'all' || collectFabricante !== 'all' || collectUser !== 'all') && (
+                  <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-400 px-2"
+                    onClick={() => { setCollectSearch(''); setCollectTipo('all'); setCollectStatus('all'); setCollectLocal('all'); setCollectFabricante('all'); setCollectUser('all'); }}>
+                    Limpar
                   </Button>
-                ))}
+                )}
               </div>
+              <div className="flex flex-wrap gap-2">
+                {filteredCollectTerminals.map(t => {
+                  const cap = getTimmyCapabilities(t.modelo);
+                  const isTimmy = t.tipo_conexao === 'websocket_cloud';
+                  return (
+                    <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
+                      className={cn('text-xs gap-1.5 flex-col h-auto py-1.5 px-2.5 items-start', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
+                      <div className="flex items-center gap-1.5">
+                        {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                        <span className="font-medium">{t.nome}</span>
+                        {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
+                      </div>
+                      {isTimmy && (
+                        <span className="text-slate-400 text-[10px] font-normal">{cap.icon} {cap.name !== 'Timmy Genérico' ? cap.name : cap.description}</span>
+                      )}
+                    </Button>
+                  );
+                })}
+               </div>
             </CardContent>
           </Card>
         )}
+
+        {/* Main content tabs */}
+        <Tabs defaultValue="lista">
+          <TabsList className="mb-2">
+            <TabsTrigger value="lista" className="gap-1.5 text-xs"><ClipboardList className="h-3.5 w-3.5" />Lista</TabsTrigger>
+            <TabsTrigger value="colaboradores" className="gap-1.5 text-xs"><BarChart2 className="h-3.5 w-3.5" />Por Colaborador</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="colaboradores">
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <RelatorioPorColaborador
+                marcacoes={filtered}
+                userMap={userMap}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                userTimezone={userTimezone}
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="lista">
 
         {/* Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
@@ -287,17 +488,26 @@ export default function Marcacoes() {
                 <tbody className="divide-y divide-slate-100">
                   {filtered.slice(0, 300).map((m, i) => {
                     const nome = m.utilizador_nome || userMap[m.enrollid] || `ID:${m.enrollid}`;
-                    const modoLabel = MODO_LABELS[m.modo] || MODO_LABELS[m.raw_mode] || m.modo || '—';
+                    const modeInfo = getModeInfo(m.modo, m.raw_mode);
+                    const terminal = terminals.find(t => t.id === m.terminal_id);
+                    const cap = terminal ? getTimmyCapabilities(terminal.modelo) : null;
                     return (
                       <tr key={m.id || i} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? format(new Date(m.timestamp), 'dd/MM/yy HH:mm:ss') : '—'}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</td>
                         <td className="px-4 py-2.5">
-                          <p className="text-xs font-medium text-slate-800 truncate max-w-[100px] lg:max-w-[140px]">{m.terminal_nome || '—'}</p>
+                          <p className="text-xs font-medium text-slate-800 truncate max-w-[100px] lg:max-w-[160px]">{m.terminal_nome || '—'}</p>
                           {m.local && <p className="text-xs text-slate-400 truncate">{m.local}</p>}
+                          {cap && cap.name !== 'Timmy Genérico' && (
+                            <p className="text-xs text-slate-300 truncate hidden lg:block">{cap.icon} {cap.name}</p>
+                          )}
                         </td>
                         <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{m.enrollid}</td>
                         <td className="px-4 py-2.5 text-xs font-medium text-slate-700 max-w-[120px] truncate">{nome}</td>
-                        <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{modoLabel}</td>
+                        <td className="px-4 py-2.5 hidden md:table-cell">
+                          <Badge className={cn('text-xs', modeInfo.color)}>
+                            {modeInfo.icon} {modeInfo.label}
+                          </Badge>
+                        </td>
                         <td className="px-4 py-2.5"><Badge className={cn('text-xs', TIPO_COLORS[m.tipo] || TIPO_COLORS.desconhecido)}>{m.tipo || 'desconhecido'}</Badge></td>
                         <td className="px-4 py-2.5 hidden lg:table-cell">{m.exportado ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-slate-300" />}</td>
                       </tr>
@@ -317,6 +527,9 @@ export default function Marcacoes() {
             </div>
           </Card>
         )}
+          </TabsContent>
+        </Tabs>
+
       </div>
     </div>
   );

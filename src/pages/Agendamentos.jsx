@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
@@ -11,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import moment from 'moment';
+
 import { toast } from 'sonner';
 import ScheduledActionModal from '@/components/agendamentos/ScheduledActionModal';
 
@@ -46,16 +47,18 @@ const FREQ_LABELS = {
 
 const DIAS_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-function formatFrequencia(sched) {
-  if (sched.frequencia === 'diaria') return `Diária às ${sched.hora} UTC`;
+function formatFrequencia(sched, timezone) {
+  if (sched.frequencia === 'diaria') return `Diária às ${sched.hora}`;
   if (sched.frequencia === 'semanal') {
     try {
       const dias = JSON.parse(sched.dias_semana || '[]').map(d => DIAS_LABELS[d]).join(', ');
-      return `${dias} às ${sched.hora} UTC`;
-    } catch { return `Semanal às ${sched.hora} UTC`; }
+      return `${dias} às ${sched.hora}`;
+    } catch { return `Semanal às ${sched.hora}`; }
   }
-  if (sched.frequencia === 'mensal') return `Dia ${sched.dia_mes} de cada mês às ${sched.hora} UTC`;
-  if (sched.frequencia === 'unica' && sched.data_unica) return moment(sched.data_unica).format('DD/MM/YY HH:mm');
+  if (sched.frequencia === 'mensal') return `Dia ${sched.dia_mes} de cada mês às ${sched.hora}`;
+  if (sched.frequencia === 'unica' && sched.data_unica) {
+    return new Date(sched.data_unica).toLocaleString('pt-PT', { timeZone: timezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
   return sched.frequencia;
 }
 
@@ -66,6 +69,7 @@ export default function Agendamentos() {
   const [currentUser, setCurrentUser] = useState(null);
   const [runningId, setRunningId] = useState(null);
   const queryClient = useQueryClient();
+  const { timezone: userTimezone } = useUserTimezone();
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -176,8 +180,8 @@ export default function Agendamentos() {
                 Terminal: <span className="font-medium text-slate-700">{sched.terminal_nome}</span>
               </p>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatFrequencia(sched)}
+              <Clock className="h-3 w-3" />
+              {formatFrequencia(sched, userTimezone)}
               </p>
 
               <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -187,7 +191,7 @@ export default function Agendamentos() {
                       ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                       : <XCircle className="h-3 w-3 text-red-400" />
                     }
-                    Última: {moment(sched.ultima_execucao).fromNow()}
+                    Última: {new Date(sched.ultima_execucao).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 {sched.total_execucoes > 0 && (
@@ -281,7 +285,7 @@ export default function Agendamentos() {
       {/* Info */}
       <div className="flex items-start gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
-        <p>As ações são executadas automaticamente pelo sistema a cada 5 minutos. Os resultados ficam registados nos <strong>Logs de Operação</strong> de cada terminal. Os horários são em <strong>UTC</strong>.</p>
+        <p>As ações são executadas automaticamente pelo sistema a cada 5 minutos. Os resultados ficam registados nos <strong>Logs de Operação</strong> de cada terminal. Os horários são na timezone <strong>{userTimezone}</strong>. Comandos críticos (abrir porta, lockctrl) têm <strong>3 tentativas automáticas</strong> em caso de falha.</p>
       </div>
 
       {/* Ativos */}
