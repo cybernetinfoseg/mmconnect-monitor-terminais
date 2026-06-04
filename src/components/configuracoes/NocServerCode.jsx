@@ -204,137 +204,12 @@ def heartbeat_listener(terminal, stop_event):
 # Compatível com: ZKTeco (iClock, ZKTime, SilkBio), Anviz (C2, EP, CrossChex)
 # ──────────────────────────────────────────────────────────────
 
-# Mapa: SN (número de série) → terminal_id / info
-sn_to_terminal = {}  # sn → terminal_id
-sn_to_info     = {}  # sn → { "nome": ..., "local": ... }
+# Mapa: SN (número de série) → terminal_id
+sn_to_terminal = {}
 
 # Fila de comandos pendentes por SN: { sn: [{"action":..., "params":..., "event": threading.Event, "result": dict}] }
 pending_commands = {}
 pending_lock = threading.Lock()
-
-
-# ──────────────────────────────────────────────────────────────
-# Gravação de Marcações ATTLOG na BD
-# ──────────────────────────────────────────────────────────────
-
-# Mapeamento protocolo iClock: campo Verified → modo de verificação
-ATTLOG_VERIFIED_MAP = {
-    0:  "fp",    # Impressão digital
-    1:  "fp",
-    2:  "fp",
-    3:  "pw",    # Senha
-    4:  "card",  # Cartão RFID
-    5:  "fp",
-    15: "face",  # Reconhecimento facial
-    20: "face",  # Face + FP
-}
-
-def parse_attlog_line(line, terminal_id, terminal_nome, terminal_local):
-    """
-    Converte uma linha ATTLOG do protocolo ZKTeco/iClock para o formato Marcacao.
-    Formato: PIN\\tDateTime\\tStatus\\tVerified\\tWorkCode\\tReserved
-    Exemplo: 12345\\t2024-01-15 08:30:00\\t0\\t1\\t\\t
-    """
-    parts = line.strip().split("\\t")
-    if len(parts) < 2:
-        return None
-    try:
-        enrollid = int(parts[0]) if parts[0] else 0
-        ts_str   = parts[1] if len(parts) > 1 else ""
-        status   = int(parts[2]) if len(parts) > 2 and parts[2] else 0
-        verified = int(parts[3]) if len(parts) > 3 and parts[3] else 0
-
-        # Status: 0=Entrada, 1=Saída, 2=Break Out, 3=Break In, 4=OT In, 5=OT Out
-        tipo_map = {0: "entrada", 1: "saida", 2: "saida", 3: "entrada", 4: "entrada", 5: "saida"}
-        tipo = tipo_map.get(status, "desconhecido")
-
-        modo = ATTLOG_VERIFIED_MAP.get(verified, f"modo_{verified}")
-
-        # Converter timestamp "YYYY-MM-DD HH:MM:SS" → ISO
-        import datetime
-        try:
-            dt = datetime.datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-            timestamp = dt.isoformat() + "Z"
-        except Exception:
-            timestamp = ts_str
-
-        return {
-            "terminal_id":   terminal_id,
-            "terminal_nome": terminal_nome,
-            "enrollid":      enrollid,
-            "timestamp":     timestamp,
-            "tipo":          tipo,
-            "modo":          modo,
-            "raw_mode":      verified,
-            "local":         terminal_local or "",
-            "exportado":     False,
-        }
-    except Exception:
-        return None
-
-def gravar_attlog(app_id, api_key, terminal_id, terminal_nome, terminal_local, body):
-    """
-    Grava marcações ATTLOG na BD via admsReport.
-    Chamado em thread separada para não bloquear o handler HTTP.
-    """
-    linhas = [l for l in body.splitlines() if l.strip() and "\\t" in l]
-    if not linhas:
-        return
-
-    records = []
-    for linha in linhas:
-        rec = parse_attlog_line(linha, terminal_id, terminal_nome, terminal_local)
-        if rec:
-            records.append(rec)
-
-    if not records:
-        return
-
-    url = f"{BASE_URL.format(app_id=app_id)}/admsReport"
-    payload = {
-        "terminal_id":    terminal_id,
-        "terminal_nome":  terminal_nome,
-        "terminal_local": terminal_local,
-        "records":        records,
-        "source":         "adms_push",
-    }
-    try:
-        r = requests.post(url, headers={"X-Api-Key": api_key, "Content-Type": "application/json"},
-                          json=payload, timeout=15)
-        r.raise_for_status()
-        result = r.json()
-        logger.info(f"[ADMS→BD] '{terminal_nome}': {result.get('saved','?')} marcações gravadas de {len(records)} recebidas")
-    except Exception as e:
-        logger.error(f"[ADMS→BD] Erro ao gravar marcações de '{terminal_nome}': {e}")
-
-
-# Reload periódico de terminais ADMS (detecta novos terminais sem restart)
-_noc_config = {}
-
-def ciclo_reload_adms(app_id, api_key, stop_event=None):
-    """Recarrega mapa SN→terminal a cada 5 minutos."""
-    global sn_to_terminal, sn_to_info
-    time.sleep(300)
-    while not (stop_event and stop_event.is_set()):
-        try:
-            sess = requests.Session()
-            terminais = listar_terminais(sess, app_id, api_key)
-            sess.close()
-            new_map  = {}
-            new_info = {}
-            for t in terminais:
-                if t.get("tipo_conexao") not in ("adms_push", "sdk_tcp"):
-                    continue
-                sn = (t.get("numero_serie") or "").strip()
-                if sn:
-                    new_map[sn]  = t["id"]
-                    new_info[sn] = {"nome": t.get("nome", sn), "local": t.get("local", "")}
-            sn_to_terminal = new_map
-            sn_to_info     = new_info
-            logger.info(f"[RELOAD-ADMS] {len(sn_to_terminal)} terminal(is) ADMS/SDK mapeado(s)")
-        except Exception as e:
-            logger.error(f"[RELOAD-ADMS] Erro: {e}")
-        time.sleep(300)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -539,19 +414,9 @@ class ADMSHandler(BaseHTTPRequestHandler):
                 logger.info(f"[ADMS] ✅ Terminal SN={sn} registou-se no servidor ADMS")
                 self._respond("OK")
 
-            # Logs de assiduidade → gravar na BD
+            # Logs de assiduidade
             elif table == "ATTLOG" and body:
-                linhas_validas = [l for l in body.splitlines() if l.strip() and "\\t" in l]
-                logger.info(f"[ADMS] 📋 ATTLOG SN={sn}: {len(linhas_validas)} registo(s)")
-                tid_local = sn_to_terminal.get(sn)
-                if tid_local and _noc_config:
-                    info = sn_to_info.get(sn, {})
-                    threading.Thread(
-                        target=gravar_attlog,
-                        args=(_noc_config.get("APP_ID",""), _noc_config.get("API_KEY",""),
-                              tid_local, info.get("nome", sn), info.get("local",""), body),
-                        daemon=True
-                    ).start()
+                logger.info(f"[ADMS] 📋 Logs de assiduidade do SN={sn}: {len(body.splitlines())} registo(s)")
                 self._respond("OK")
 
             # Dados de utilizadores
@@ -591,7 +456,7 @@ class ADMSHandler(BaseHTTPRequestHandler):
                     "tipo":        "adms_push",
                 }
         else:
-            logger.warning(f"[ADMS] SN={sn} não mapeado — adicione o número de série no painel NOC Monitor. (reload automático a cada 5min)")
+            logger.warning(f"[ADMS] SN={sn} não está mapeado a nenhum terminal. Adicione o número de série no painel.")
 
 
 def start_adms_server(port, stop_event):
@@ -720,10 +585,6 @@ def run_noc_server(stop_event=None):
         adms_port = config.get("ADMS_PORT", DEFAULT_ADMS_PORT)
         ctrl_port = config.get("CTRL_PORT", DEFAULT_CTRL_PORT)
 
-        # Guardar config globalmente para acesso nos handlers ADMS
-        global _noc_config
-        _noc_config = config
-
         logger.info("=" * 65)
         logger.info("  NOC Monitor — Servidor Unificado")
         logger.info(f"  Heartbeat TCP: portas por terminal")
@@ -758,12 +619,11 @@ def run_noc_server(stop_event=None):
         logger.info(f"Terminais: {len(hb_terminais)} Heartbeat | {len(adms_terminais)} ADMS/Push | {len(sdk_terminais)} SDK-TCP | {len(ws_terminais)} WebSocket Cloud")
 
         # Construir mapa SN → terminal_id para ADMS
-        global sn_to_terminal, sn_to_info
-        for t in adms_terminais + sdk_terminais:
+        global sn_to_terminal
+        for t in adms_terminais:
             sn = t.get("numero_serie", "").strip()
             if sn:
                 sn_to_terminal[sn] = t["id"]
-                sn_to_info[sn]     = {"nome": t.get("nome", sn), "local": t.get("local", "")}
                 logger.info(f"  [ADMS] Mapeado: SN={sn} → '{t['nome']}'")
             else:
                 logger.warning(f"  [ADMS] '{t['nome']}' sem número de série — não será monitorizado via ADMS!")
@@ -785,13 +645,6 @@ def run_noc_server(stop_event=None):
         ctrl_thread = threading.Thread(target=start_ctrl_server, args=(ctrl_port, stop_event),
                                        name="ctrl-http", daemon=True)
         ctrl_thread.start()
-
-        # Iniciar reload periódico de terminais ADMS/SDK (detecta novos terminais)
-        threading.Thread(
-            target=ciclo_reload_adms,
-            args=(app_id, api_key, stop_event),
-            name="reload-adms", daemon=True
-        ).start()
 
         # Iniciar threads SDK-TCP (1 por terminal)
         for t in sdk_terminais:
@@ -865,9 +718,8 @@ if __name__ == "__main__":
 
 const SECTIONS = [
   { key: 'heartbeat', label: 'Heartbeat TCP', color: 'violet', badge: 'TCP', desc: 'Terminal conecta TCP → online/offline por timeout. Cada terminal usa uma porta diferente.' },
-  { key: 'adms',      label: 'ADMS / Push',   color: 'blue',   badge: 'HTTP', desc: 'ZKTeco ADMS, Anviz CrossChex — terminal faz HTTP POST. Grava marcações ATTLOG automaticamente na BD.' },
+  { key: 'adms',      label: 'ADMS / Push',   color: 'blue',   badge: 'HTTP', desc: 'ZKTeco ADMS, Anviz CrossChex — terminal faz HTTP POST. Servidor fica em http://51.91.219.145:8080.' },
   { key: 'sdk',       label: 'SDK-TCP',        color: 'emerald', badge: 'TCP', desc: 'Polling activo na porta ZKTeco SDK (4370). Terminal precisa de ter IP acessível.' },
-  { key: 'reload',    label: 'Reload Auto',    color: 'orange',  badge: 'AUTO', desc: 'Novos terminais ADMS detectados automaticamente a cada 5 minutos, sem restart do servidor.' },
 ];
 
 export default function NocServerCode() {

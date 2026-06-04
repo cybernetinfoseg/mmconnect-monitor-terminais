@@ -24,10 +24,7 @@ import {
   MapPin,
   Users,
   Fingerprint,
-  Share2,
-  Building2,
-  CalendarOff,
-  Clock
+  Share2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,7 +32,6 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 import PendingApproval from './components/auth/PendingApproval';
 import { useRequireAuth } from './components/auth/useRequireAuth';
-import SidebarClock from './components/dashboard/SidebarClock';
 
 const ALL_NAV_ITEMS = [
   { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
@@ -43,12 +39,8 @@ const ALL_NAV_ITEMS = [
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
 
   { name: 'Mapa', page: 'Mapa', icon: MapPin },
-  { name: 'Colaboradores', page: 'Utilizadores', icon: Users },
+  { name: 'Utilizadores', page: 'Utilizadores', icon: Users },
   { name: 'Marcações', page: 'Marcacoes', icon: Fingerprint },
-  { name: 'Presença', page: 'Presenca', icon: Building2 },
-  { name: 'Controlo Acesso', page: 'ControloAcesso', icon: Shield },
-  { name: 'Horários', page: 'GestaoHorarios', icon: Clock },
-  { name: 'Ausências', page: 'GestaoAusencias', icon: CalendarOff },
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
@@ -181,7 +173,6 @@ export default function Layout({ children, currentPageName }) {
       </nav>
       <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
 
-        <SidebarClock />
         {currentUser && (
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
             <User className="h-4 w-4 text-slate-400 shrink-0" />

@@ -4,6 +4,8 @@ import { Bell, BellOff, BellRing } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
+const VAPID_PUBLIC_KEY = null; // Set this if you configure VAPID keys in secrets
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -14,14 +16,9 @@ function urlBase64ToUint8Array(base64String) {
 export default function PushNotificationManager() {
   const [state, setState] = useState('idle'); // idle | requesting | subscribed | denied | unsupported
   const [loading, setLoading] = useState(false);
-  const [vapidKey, setVapidKey] = useState(null);
 
   useEffect(() => {
     checkStatus();
-    // Buscar chave pública VAPID do backend
-    base44.functions.invoke('pushNotify', { action: 'get_vapid_key' })
-      .then(res => { if (res.data?.vapid_public_key) setVapidKey(res.data.vapid_public_key); })
-      .catch(() => {});
   }, []);
 
   async function checkStatus() {
@@ -77,13 +74,13 @@ export default function PushNotificationManager() {
       }
 
       let subscription;
-      if (vapidKey) {
+      if (VAPID_PUBLIC_KEY) {
         subscription = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
         });
       } else {
-        // Sem VAPID configurado — tentar sem applicationServerKey (apenas Firefox antigo)
+        // Without VAPID, use browser's default
         subscription = await reg.pushManager.subscribe({ userVisibleOnly: true }).catch(() => null);
       }
 

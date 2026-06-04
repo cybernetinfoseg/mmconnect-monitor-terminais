@@ -59,16 +59,14 @@ Deno.serve(async (req) => {
         const result = terminals.map(t => ({
             id: t.id,
             nome: t.nome,
-            local: t.local || '',
+            local: t.local,
             tipo_conexao: t.tipo_conexao,
-            ip_publico: t.ip_publico || '',
-            ip_local: t.ip_local || '',
-            dns: t.dns || '',
+            ip_publico: t.ip_publico,
+            ip_local: t.ip_local,
+            dns: t.dns,
             porta: t.porta || 5005,
             numero_serie: t.numero_serie || '',
             fabricante: t.fabricante || 'zkteco',
-            modelo: t.modelo || '',
-            cliente_nome: t.cliente_nome || '',
             ativo: t.ativo,
         }));
 

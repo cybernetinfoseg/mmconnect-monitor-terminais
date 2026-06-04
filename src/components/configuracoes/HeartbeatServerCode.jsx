@@ -24,10 +24,10 @@ const HEARTBEAT_CODE = `# heartbeat_server.py — Serviço Heartbeat NOC Monitor
 # }
 #
 # Como funciona:
-#   1. O servico busca terminais do tipo "heartbeat" via nocServerGetTerminals
+#   1. O servico busca terminais do tipo "heartbeat" no NOC Monitor (heartbeatGetTerminals)
 #   2. Para cada terminal, abre um socket TCP na porta configurada (o terminal ja aponta para este IP/porta)
 #   3. Quando o terminal conecta -> online. Se nao conectar no timeout -> offline
-#   4. Reporta o status a cada INTERVALO_REPORT segundos via nocServerReport (endpoint unificado)
+#   4. Reporta o status a cada INTERVALO_REPORT segundos via heartbeatReport
 
 import os, sys, json, time, socket, logging, threading
 from logging.handlers import RotatingFileHandler
@@ -132,20 +132,17 @@ def _headers(api_key):
 
 
 def listar_terminais(session, app_id, api_key):
-    """Busca terminais do tipo 'heartbeat' via nocServerGetTerminals."""
-    url = f"{BASE_URL.format(app_id=app_id)}/nocServerGetTerminals"
+    url = f"{BASE_URL.format(app_id=app_id)}/heartbeatGetTerminals"
     r   = session.post(url, headers=_headers(api_key), json={}, timeout=10)
     r.raise_for_status()
     data = r.json()
     if not data.get("success"):
-        raise ValueError(f"nocServerGetTerminals erro: {data}")
-    # Filtrar apenas terminais heartbeat
-    return [t for t in data.get("terminals", []) if t.get("tipo_conexao") == "heartbeat"]
+        raise ValueError(f"heartbeatGetTerminals erro: {data}")
+    return data.get("terminals", [])
 
 
 def reportar_status(session, app_id, api_key, terminal_id, status, latencia_ms=None, segundos_sem_ping=0):
-    """Reporta status do terminal via nocServerReport (endpoint unificado)."""
-    url     = f"{BASE_URL.format(app_id=app_id)}/nocServerReport"
+    url     = f"{BASE_URL.format(app_id=app_id)}/heartbeatReport"
     payload = {
         "terminal_id":       terminal_id,
         "status":            status,

@@ -6,28 +6,23 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 // ─── Helpers de conexão (espelhados de terminalControl) ─────────────────────
 
-function getNocServerHost() {
-  const host = Deno.env.get('NOC_SERVER_HOST');
-  if (!host) throw new Error('NOC_SERVER_HOST não configurado. Defina esta variável de ambiente no painel de Secrets.');
-  return host;
+function buildTimmyWsUrl(terminal) {
+  const host = terminal.ip_publico || terminal.dns || '51.91.219.145';
+  const port = terminal.porta || 7788;
+  return `ws://${host}:${port}`;
 }
 
 async function sendTimmyCommand(terminal, command) {
-  // Prioridade: ip_publico do terminal → NOC_SERVER_HOST global
-  const host = terminal.ip_publico || terminal.dns || getNocServerHost();
-  const ctrlPort = 7789;
-  const sn = terminal.numero_serie || '';
-  if (!sn) throw new Error(`SN não configurado no terminal "${terminal.nome}"`);
-  const resp = await fetch(`http://${host}:${ctrlPort}/cmd`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sn, command }),
-    signal: AbortSignal.timeout(12000),
-  }).catch(e => { throw new Error(`Servidor Timmy (${host}:${ctrlPort}) inacessível — ${e.message}`); });
-  if (!resp.ok) throw new Error(`Servidor Timmy respondeu ${resp.status}`);
-  const data = await resp.json();
-  if (!data.success) throw new Error(data.error || 'Servidor Timmy falhou');
-  return data.result || { result: true };
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(buildTimmyWsUrl(terminal));
+    const timeout = setTimeout(() => { ws.close(); reject(new Error('Timeout')); }, 8000);
+    ws.onopen = () => ws.send(JSON.stringify(command));
+    ws.onmessage = (event) => {
+      clearTimeout(timeout); ws.close();
+      try { resolve(JSON.parse(event.data)); } catch { resolve({ result: true, raw: event.data }); }
+    };
+    ws.onerror = () => { clearTimeout(timeout); reject(new Error('WS connection failed')); };
+  });
 }
 
 function buildBaseUrl(terminal) {
@@ -45,33 +40,9 @@ async function hikvisionRequest(terminal, method, path, body = null) {
 }
 
 async function dahuaRequest(terminal, cgiPath) {
-  const base = buildBaseUrl(terminal);
-  const user = 'admin';
-  const pass = terminal.observacoes || 'admin';
-  const url = `${base}${cgiPath}`;
-
-  // Dahua requer Digest Auth — primeiro obter nonce
-  const r1 = await fetch(url, { signal: AbortSignal.timeout(8000) }).catch(() => null);
-  if (!r1 || r1.status !== 401) return { status: r1?.status || 0, body: await r1?.text().catch(() => '') };
-
-  const wwwAuth = r1.headers.get('www-authenticate') || '';
-  const realm  = (wwwAuth.match(/realm="([^"]*)"/)  || [])[1] || '';
-  const nonce  = (wwwAuth.match(/nonce="([^"]*)"/)  || [])[1] || '';
-  const qop    = (wwwAuth.match(/qop="([^"]*)"/)    || [])[1] || '';
-
-  const md5 = async (str) => {
-    const buf = await crypto.subtle.digest('MD5', new TextEncoder().encode(str)).catch(() => null);
-    if (!buf) return str;
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  };
-  const nc = '00000001'; const cnonce = Math.random().toString(36).substring(2, 10);
-  const ha1 = await md5(`${user}:${realm}:${pass}`);
-  const ha2 = await md5(`GET:${cgiPath.split('?')[0]}`);
-  const response = qop ? await md5(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`) : await md5(`${ha1}:${nonce}:${ha2}`);
-  const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${cgiPath.split('?')[0]}", ` +
-    (qop ? `qop=${qop}, nc=${nc}, cnonce="${cnonce}", ` : '') + `response="${response}"`;
-  const r2 = await fetch(url, { headers: { 'Authorization': authHeader }, signal: AbortSignal.timeout(8000) }).catch(() => null);
-  return { status: r2?.status || 0, body: await r2?.text().catch(() => '') };
+  const creds = btoa(`admin:${terminal.observacoes || 'admin'}`);
+  const resp = await fetch(`${buildBaseUrl(terminal)}${cgiPath}`, { headers: { 'Authorization': `Basic ${creds}` } });
+  return { status: resp.status, body: await resp.text() };
 }
 
 // ─── Executores de ação ──────────────────────────────────────────────────────
@@ -171,8 +142,13 @@ async function runAction(terminal, action) {
 
   if (action === 'reboot') {
     if (tipo === 'websocket_cloud') {
-      const r = await sendTimmyCommand(terminal, { cmd: 'reboot' }).catch(() => ({ result: true }));
-      return { success: true, message: 'Comando de reinício enviado', data: r };
+      await new Promise((resolve) => {
+        const ws = new WebSocket(buildTimmyWsUrl(terminal));
+        ws.onopen = () => { ws.send(JSON.stringify({ cmd: 'reboot' })); setTimeout(() => { ws.close(); resolve(); }, 1000); };
+        ws.onerror = () => resolve();
+        setTimeout(() => { try { ws.close(); } catch {} resolve(); }, 5000);
+      });
+      return { success: true, message: 'Comando de reinício enviado' };
     }
     if (tipo === 'adms_push' || tipo === 'sdk_tcp') {
       const ip = terminal.ip_publico || terminal.dns || terminal.ip_local;
@@ -236,11 +212,8 @@ async function runAction(terminal, action) {
 // ─── Verificar se um agendamento deve ser executado agora ────────────────────
 
 function shouldRunNow(schedule, now) {
-  // Usar hora local Europe/London (o utilizador agenda na sua timezone)
-  const localStr = now.toLocaleString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false });
-  const [hourStr, minuteStr] = localStr.split(':');
-  const hour = parseInt(hourStr, 10);
-  const minute = parseInt(minuteStr, 10);
+  const hour = now.getUTCHours();
+  const minute = now.getUTCMinutes();
   const [schedHour, schedMin] = (schedule.hora || '00:00').split(':').map(Number);
 
   // Janela de 5 minutos (o cron corre a cada 5 min)
@@ -260,16 +233,11 @@ function shouldRunNow(schedule, now) {
 
   if (freq === 'semanal') {
     const dias = JSON.parse(schedule.dias_semana || '[1,2,3,4,5]');
-    // Usar dia da semana local (Europe/London) consistente com a hora local já usada acima
-    const localDayStr = now.toLocaleString('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
-    const dayMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
-    const localDay = dayMap[localDayStr] ?? now.getUTCDay();
-    return dias.includes(localDay);
+    return dias.includes(now.getUTCDay());
   }
 
   if (freq === 'mensal') {
-    const localDate = parseInt(now.toLocaleString('en-GB', { timeZone: 'Europe/London', day: '2-digit' }), 10);
-    return localDate === (schedule.dia_mes || 1);
+    return now.getUTCDate() === (schedule.dia_mes || 1);
   }
 
   if (freq === 'unica' && schedule.data_unica) {
@@ -287,8 +255,17 @@ Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
 
-    // Função interna — sem verificação de auth (acesso controlado pelo mainScheduler)
-    const callerEmail = 'sistema@cron';
+    // Permitir chamada sem autenticação (cron) mas verificar se é admin se houver sessão
+    let callerEmail = 'sistema@cron';
+    try {
+      const user = await base44.auth.me();
+      if (user) {
+        if (user.role !== 'admin') {
+          return Response.json({ error: 'Acesso negado' }, { status: 403 });
+        }
+        callerEmail = user.email;
+      }
+    } catch {}
 
     const now = new Date();
     const schedules = await base44.asServiceRole.entities.ScheduledAction.filter({ ativo: true });

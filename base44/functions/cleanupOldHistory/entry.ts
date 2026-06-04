@@ -25,29 +25,31 @@ Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
 
-        // Função interna — sem verificação de auth (acesso controlado pelo mainScheduler)
+        // Permite chamadas do scheduler (sem user) OU de admins autenticados
+        const isAuthenticated = await base44.auth.isAuthenticated();
+        if (isAuthenticated) {
+            const user = await base44.auth.me();
+            if (user?.role !== 'admin') {
+                return Response.json({ error: 'Forbidden: apenas admins' }, { status: 403 });
+            }
+        }
 
-        const cutoff7  = new Date(Date.now() -  7 * 24 * 60 * 60 * 1000).toISOString();
-        const cutoff60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
-        const cutoff90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-
-        // Buscar registos mais antigos primeiro (ordenação ascendente por timestamp)
-        const [allHistory, allIncidents, allOpLogs] = await Promise.all([
-            base44.asServiceRole.entities.StatusHistory.list('timestamp', 100).catch(() => []),
-            base44.asServiceRole.entities.AlertIncident.list('timestamp', 50).catch(() => []),
-            base44.asServiceRole.entities.OperationLog.list('timestamp', 50).catch(() => []),
-        ]);
-
-        // StatusHistory: manter apenas 7 dias
-        const historyToDelete = allHistory.filter(r => r.timestamp && r.timestamp < cutoff7);
+        // StatusHistory: manter apenas 7 dias (cresce muito rápido)
+        const cutoff7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const oldHistory = await base44.asServiceRole.entities.StatusHistory.list('timestamp', 60).catch(() => []);
+        const historyToDelete = oldHistory.filter(r => r.timestamp < cutoff7);
         const deletedHistory = await deleteSequential(base44.asServiceRole.entities.StatusHistory, historyToDelete, 50);
 
         // AlertIncidents resolvidos há mais de 60 dias
-        const incidentsToDelete = allIncidents.filter(i => i.resolvido && i.timestamp && i.timestamp < cutoff60);
+        const cutoff60 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+        const oldIncidents = await base44.asServiceRole.entities.AlertIncident.list('timestamp', 30).catch(() => []);
+        const incidentsToDelete = oldIncidents.filter(i => i.resolvido && i.timestamp < cutoff60);
         const deletedIncidents = await deleteSequential(base44.asServiceRole.entities.AlertIncident, incidentsToDelete, 20);
 
         // OperationLogs com mais de 90 dias
-        const opLogsToDelete = allOpLogs.filter(l => l.timestamp && l.timestamp < cutoff90);
+        const cutoff90 = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        const oldOpLogs = await base44.asServiceRole.entities.OperationLog.list('timestamp', 30).catch(() => []);
+        const opLogsToDelete = oldOpLogs.filter(l => l.timestamp < cutoff90);
         const deletedOpLogs = await deleteSequential(base44.asServiceRole.entities.OperationLog, opLogsToDelete, 20);
 
         console.log(`Cleanup: history=${deletedHistory} incidents=${deletedIncidents} oplogs=${deletedOpLogs}`);

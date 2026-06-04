@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
                     terminal_nome: terminal.nome,
                     local: terminal.local || '',
                     cliente: terminal.cliente_nome || '',
-                    owner_email: terminal.usuario_email || terminal.created_by || '',
+                    owner_email: terminal.created_by || '',
                 }).catch(() => {});
 
             } else if (statusEfetivo === 'online') {

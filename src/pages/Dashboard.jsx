@@ -7,31 +7,53 @@ import {
   Wifi, 
   WifiOff, 
   MapPin, 
+  RefreshCw,
+  Activity,
   AlertTriangle,
-  User,
-  LayoutList,
-  X
+  ArrowUpDown,
+  LayoutDashboard,
+  Settings2,
+  LogOut,
+  User
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
+import { Tv } from 'lucide-react';
 import KPICard from '../components/dashboard/KPICard';
 import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import TerminalsTable from '../components/dashboard/TerminalsTable';
 import StatusPieChart from '../components/dashboard/StatusPieChart';
+import FilterDropdown from '../components/dashboard/FilterDropdown';
 import AlertsList from '../components/dashboard/AlertsList';
 import PullToRefresh from '../components/dashboard/PullToRefresh';
+import TerminalStatusWidget from '../components/dashboard/TerminalStatusWidget';
 import AlertRulesWidget from '../components/dashboard/AlertRulesWidget';
 import RecentAuditWidget from '../components/dashboard/RecentAuditWidget';
+const DEFAULT_WIDGETS = {
+  terminalStatus: true,
+  alertRules: true,
+  recentAudit: true,
+};
 
 export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
   const [statusFilter, setStatusFilter] = useState(null);
   const [userFilter, setUserFilter] = useState(null);
-
-  const [showExtrasModal, setShowExtrasModal] = useState(false);
+  const [sortBy, setSortBy] = useState('status');
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [showWidgetConfig, setShowWidgetConfig] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(5000);
+  const [widgets, setWidgets] = useState(() => {
+    try {
+      const saved = localStorage.getItem('dashboard-widgets');
+      return saved ? { ...DEFAULT_WIDGETS, ...JSON.parse(saved) } : DEFAULT_WIDGETS;
+    } catch { return DEFAULT_WIDGETS; }
+  });
 
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
@@ -49,19 +71,46 @@ export default function Dashboard() {
       .catch(() => setRefreshInterval(30000));
   }, []);
 
+  const toggleWidget = (key) => {
+    setWidgets(prev => {
+      const next = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('dashboard-widgets', JSON.stringify(next));
+      return next;
+    });
+  };
+
   const perms = resolvePermissions(currentUser);
   const canSeeAll = currentUser?.role === 'admin';
 
-  // Fetch terminals via backend function to bypass RLS limitations on custom fields
+  // Fetch terminals with server-side filtering for security
   const { data: terminals = [], isLoading, refetch } = useQuery({
     queryKey: ['terminals', currentUser?.email, canSeeAll],
     queryFn: async () => {
-      const res = await base44.functions.invoke('getMyTerminals', {});
-      return res.data?.terminals || [];
+      if (canSeeAll) {
+        return await base44.entities.Terminal.list();
+      }
+      return await base44.entities.Terminal.filter(
+        { created_by: currentUser?.email },
+        '-created_date'
+      );
     },
     refetchInterval: refreshInterval,
     enabled: !!currentUser,
   });
+
+  // Monitorar todos os terminais
+  const handleMonitorAll = async () => {
+    setIsMonitoring(true);
+    try {
+      await base44.functions.invoke('monitorAllTerminals', {});
+      setLastRefresh(new Date());
+      setTimeout(() => refetch(), 2000);
+    } catch (error) {
+      console.error('Erro ao monitorar:', error);
+    } finally {
+      setIsMonitoring(false);
+    }
+  };
 
   // Fetch alerts with server-side filtering for security
   const { data: alerts = [] } = useQuery({
@@ -70,9 +119,10 @@ export default function Dashboard() {
       if (canSeeAll) {
         return await base44.entities.AlertIncident.list('-created_date', 50);
       }
-      // Non-admins: buscar terminais via backend function para garantir visibilidade correcta
-      const res = await base44.functions.invoke('getMyTerminals', {});
-      const myTerminals = res.data?.terminals || [];
+      // Non-admins: fetch alerts from their own terminals only
+      const myTerminals = await base44.entities.Terminal.filter(
+        { created_by: currentUser?.email }
+      );
       const myTerminalIds = myTerminals.map(t => t.id);
       if (myTerminalIds.length === 0) return [];
       // Fetch alerts and filter by owned terminals
@@ -96,13 +146,22 @@ export default function Dashboard() {
 
   // Apply filters
   const filteredTerminals = useMemo(() => {
-    return terminals.filter(t => {
+    let list = terminals.filter(t => {
       if (localFilter && t.local !== localFilter) return false;
+
       if (statusFilter && t.status !== statusFilter) return false;
       if (userFilter && (t.usuario_email || t.created_by) !== userFilter) return false;
       return true;
     });
-  }, [terminals, localFilter, statusFilter, userFilter]);
+    if (sortBy === 'status') {
+      list = [...list].sort((a, b) => a.status === 'offline' ? -1 : 1);
+    } else if (sortBy === 'nome') {
+      list = [...list].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+    } else if (sortBy === 'ping') {
+      list = [...list].sort((a, b) => (b.segundos_sem_ping || 0) - (a.segundos_sem_ping || 0));
+    }
+    return list;
+  }, [terminals, localFilter, statusFilter, userFilter, sortBy]);
 
   // Calculate KPIs
   const stats = useMemo(() => {
@@ -120,71 +179,186 @@ export default function Dashboard() {
 
   // Sync filters to localStorage so TV Mode mirrors them in real-time
   useEffect(() => {
-    const filters = { local: localFilter, status: statusFilter, user: userFilter };
+    const filters = { local: localFilter, status: statusFilter, sort: sortBy, user: userFilter };
     localStorage.setItem('dashboard-filters', JSON.stringify(filters));
-  }, [localFilter, statusFilter, userFilter]);
+  }, [localFilter, statusFilter, sortBy]);
 
   const handlePullRefresh = async () => {
     await refetch();
+    setLastRefresh(new Date());
   };
 
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 w-full overflow-x-hidden">
+      {/* Header */}
+      <div className="bg-slate-900 text-white px-3 sm:px-6 py-3 sm:py-4 w-full">
+        <div className="max-w-full mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="p-1.5 sm:p-2 bg-emerald-500/20 rounded-lg shrink-0">
+              <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight truncate">NOC Monitor</h1>
+              <p className="text-xs text-slate-400 truncate">Terminais Biométricos</p>
+              <p className="text-xs text-slate-400/70 mt-0.5 hidden sm:block">Sistema de Monitoramento</p>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto">
+            {currentUser && (
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap">
+                <User className="h-4 w-4 text-slate-400 shrink-0" />
+                <span className="truncate">{currentUser.full_name || currentUser.email}</span>
+              </div>
+            )}
+            <div className="text-right hidden sm:block whitespace-nowrap">
+              <p className="text-xs text-slate-400">Última atualização</p>
+              <p className="text-xs sm:text-sm font-mono text-slate-200">
+                {lastRefresh.toLocaleTimeString('pt-PT')}
+              </p>
+            </div>
+            {/* Mobile: single refresh button + menu; Desktop: full buttons */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMonitorAll}
+              disabled={isMonitoring}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5"
+            >
+              <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
+              <span className="hidden sm:inline">Atualizar</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowWidgetConfig(v => !v)}
+              className={cn("hidden sm:flex bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5", showWidgetConfig && "bg-white/20")}
+            >
+              <Settings2 className="h-4 w-4" />
+              Widgets
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => base44.auth.logout()}
+              className="hidden sm:flex text-slate-300 hover:text-white hover:bg-white/10 gap-1"
+              title="Sair"
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Widget Config Panel */}
+      {showWidgetConfig && (
+        <div className="bg-slate-800 border-b border-slate-700 px-4 sm:px-6 py-3">
+          <div className="max-w-[1920px] mx-auto flex flex-wrap items-center gap-4 sm:gap-6">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <LayoutDashboard className="h-3.5 w-3.5" /> Widgets visíveis
+            </span>
+            {[
+              { key: 'terminalStatus', label: 'Status de Terminais' },
+              { key: 'alertRules', label: 'Regras de Alerta' },
+              { key: 'recentAudit', label: 'Auditoria Recente' },
+
+            ].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer">
+                <Switch
+                  checked={widgets[key]}
+                  onCheckedChange={() => toggleWidget(key)}
+                  className="data-[state=checked]:bg-emerald-500"
+                />
+                <span className="text-sm text-slate-300">{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-[1920px]">
         {/* Filters */}
-        <motion.div
+        <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-xl p-3 sm:p-4 space-y-3"
+          className="flex flex-col gap-3 sm:gap-4"
         >
-          <div className="flex flex-wrap gap-2 items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtros</span>
-            {(localFilter || statusFilter || userFilter) && (
-              <Button variant="ghost" size="sm" onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }} className="text-slate-500 hover:text-slate-700 h-7 px-2 text-xs">
-                Limpar
-              </Button>
-            )}
-          </div>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 ${canSeeAll ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2 sm:gap-3`}>
+            <FilterDropdown
+              label="Filtrar por Local"
+              icon={MapPin}
+              value={localFilter}
+              onChange={setLocalFilter}
+              options={locais}
+              placeholder="Todos os locais"
+            />
 
-          <div className={`grid grid-cols-1 ${canSeeAll ? 'sm:grid-cols-2' : ''} gap-2`}>
-            {/* Local */}
-            <div>
-              <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                <MapPin className="h-3 w-3" /> Local
-              </label>
-              <select
-                value={localFilter || ''}
-                onChange={e => setLocalFilter(e.target.value || null)}
-                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
-              >
-                <option value="">Todos</option>
-                {locais.map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
-
-            {/* Utilizador (admin only) */}
             {canSeeAll && (
-              <div>
-                <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
-                  <User className="h-3 w-3" /> Utilizador
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" />
+                  Filtrar por Utilizador
                 </label>
                 <select
                   value={userFilter || ''}
                   onChange={e => setUserFilter(e.target.value || null)}
-                  className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
+                  className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 w-full"
                 >
-                  <option value="">Todos</option>
-                  {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+                  <option value="">Todos os utilizadores</option>
+                  {usuarios.map(u => (
+                    <option key={u} value={u}>{u}</option>
+                  ))}
                 </select>
               </div>
             )}
+            <FilterDropdown
+              label="Status"
+              icon={Activity}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={['online', 'offline']}
+              placeholder="Todos os status"
+            />
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                Ordenar por
+              </label>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="h-9 px-3 rounded-md border border-slate-200 bg-white/80 text-xs sm:text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300 w-full"
+              >
+                <option value="status">Status</option>
+                <option value="nome">Nome</option>
+                <option value="ping">Sem ping</option>
+              </select>
+            </div>
           </div>
-
-
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+            {(localFilter || statusFilter || userFilter) && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                Limpar filtros
+              </Button>
+            )}
+            <Link
+              to={`/TVMode${localFilter ? `?local=${encodeURIComponent(localFilter)}` : ''}`}
+              className="w-full sm:w-auto"
+            >
+              <Button variant="outline" size="sm" className="gap-1.5 text-slate-600 w-full sm:w-auto">
+                <Tv className="h-4 w-4" />
+                Modo TV
+              </Button>
+            </Link>
+          </div>
         </motion.div>
 
         {/* KPIs */}
@@ -194,8 +368,6 @@ export default function Dashboard() {
             value={stats.total}
             icon={Monitor}
             color="blue"
-            onClick={() => { setStatusFilter(null); setLocalFilter(null); setUserFilter(null); }}
-            active={!statusFilter && !localFilter && !userFilter}
           />
           <KPICard
             title="Online"
@@ -204,22 +376,18 @@ export default function Dashboard() {
             color="green"
             trend="up"
             trendValue={`${stats.onlinePercentage}% disponível`}
-            onClick={() => setStatusFilter(statusFilter === 'online' ? null : 'online')}
-            active={statusFilter === 'online'}
           />
           <KPICard
             title="Offline"
             value={stats.offline}
             icon={WifiOff}
             color="red"
-            onClick={() => setStatusFilter(statusFilter === 'offline' ? null : 'offline')}
-            active={statusFilter === 'offline'}
           />
         </div>
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-          {/* Chart + Status Widget */}
+          {/* Chart */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -232,46 +400,11 @@ export default function Dashboard() {
                   Distribuição de Status
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 <StatusPieChart 
                   online={stats.online} 
                   offline={stats.offline}
-                  compact
                 />
-                {/* Status bar */}
-                <div className="space-y-2 border-t border-slate-100 pt-3">
-                  {(() => {
-                    const pct = stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0;
-                    const color = pct >= 80 ? 'emerald' : pct >= 50 ? 'amber' : 'red';
-                    const barClass = color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-red-500';
-                    const textClass = color === 'emerald' ? 'text-emerald-600' : color === 'amber' ? 'text-amber-600' : 'text-red-600';
-                    return (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-slate-500">Disponibilidade</span>
-                          <span className={cn("text-sm font-bold", textClass)}>{pct}%</span>
-                        </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className={cn("h-full rounded-full transition-all duration-500", barClass)} style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="grid grid-cols-3 gap-1 text-center pt-1">
-                          <div>
-                            <p className="text-base font-bold text-slate-700">{stats.total}</p>
-                            <p className="text-[10px] text-slate-400">Total</p>
-                          </div>
-                          <div>
-                            <p className="text-base font-bold text-emerald-600">{stats.online}</p>
-                            <p className="text-[10px] text-slate-400 flex items-center justify-center gap-0.5"><Wifi className="h-2.5 w-2.5" /> Online</p>
-                          </div>
-                          <div>
-                            <p className="text-base font-bold text-red-500">{stats.offline}</p>
-                            <p className="text-[10px] text-slate-400 flex items-center justify-center gap-0.5"><WifiOff className="h-2.5 w-2.5" /> Offline</p>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -312,20 +445,9 @@ export default function Dashboard() {
           >
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-500" />
-                    Incidentes
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowExtrasModal(true)}
-                    className="h-6 px-2 text-[10px] text-slate-400 hover:text-slate-600 gap-1"
-                  >
-                    <LayoutList className="h-3 w-3" />
-                    Ver mais
-                  </Button>
+                <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                  Incidentes
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -335,27 +457,24 @@ export default function Dashboard() {
           </motion.div>
         </div>
 
-        {/* Extras Modal */}
-        {showExtrasModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
-            >
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-                <h2 className="text-base font-semibold text-slate-800">Auditoria &amp; Alertas</h2>
-                <button onClick={() => setShowExtrasModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-                  <X className="h-5 w-5 text-slate-500" />
-                </button>
-              </div>
-              <div className="overflow-y-auto flex-1 p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <RecentAuditWidget currentUser={currentUser} />
-                  <AlertRulesWidget />
-                </div>
-              </div>
-            </motion.div>
+        {/* Custom Widgets Row */}
+        {(widgets.terminalStatus || widgets.alertRules || widgets.recentAudit) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {widgets.terminalStatus && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                <TerminalStatusWidget total={stats.total} online={stats.online} offline={stats.offline} />
+              </motion.div>
+            )}
+            {widgets.alertRules && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+                <AlertRulesWidget />
+              </motion.div>
+            )}
+            {widgets.recentAudit && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                <RecentAuditWidget currentUser={currentUser} />
+              </motion.div>
+            )}
           </div>
         )}
         </div>

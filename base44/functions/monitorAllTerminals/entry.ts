@@ -1,37 +1,52 @@
 /**
  * monitorAllTerminals — verifica o status de todos os terminais ativos.
  *
- * Anti-falso-offline:
- *   - Passivos: timeout com margem 1.5× antes de declarar offline
- *   - Ativos (ip_publico/dns/api): 3 tentativas TCP/HTTP antes de declarar offline
- *   - WebSocket Cloud: usa servidor Timmy (/status/<sn>) com fallback pelo ultimo_ping
- *   - Throttle de histórico: só regista a cada 1h (a não ser em mudanças de estado)
+ * Lógica por tipo de conexão:
+ *   PASSIVOS (dependem de push externo — verificar apenas timeout do último ping):
+ *     - ip_local   → Agente Local (agentReport) — timeout 150s
+ *     - heartbeat  → NOC Server TCP heartbeat — timeout 150s
+ *     - adms_push  → NOC Server HTTP ADMS — timeout 300s (ciclo mais lento)
+ *     - sdk_tcp    → NOC Server polling SDK — timeout 150s
+ *     - p2s        → P2S Server (conexão inversa) — timeout 150s
+ *
+ *   ATIVOS (sondagem direta via TCP/HTTP):
+ *     - ip_publico → TCP/HTTP direto ao terminal
+ *     - dns        → TCP/HTTP direto ao terminal (via hostname)
+ *     - api        → HTTP GET ao endpoint configurado
+ *
+ * THROTTLE do histórico: só grava StatusHistory quando:
+ *   - há mudança de status, OU
+ *   - passou mais de 1 hora desde o último registo
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-// Timeout base para terminais passivos (segundos sem ping → offline)
-// Estes valores já têm margem. PASSIVE_TIMEOUT é o timeout REAL após o qual
-// declaramos offline. Inclui margem de 1.5× sobre o ciclo normal do servidor.
+// Timeout para terminais passivos (segundos sem ping → offline)
 const PASSIVE_TIMEOUT = {
-    ip_local:         180,  // agente reporta a cada 30s → 6× margem
-    heartbeat:        180,  // noc_server heartbeat TCP
-    sdk_tcp:          180,  // noc_server SDK polling
-    p2s:              180,  // p2s_server conexão inversa
-    adms_push:        450,  // ADMS ciclo pode ser até 3min → 1.5× margem
-    websocket_cloud:  360,  // timmy: heartbeat 3s, report 60s → margem de 6×
+    ip_local:         150,  // agente reporta a cada 30s → 5× margem
+    heartbeat:        150,  // noc_server heartbeat TCP
+    sdk_tcp:          150,  // noc_server SDK polling
+    p2s:              150,  // p2s_server conexão inversa
+    adms_push:        300,  // ADMS ciclo mais lento (pode ser até 2min)
+    websocket_cloud:  300,  // timmy_ws_server: heartbeat pode ser 60-90s → 5× margem
 };
 
-const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s']);
+const PASSIVE_TYPES = new Set(['ip_local', 'heartbeat', 'adms_push', 'sdk_tcp', 'p2s', 'websocket_cloud']);
 const ACTIVE_TYPES  = new Set(['ip_publico', 'dns', 'api']);
 
 const HISTORY_THROTTLE_SECONDS = 3600;
-const CHECK_TIMEOUT_MS = 4000;
-const ACTIVE_RETRY_COUNT = 3;  // tentativas antes de declarar offline (ativos)
-const ACTIVE_RETRY_DELAY_MS = 1500; // pausa entre tentativas
+const CHECK_TIMEOUT_MS = 5000;
 
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
+
+        const isAuthenticated = await base44.auth.isAuthenticated();
+        if (isAuthenticated) {
+            const user = await base44.auth.me();
+            if (user?.role !== 'admin') {
+                return Response.json({ error: 'Forbidden: acesso apenas para administradores' }, { status: 403 });
+            }
+        }
 
         const terminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
         const agora = new Date();
@@ -50,29 +65,9 @@ Deno.serve(async (req) => {
                     let latencia_ms = null;
                     let timestampOffline = agora;
 
-                    if (tipo === 'websocket_cloud') {
-                        // ── WEBSOCKET CLOUD: consultar servidor Timmy em tempo real ──
-                        const wsResult = await checkTimmyWsServer(terminal);
-                        if (wsResult.serverReachable) {
-                            novoStatus = wsResult.online ? 'online' : 'offline';
-                        } else {
-                            // Servidor inacessível — fallback: timeout conservador do último ping
-                            if (terminal.ultimo_ping) {
-                                const seg = Math.floor((agora - new Date(terminal.ultimo_ping)) / 1000);
-                                novoStatus = seg > PASSIVE_TIMEOUT.websocket_cloud ? 'offline' : 'online';
-                            } else {
-                                novoStatus = 'offline';
-                            }
-                        }
-                        await base44.asServiceRole.entities.Terminal.update(terminal.id, {
-                            status: novoStatus,
-                            ultimo_check: agora.toISOString(),
-                            ...(novoStatus === 'online' ? { ultimo_ping: agora.toISOString(), segundos_sem_ping: 0 } : {}),
-                        });
-
-                    } else if (PASSIVE_TYPES.has(tipo)) {
-                        // ── PASSIVO: verificar timeout do último ping (com margem generosa) ──
-                        const timeoutSec = PASSIVE_TIMEOUT[tipo] || 180;
+                    if (PASSIVE_TYPES.has(tipo)) {
+                        // ── PASSIVO: verificar timeout do último ping ──────────────
+                        const timeoutSec = PASSIVE_TIMEOUT[tipo] || 150;
                         if (terminal.ultimo_ping) {
                             const ultimoPing = new Date(terminal.ultimo_ping);
                             const segundosSemPing = Math.floor((agora - ultimoPing) / 1000);
@@ -92,10 +87,9 @@ Deno.serve(async (req) => {
                                 ultimo_check: agora.toISOString(),
                             });
                         }
-
                     } else if (ACTIVE_TYPES.has(tipo)) {
-                        // ── ATIVO: 3 tentativas antes de declarar offline ──────────
-                        const checkResult = await checkTerminalActiveWithRetry(terminal, ACTIVE_RETRY_COUNT);
+                        // ── ATIVO: sondagem direta TCP/HTTP ───────────────────────
+                        const checkResult = await checkTerminalActive(terminal);
                         novoStatus = checkResult.online ? 'online' : 'offline';
                         latencia_ms = checkResult.latencia_ms || null;
                         await base44.asServiceRole.entities.Terminal.update(terminal.id, {
@@ -104,80 +98,125 @@ Deno.serve(async (req) => {
                             ultimo_check: agora.toISOString(),
                             ...(checkResult.online ? { ultimo_ping: agora.toISOString() } : {}),
                         });
-
                     } else {
+                        // Tipo desconhecido — ignorar
                         console.warn(`[monitorAllTerminals] tipo desconhecido: ${tipo} (terminal: ${terminal.nome})`);
                         return { terminal_id: terminal.id, terminal_nome: terminal.nome, tipo, success: true, status: terminal.status, statusMudou: false, skipped: true };
                     }
 
-                    const statusMudou = statusAnterior !== null && statusAnterior !== novoStatus;
+                    const statusMudou = statusAnterior !== novoStatus;
 
                     // Actualizar cache
-                    const cacheUpdate = { ultimo_status: novoStatus, atualizado_em: agora.toISOString() };
                     if (cache) {
-                        await base44.asServiceRole.entities.StatusCache.update(cache.id, cacheUpdate);
+                        await base44.asServiceRole.entities.StatusCache.update(cache.id, {
+                            ultimo_status: novoStatus,
+                            atualizado_em: agora.toISOString(),
+                        });
                     } else {
-                        await base44.asServiceRole.entities.StatusCache.create({ terminal_id: terminal.id, ...cacheUpdate });
+                        await base44.asServiceRole.entities.StatusCache.create({
+                            terminal_id: terminal.id,
+                            ultimo_status: novoStatus,
+                            atualizado_em: agora.toISOString(),
+                        });
                     }
 
-                    // Eventos de mudança → offline
+                    // Criar incidente e EscalationAlert se transitou → offline
                     if (statusMudou && novoStatus === 'offline') {
-                        await Promise.all([
-                            base44.asServiceRole.entities.AlertIncident.create({
-                                terminal_id: terminal.id, terminal_nome: terminal.nome,
-                                local: terminal.local || '', cliente: terminal.cliente_nome || '',
-                                tipo: 'offline', timestamp: timestampOffline.toISOString(),
-                                resolvido: false, notificado: false,
-                            }),
-                            base44.asServiceRole.entities.EscalationAlert.create({
-                                terminal_id: terminal.id, terminal_nome: terminal.nome,
-                                local: terminal.local || '', cliente: terminal.cliente_nome || '',
-                                owner_email: terminal.created_by || '',
-                                offline_desde: timestampOffline.toISOString(),
-                                escalado: false, resolvido: false, notificacao_inicial_enviada: false,
-                            }).catch(() => {}),
-                            base44.asServiceRole.functions.invoke('pushNotify', {
-                                action: 'notify_offline', terminal_id: terminal.id,
-                                terminal_nome: terminal.nome, local: terminal.local || '',
-                                cliente: terminal.cliente_nome || '', owner_email: terminal.created_by || '',
-                            }).catch(() => {}),
-                        ]);
+                        await base44.asServiceRole.entities.AlertIncident.create({
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local,
+                            cliente: terminal.cliente_nome,
+                            tipo: 'offline',
+                            timestamp: timestampOffline.toISOString(),
+                            resolvido: false,
+                            notificado: false,
+                        });
+
+                        // Criar EscalationAlert para escalonamento automático após 24h
+                        await base44.asServiceRole.entities.EscalationAlert.create({
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || '',
+                            owner_email: terminal.created_by || '',
+                            offline_desde: timestampOffline.toISOString(),
+                            escalado: false,
+                            resolvido: false,
+                            notificacao_inicial_enviada: false,
+                        }).catch(() => {});
+
+                        await base44.asServiceRole.functions.invoke('pushNotify', {
+                            action: 'notify_offline',
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || '',
+                            owner_email: terminal.created_by || '',
+                        }).catch(() => {});
+
+                        // Notificação Telegram
+                        const users = await base44.asServiceRole.entities.User.list().catch(() => []);
+                        const targets = users.filter(u => u.role === 'admin' || u.email === terminal.created_by);
+                        for (const u of targets) {
+                            if (u.telegram_bot_token && u.telegram_chat_id) {
+                                const msg = `🔴 <b>Terminal Offline</b>\n\n` +
+                                    `📟 <b>${terminal.nome}</b>\n` +
+                                    `📍 Local: ${terminal.local || '—'}\n` +
+                                    `🏢 Cliente: ${terminal.cliente_nome || '—'}\n` +
+                                    `🕐 ${agora.toLocaleString('pt-PT', { timeZone: 'UTC' })} UTC`;
+                                await base44.asServiceRole.functions.invoke('telegramNotify', {
+                                    bot_token: u.telegram_bot_token,
+                                    chat_id: u.telegram_chat_id,
+                                    message: msg,
+                                }).catch(() => {});
+                            }
+                        }
                     }
 
-                    // Eventos de mudança → online
+                    // Resolver incidentes e escalações se voltou online
                     if (statusMudou && novoStatus === 'online') {
                         const [openIncidents, openEscalations] = await Promise.all([
                             base44.asServiceRole.entities.AlertIncident.filter({ terminal_id: terminal.id, resolvido: false }).catch(() => []),
                             base44.asServiceRole.entities.EscalationAlert.filter({ terminal_id: terminal.id, resolvido: false }).catch(() => []),
                         ]);
-                        await Promise.all([
-                            ...openIncidents.map(inc => {
-                                const duracao = Math.round((agora - new Date(inc.timestamp)) / 60000);
-                                return base44.asServiceRole.entities.AlertIncident.update(inc.id, {
-                                    resolvido: true, resolvido_em: agora.toISOString(), duracao_minutos: duracao,
-                                }).catch(() => {});
-                            }),
-                            ...openEscalations.map(esc => base44.asServiceRole.entities.EscalationAlert.update(esc.id, { resolvido: true }).catch(() => {})),
-                            base44.asServiceRole.entities.AlertIncident.create({
-                                terminal_id: terminal.id, terminal_nome: terminal.nome,
-                                local: terminal.local || '', cliente: terminal.cliente_nome || '',
-                                tipo: 'restored', timestamp: agora.toISOString(), resolvido: true, notificado: false,
-                            }).catch(() => {}),
-                        ]);
+                        for (const inc of openIncidents) {
+                            const duracao = Math.round((agora - new Date(inc.timestamp)) / 60000);
+                            await base44.asServiceRole.entities.AlertIncident.update(inc.id, {
+                                resolvido: true, resolvido_em: agora.toISOString(), duracao_minutos: duracao,
+                            }).catch(() => {});
+                        }
+                        for (const esc of openEscalations) {
+                            await base44.asServiceRole.entities.EscalationAlert.update(esc.id, { resolvido: true }).catch(() => {});
+                        }
+                        // Incidente "restored"
+                        await base44.asServiceRole.entities.AlertIncident.create({
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || '',
+                            tipo: 'restored',
+                            timestamp: agora.toISOString(),
+                            resolvido: true,
+                            notificado: false,
+                        }).catch(() => {});
                     }
 
-                    // Throttle histórico
-                    const ultimoHistorico = cache?.atualizado_em ? new Date(cache.atualizado_em) : null;
-                    const segundosDesdeUltimo = ultimoHistorico
-                        ? Math.floor((agora - ultimoHistorico) / 1000)
+                    // THROTTLE histórico
+                    const ultimoCheck = terminal.ultimo_check ? new Date(terminal.ultimo_check) : null;
+                    const segundosDesdeUltimoCheck = ultimoCheck
+                        ? Math.floor((agora - ultimoCheck) / 1000)
                         : HISTORY_THROTTLE_SECONDS + 1;
 
-                    if (statusMudou || segundosDesdeUltimo >= HISTORY_THROTTLE_SECONDS) {
+                    if (statusMudou || segundosDesdeUltimoCheck >= HISTORY_THROTTLE_SECONDS) {
                         const tsHistorico = (statusMudou && novoStatus === 'offline') ? timestampOffline : agora;
                         await base44.asServiceRole.entities.StatusHistory.create({
-                            terminal_id: terminal.id, terminal_nome: terminal.nome,
-                            status: novoStatus, timestamp: tsHistorico.toISOString(),
-                            local: terminal.local || '', cliente: terminal.cliente_nome || '',
+                            terminal_id: terminal.id,
+                            terminal_nome: terminal.nome,
+                            status: novoStatus,
+                            timestamp: tsHistorico.toISOString(),
+                            local: terminal.local || '',
+                            cliente: terminal.cliente_nome || '',
                         }).catch(() => {});
                     }
 
@@ -204,76 +243,50 @@ Deno.serve(async (req) => {
     }
 });
 
-/**
- * Verifica terminal activo com retry (até maxRetries tentativas).
- * Só declara offline se TODAS as tentativas falharem.
- */
-async function checkTerminalActiveWithRetry(terminal, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const result = await checkTerminalActive(terminal);
-        if (result.online) return result;
-        if (attempt < maxRetries) {
-            await new Promise(r => setTimeout(r, ACTIVE_RETRY_DELAY_MS));
-        }
-    }
-    return { online: false };
-}
-
-async function checkTimmyWsServer(terminal) {
-    const sn = (terminal.numero_serie || '').trim();
-    if (!sn) return { serverReachable: false, online: false };
-    const host = terminal.ip_publico || terminal.dns || null;
-    if (!host) return { serverReachable: false, online: false };
-    try {
-        const ctrlPort = 7789; // porta HTTP de controlo do servidor Timmy (sempre fixa)
-        const resp = await fetch(`http://${host}:${ctrlPort}/status/${sn}`, { signal: AbortSignal.timeout(4000) });
-        if (!resp.ok) return { serverReachable: true, online: false };
-        const data = await resp.json();
-        return { serverReachable: true, online: data.connected === true };
-    } catch {
-        return { serverReachable: false, online: false };
-    }
-}
-
 async function checkTerminalActive(terminal) {
     const porta = terminal.porta || 5005;
     const inicio = Date.now();
 
-    if (terminal.tipo_conexao === 'api' && terminal.api_endpoint) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+    try {
+        if (terminal.tipo_conexao === 'api' && terminal.api_endpoint) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+            try {
+                const res = await fetch(terminal.api_endpoint, { signal: controller.signal });
+                clearTimeout(timer);
+                return { online: res.ok || res.status < 500, latencia_ms: Date.now() - inicio };
+            } catch {
+                clearTimeout(timer);
+                return { online: false };
+            }
+        }
+
+        // ip_publico ou dns → TCP primeiro, fallback HTTP
+        const host = terminal.tipo_conexao === 'ip_publico' ? terminal.ip_publico :
+                     terminal.tipo_conexao === 'dns' ? terminal.dns : null;
+
+        if (!host) return { online: false };
+
+        // TCP
         try {
-            const res = await fetch(terminal.api_endpoint, { signal: controller.signal });
+            const conn = await Promise.race([
+                Deno.connect({ hostname: host, port: Number(porta) }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('tcp_timeout')), CHECK_TIMEOUT_MS))
+            ]);
+            conn.close();
+            return { online: true, latencia_ms: Date.now() - inicio };
+        } catch {}
+
+        // Fallback HTTP
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
+            await fetch(`http://${host}:${porta}`, { signal: controller.signal });
             clearTimeout(timer);
-            return { online: res.ok || res.status < 500, latencia_ms: Date.now() - inicio };
+            return { online: true, latencia_ms: Date.now() - inicio };
         } catch {
-            clearTimeout(timer);
             return { online: false };
         }
-    }
-
-    const host = terminal.tipo_conexao === 'ip_publico' ? terminal.ip_publico :
-                 terminal.tipo_conexao === 'dns' ? terminal.dns : null;
-
-    if (!host) return { online: false };
-
-    // TCP
-    try {
-        const conn = await Promise.race([
-            Deno.connect({ hostname: host, port: Number(porta) }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('tcp_timeout')), CHECK_TIMEOUT_MS))
-        ]);
-        conn.close();
-        return { online: true, latencia_ms: Date.now() - inicio };
-    } catch {}
-
-    // Fallback HTTP
-    try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
-        await fetch(`http://${host}:${porta}`, { signal: controller.signal });
-        clearTimeout(timer);
-        return { online: true, latencia_ms: Date.now() - inicio };
     } catch {
         return { online: false };
     }
