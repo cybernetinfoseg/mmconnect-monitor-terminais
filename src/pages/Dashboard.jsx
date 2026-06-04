@@ -224,7 +224,7 @@ export default function Dashboard() {
                 size="sm"
                 onClick={handleMonitorAll}
                 disabled={isMonitoring}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5 px-3 py-1">
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5 px-3 mx-40 my-1">
                 
               <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
               <span className="hidden sm:inline">Atualizar</span>
