@@ -219,16 +219,16 @@ export default function Dashboard() {
                 
             </div>
             {/* Mobile: single refresh button + menu; Desktop: full buttons */}
-            <Button
-                variant="outline"
-                size="sm"
-                onClick={handleMonitorAll}
-                disabled={isMonitoring}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20 gap-1.5 px-3 hidden">
-                
-              <RefreshCw className={cn("h-4 w-4", isMonitoring && "animate-spin")} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
+            
+
+
+
+
+
+
+
+
+              
             <Button
                 variant="outline"
                 size="sm"
