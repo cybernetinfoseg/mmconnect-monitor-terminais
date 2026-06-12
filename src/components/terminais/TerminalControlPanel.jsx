@@ -34,6 +34,7 @@ import {
   ListChecks,
   Timer,
   Cpu,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UserActionForm from './UserActionForm';
@@ -60,12 +61,14 @@ function getSupportedActions(terminal) {
     clearlog:    { label: 'Limpar Logs',             icon: Trash2,       color: 'orange',  desc: 'Apagar todos os registos de ponto do terminal', confirm: true, danger: true },
     clearusers:  { label: 'Limpar Utilizadores',     icon: Trash2,       color: 'red',     desc: 'Apagar TODOS os utilizadores e dados biométricos', confirm: true, danger: true },
     initdevice:  { label: 'Reset de Fábrica',        icon: RotateCcw,    color: 'red',     desc: 'Inicializar terminal — apaga tudo e repõe configurações de fábrica', confirm: true, danger: true },
-    gettime:     { label: 'Ver Hora do Terminal',     icon: Timer,        color: 'blue',    desc: 'Obter hora atual do terminal e comparar com o servidor' },
-    getdevcap:   { label: 'Capacidade do Dispositivo', icon: Cpu,         color: 'slate',   desc: 'Ver slots usados: utilizadores, faces, impressões digitais, logs' },
+    gettime:        { label: 'Ver Hora do Terminal',      icon: Timer,         color: 'blue',    desc: 'Obter hora atual do terminal e comparar com o servidor' },
+    getdevcap:      { label: 'Capacidade do Dispositivo', icon: Cpu,           color: 'slate',   desc: 'Ver slots usados: utilizadores, faces, impressões digitais, logs' },
+    setuserprofile: { label: 'Mensagem no Terminal',      icon: MessageSquare, color: 'teal',    desc: 'Definir mensagem personalizada exibida no ecrã do terminal por utilizador', form: true },
+    getuserprofile: { label: 'Ler Mensagem Terminal',     icon: MessageSquare, color: 'slate',   desc: 'Ler mensagem/perfil associado a um utilizador no terminal', form: true },
   };
 
   if (tipo === 'websocket_cloud') {
-    return ['settime', 'gettime', 'getlogs', 'getalllog', 'opendoor', 'reboot', 'getdevinfo', 'getdevcap', 'getparam', 'lockctrl', 'getuserlist', 'adduser', 'blockuser', 'deleteuser', 'clearlog', 'clearusers', 'initdevice'].map(k => ({ key: k, ...all[k] }));
+    return ['settime', 'gettime', 'getlogs', 'getalllog', 'opendoor', 'reboot', 'getdevinfo', 'getdevcap', 'getparam', 'lockctrl', 'getuserlist', 'adduser', 'blockuser', 'deleteuser', 'clearlog', 'clearusers', 'initdevice', 'setuserprofile', 'getuserprofile'].map(k => ({ key: k, ...all[k] }));
   }
   if (tipo === 'adms_push') {
     return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser', 'deleteuser'].map(k => ({ key: k, ...all[k] }));
@@ -149,6 +152,13 @@ function ResultBox({ result }) {
                   <p className="text-[10px] text-slate-400 text-center">...e mais {result.data.total - 20}</p>
                 )}
               </div>
+            </div>
+          )}
+          {/* Perfil/mensagem do utilizador (getuserprofile) */}
+          {result.data?.profile !== undefined && (
+            <div className="mt-2 bg-white rounded p-2 border border-teal-100 text-xs">
+              <p className="text-slate-400 mb-1">Mensagem no terminal (ID:{result.data.enrollid ?? 0}):</p>
+              <p className="font-medium text-slate-700">{result.data.profile || '(sem mensagem)'}</p>
             </div>
           )}
           {/* Hora do terminal (gettime) */}

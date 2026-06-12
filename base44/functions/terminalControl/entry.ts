@@ -673,6 +673,23 @@ async function actionGetDevCap(terminal) {
   return { success: resp.result === true, message: 'Capacidades do dispositivo obtidas', data: resp };
 }
 
+async function actionSetUserProfile(terminal, params) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'setuserprofile apenas suportado via WebSocket Cloud (Timmy)' };
+  const { enrollid = 0, profile } = params || {};
+  if (!profile && profile !== '') return { success: false, error: 'profile é obrigatório' };
+  if (String(profile).length > 200) return { success: false, error: 'profile máximo 200 bytes' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'setuserprofile', enrollid: Number(enrollid), profile: String(profile) });
+  const label = enrollid === 0 ? 'Mensagem pública' : `Perfil utilizador ID:${enrollid}`;
+  return { success: resp.result === true, message: `${label} atualizado`, data: resp };
+}
+
+async function actionGetUserProfile(terminal, params) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getuserprofile apenas suportado via WebSocket Cloud (Timmy)' };
+  const { enrollid = 0 } = params || {};
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getuserprofile', enrollid: Number(enrollid) });
+  return { success: resp.result === true, message: `Perfil do utilizador ID:${enrollid}`, data: { profile: resp.record, enrollid: resp.enrollid } };
+}
+
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -720,8 +737,10 @@ Deno.serve(async (req) => {
       case 'getparam':    result = await actionGetParam(terminal); break;
       case 'setparam':    result = await actionSetParam(terminal, params); break;
       case 'initdevice':  result = await actionInitDevice(terminal); break;
-      case 'gettime':     result = await actionGetTime(terminal); break;
-      case 'getdevcap':   result = await actionGetDevCap(terminal); break;
+      case 'gettime':       result = await actionGetTime(terminal); break;
+      case 'getdevcap':     result = await actionGetDevCap(terminal); break;
+      case 'setuserprofile': result = await actionSetUserProfile(terminal, params); break;
+      case 'getuserprofile': result = await actionGetUserProfile(terminal, params); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }

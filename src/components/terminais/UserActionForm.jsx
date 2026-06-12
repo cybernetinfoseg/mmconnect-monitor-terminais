@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, UserX, UserMinus, X, Loader2, LockOpen, Lock, DoorOpen } from 'lucide-react';
+import { UserPlus, UserX, UserMinus, X, Loader2, LockOpen, Lock, DoorOpen, MessageSquare } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 /**
  * Formulário inline para ações que requerem dados do utilizador:
@@ -20,6 +21,7 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading, te
     privilege: '0',
     block: false,
     fuc: '1',
+    profile: '',
   });
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
@@ -304,6 +306,130 @@ export default function UserActionForm({ action, onSubmit, onCancel, loading, te
             onClick={() => onSubmit({ enrollid: Number(form.enrollid) || form.enrollid })}
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Remover'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (action === 'setuserprofile') {
+    return (
+      <div className="bg-white border border-teal-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-teal-700">
+            <MessageSquare className="h-4 w-4" />
+            <span className="font-semibold text-sm">Mensagem no Terminal</span>
+          </div>
+          <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+        </div>
+
+        {terminalUsers.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">Selecionar utilizador (opcional)</Label>
+            <select
+              className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              defaultValue=""
+              onChange={e => {
+                const u = terminalUsers.find(u => String(u.id) === e.target.value);
+                if (u) set('enrollid', String(u.enrollid));
+              }}
+            >
+              <option value="">— Mensagem pública (enrollid=0) —</option>
+              {terminalUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.enrollid} — {u.nome}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <Label className="text-xs">ID do Utilizador (0 = público)</Label>
+          <Input
+            type="number" min={0}
+            placeholder="0"
+            value={form.enrollid}
+            onChange={e => set('enrollid', e.target.value)}
+            className="h-8 text-sm"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs">Mensagem (máx. 200 caracteres) *</Label>
+          <Textarea
+            placeholder="Ex: Bem-vindo! Bom trabalho."
+            value={form.profile}
+            onChange={e => set('profile', e.target.value)}
+            maxLength={200}
+            className="text-sm h-20 resize-none"
+          />
+          <p className="text-xs text-slate-400 text-right">{form.profile.length}/200</p>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onCancel}>Cancelar</Button>
+          <Button
+            size="sm"
+            className="flex-1"
+            disabled={loading || !form.profile}
+            onClick={() => onSubmit({ enrollid: Number(form.enrollid) || 0, profile: form.profile })}
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Enviar'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (action === 'getuserprofile') {
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-slate-700">
+            <MessageSquare className="h-4 w-4" />
+            <span className="font-semibold text-sm">Ler Mensagem do Terminal</span>
+          </div>
+          <button onClick={onCancel} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
+        </div>
+
+        {terminalUsers.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-xs">Selecionar utilizador</Label>
+            <select
+              className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              defaultValue=""
+              onChange={e => {
+                const u = terminalUsers.find(u => String(u.id) === e.target.value);
+                if (u) set('enrollid', String(u.enrollid));
+              }}
+            >
+              <option value="">— Mensagem pública (enrollid=0) —</option>
+              {terminalUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.enrollid} — {u.nome}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <Label className="text-xs">ID do Utilizador (0 = público)</Label>
+          <Input
+            type="number" min={0}
+            placeholder="0"
+            value={form.enrollid}
+            onChange={e => set('enrollid', e.target.value)}
+            className="h-8 text-sm"
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" className="flex-1" onClick={onCancel}>Cancelar</Button>
+          <Button
+            size="sm"
+            className="flex-1"
+            disabled={loading}
+            onClick={() => onSubmit({ enrollid: Number(form.enrollid) || 0 })}
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Ler'}
           </Button>
         </div>
       </div>
