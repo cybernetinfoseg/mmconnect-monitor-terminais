@@ -1,0 +1,138 @@
+{
+  "name": "ReciboVencimento",
+  "type": "object",
+  "properties": {
+    "processamento_id": {
+      "type": "string",
+      "description": "ID do ProcessamentoSalario"
+    },
+    "colaborador_id": {
+      "type": "string"
+    },
+    "colaborador_nome": {
+      "type": "string"
+    },
+    "enrollid": {
+      "type": "number"
+    },
+    "numero_recibo": {
+      "type": "string",
+      "description": "N\u00famero \u00fanico do recibo (ex: RV-2025-001)"
+    },
+    "ano": {
+      "type": "number"
+    },
+    "mes": {
+      "type": "number"
+    },
+    "data_emissao": {
+      "type": "string",
+      "format": "date"
+    },
+    "nif_colaborador": {
+      "type": "string"
+    },
+    "niss_colaborador": {
+      "type": "string"
+    },
+    "cargo": {
+      "type": "string"
+    },
+    "departamento": {
+      "type": "string"
+    },
+    "data_admissao": {
+      "type": "string",
+      "format": "date"
+    },
+    "salario_base": {
+      "type": "number"
+    },
+    "subsidio_alimentacao": {
+      "type": "number",
+      "default": 0
+    },
+    "subsidio_alimentacao_tipo": {
+      "type": "string",
+      "enum": [
+        "dinheiro",
+        "cartao_refeicao"
+      ],
+      "default": "cartao_refeicao"
+    },
+    "outros_subsidios": {
+      "type": "number",
+      "default": 0
+    },
+    "descricao_outros_subsidios": {
+      "type": "string"
+    },
+    "horas_extra_valor": {
+      "type": "number",
+      "default": 0
+    },
+    "horas_extra_minutos": {
+      "type": "number",
+      "default": 0
+    },
+    "faltas_dias": {
+      "type": "number",
+      "default": 0
+    },
+    "faltas_valor": {
+      "type": "number",
+      "default": 0
+    },
+    "outros_descontos": {
+      "type": "number",
+      "default": 0
+    },
+    "descricao_outros_descontos": {
+      "type": "string"
+    },
+    "remuneracao_bruta": {
+      "type": "number"
+    },
+    "valor_ss_trabalhador": {
+      "type": "number"
+    },
+    "taxa_ss_trabalhador": {
+      "type": "number",
+      "default": 11
+    },
+    "valor_irs": {
+      "type": "number"
+    },
+    "taxa_irs": {
+      "type": "number",
+      "default": 0
+    },
+    "outros_descontos_obrigatorios": {
+      "type": "number",
+      "default": 0
+    },
+    "total_descontos": {
+      "type": "number"
+    },
+    "remuneracao_liquida": {
+      "type": "number"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "emitido",
+        "entregue",
+        "anulado"
+      ],
+      "default": "emitido"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "ano",
+    "mes"
+  ]
+}

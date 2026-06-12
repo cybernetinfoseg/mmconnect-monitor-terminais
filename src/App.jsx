@@ -24,6 +24,8 @@ import GestaoFeriasRH from './pages/GestaoFeriasRH';
 import HorasExtra from './pages/HorasExtra.jsx';
 import BancoHoras from './pages/BancoHoras.jsx';
 import MapaAssiduidade from './pages/MapaAssiduidade.jsx';
+import Payroll from './pages/Payroll.jsx';
+import Recibos from './pages/Recibos.jsx';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -98,6 +100,8 @@ const AuthenticatedApp = () => {
       <Route path="/HorasExtra" element={<LayoutWrapper currentPageName="HorasExtra"><HorasExtra /></LayoutWrapper>} />
       <Route path="/BancoHoras" element={<LayoutWrapper currentPageName="BancoHoras"><BancoHoras /></LayoutWrapper>} />
       <Route path="/MapaAssiduidade" element={<LayoutWrapper currentPageName="MapaAssiduidade"><MapaAssiduidade /></LayoutWrapper>} />
+      <Route path="/Payroll" element={<LayoutWrapper currentPageName="Payroll"><Payroll /></LayoutWrapper>} />
+      <Route path="/Recibos" element={<LayoutWrapper currentPageName="Recibos"><Recibos /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

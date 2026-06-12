@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   Users, FileText, CalendarDays, TrendingUp, AlertTriangle,
-  Clock, UserCheck, UserX, Plus, ChevronRight
+  Clock, UserCheck, Archive, Banknote, ChevronRight
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -90,6 +90,50 @@ export default function RH() {
       badge: feriasPendentes.length > 0 ? `${feriasPendentes.length} para aprovar` : null,
       badgeColor: 'bg-orange-100 text-orange-700',
     },
+    {
+      title: 'Horas Extra',
+      desc: 'Registo, aprovação e controlo do limite legal anual (art. 268º CT)',
+      icon: TrendingUp,
+      color: 'bg-violet-50 border-violet-200',
+      iconColor: 'text-violet-600',
+      link: '/HorasExtra',
+      stats: 'Horas suplementares',
+      badge: null,
+      badgeColor: '',
+    },
+    {
+      title: 'Banco de Horas',
+      desc: 'Saldos acumulados, compensações e movimentos (art. 208º CT)',
+      icon: Archive,
+      color: 'bg-blue-50 border-blue-200',
+      iconColor: 'text-blue-600',
+      link: '/BancoHoras',
+      stats: 'Créditos e débitos',
+      badge: null,
+      badgeColor: '',
+    },
+    {
+      title: 'Payroll',
+      desc: 'Processamento salarial mensal com cálculo automático SS e IRS',
+      icon: Banknote,
+      color: 'bg-green-50 border-green-200',
+      iconColor: 'text-green-600',
+      link: '/Payroll',
+      stats: `${anoAtual}`,
+      badge: null,
+      badgeColor: '',
+    },
+    {
+      title: 'Recibos de Vencimento',
+      desc: 'Emissão e arquivo de recibos gerados automaticamente',
+      icon: FileText,
+      color: 'bg-teal-50 border-teal-200',
+      iconColor: 'text-teal-600',
+      link: '/Recibos',
+      stats: 'Recibos digitais',
+      badge: null,
+      badgeColor: '',
+    },
   ];
 
   const alertas = [];
@@ -136,12 +180,13 @@ export default function RH() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           {[
             { label: 'Colaboradores Ativos', value: ativos.length, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
             { label: 'Contratos Ativos', value: contratosAtivos.length, icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' },
             { label: 'Férias Pendentes', value: feriasPendentes.length, icon: CalendarDays, color: 'text-amber-600', bg: 'bg-amber-50' },
             { label: 'Contratos a Expirar', value: contratosAExpirar.length, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
+            { label: 'Férias Aprovadas (ano)', value: feriasAprovadas.length, icon: Archive, color: 'text-teal-600', bg: 'bg-teal-50' },
           ].map((kpi, i) => (
             <Card key={i} className="bg-white border-slate-200">
               <CardContent className="p-4">

@@ -1,0 +1,59 @@
+{
+  "name": "MovimentoBancoHoras",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome do colaborador (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "data": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do movimento"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "credito",
+        "debito",
+        "pagamento",
+        "expiracao"
+      ],
+      "description": "Tipo de movimento: cr\u00e9dito=horas extra ganhas, d\u00e9bito=compensa\u00e7\u00e3o gozada, pagamento=horas extra pagas, expira\u00e7\u00e3o=horas caducadas"
+    },
+    "minutos": {
+      "type": "number",
+      "description": "Minutos do movimento (sempre positivo)"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do movimento"
+    },
+    "registo_extra_id": {
+      "type": "string",
+      "description": "ID do RegistoHorasExtra de origem (se cr\u00e9dito)"
+    },
+    "aprovado_por": {
+      "type": "string",
+      "description": "Email de quem autorizou"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Email do respons\u00e1vel"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "data",
+    "tipo",
+    "minutos"
+  ]
+}

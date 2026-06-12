@@ -33,7 +33,9 @@ import {
   Palmtree,
   TrendingUp,
   Archive,
-  LayoutGrid
+  LayoutGrid,
+  Banknote,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -63,6 +65,8 @@ const ALL_NAV_ITEMS = [
   { name: 'Horas Extra', page: 'HorasExtra', icon: TrendingUp },
   { name: 'Banco de Horas', page: 'BancoHoras', icon: Archive },
   { name: 'Mapa Assiduidade', page: 'MapaAssiduidade', icon: LayoutGrid },
+  { name: 'Payroll', page: 'Payroll', icon: Banknote },
+  { name: 'Recibos', page: 'Recibos', icon: FileText },
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
