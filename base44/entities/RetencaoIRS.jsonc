@@ -1,0 +1,83 @@
+{
+  "name": "RetencaoIRS",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "nif": {
+      "type": "string",
+      "description": "NIF"
+    },
+    "ano": {
+      "type": "number",
+      "description": "Ano fiscal"
+    },
+    "estado_civil": {
+      "type": "string",
+      "enum": [
+        "solteiro",
+        "casado",
+        "divorciado",
+        "viuvo"
+      ],
+      "description": "Estado civil para tabela"
+    },
+    "dependentes": {
+      "type": "number",
+      "default": 0,
+      "description": "N\u00famero de dependentes"
+    },
+    "deficiencia": {
+      "type": "boolean",
+      "default": false,
+      "description": "Defici\u00eancia >= 60%"
+    },
+    "tabela": {
+      "type": "string",
+      "description": "Tabela aplicada (ex: A1, B1)"
+    },
+    "taxa_retem": {
+      "type": "number",
+      "description": "Taxa de reten\u00e7\u00e3o (%)"
+    },
+    "remuneracao_anual_bruta": {
+      "type": "number",
+      "description": "Remunera\u00e7\u00e3o anual bruta"
+    },
+    "irs_retido_anual": {
+      "type": "number",
+      "description": "IRS retido no ano"
+    },
+    "irs_acerto": {
+      "type": "number",
+      "description": "Acerto de IRS (IRS devido - retido)"
+    },
+    "liquidar_empresa": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se empresa deve liquidar diferen\u00e7a"
+    },
+    "data_recalculo": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do \u00faltimo rec\u00e1lculo"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "nif",
+    "ano"
+  ]
+}

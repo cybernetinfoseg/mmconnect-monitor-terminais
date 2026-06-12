@@ -1,0 +1,86 @@
+{
+  "name": "Formacao",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "titulo": {
+      "type": "string",
+      "description": "T\u00edtulo da forma\u00e7\u00e3o"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "obrigatoria",
+        "voluntaria"
+      ],
+      "default": "voluntaria",
+      "description": "Tipo de forma\u00e7\u00e3o"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio"
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de fim"
+    },
+    "horas": {
+      "type": "number",
+      "description": "Total de horas"
+    },
+    "entidade_formadora": {
+      "type": "string",
+      "description": "Nome da entidade formadora"
+    },
+    "instrutor": {
+      "type": "string",
+      "description": "Nome do instrutor"
+    },
+    "certificado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se tem certificado"
+    },
+    "certificado_url": {
+      "type": "string",
+      "description": "URL do certificado"
+    },
+    "classificacao": {
+      "type": "string",
+      "description": "Classifica\u00e7\u00e3o/nota"
+    },
+    "custo": {
+      "type": "number",
+      "default": 0,
+      "description": "Custo da forma\u00e7\u00e3o (\u20ac)"
+    },
+    "renovacao_prevista": {
+      "type": "string",
+      "format": "date",
+      "description": "Data prevista para renova\u00e7\u00e3o"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "titulo"
+  ]
+}

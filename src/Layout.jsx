@@ -39,7 +39,8 @@ import {
   DoorOpen,
   UserCheck,
   BarChart3,
-  Activity
+  Activity,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,15 @@ const ALL_NAV_ITEMS = [
   { name: 'Fichas RH', page: 'FichaColaborador', icon: Users },
   { name: 'Contratos', page: 'GestaoContratos', icon: FileSignature },
   { name: 'Férias RH', page: 'GestaoFeriasRH', icon: Palmtree },
+  { name: 'Justificação Faltas', page: 'JustificacaoFaltas', icon: FileSignature },
+  { name: 'Gestão de Baixas', page: 'GestAoBaixas', icon: AlertTriangle },
+  { name: 'Desempenho', page: 'GestaoDesempenho', icon: TrendingUp },
+  { name: 'Formação', page: 'GestaoFormacao', icon: BookOpen },
+  { name: 'Documentos', page: 'DocumentosColaborador', icon: FileText },
+  { name: 'Ficha Salarial', page: 'FichaSalarial', icon: Banknote },
+  { name: 'Custos Depts', page: 'CustosDepartamentos', icon: BarChart3 },
+  { name: 'Adiantamentos', page: 'Adiantamentos', icon: Banknote },
+  { name: 'Organigrama', page: 'Organigrama', icon: Building2 },
   { name: 'Horas Extra', page: 'HorasExtra', icon: TrendingUp },
   { name: 'Banco de Horas', page: 'BancoHoras', icon: Archive },
   { name: 'Mapa Assiduidade', page: 'MapaAssiduidade', icon: LayoutGrid },

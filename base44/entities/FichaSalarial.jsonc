@@ -1,0 +1,100 @@
+{
+  "name": "FichaSalarial",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "nif": {
+      "type": "string",
+      "description": "NIF do colaborador"
+    },
+    "niss": {
+      "type": "string",
+      "description": "NISS do colaborador"
+    },
+    "iban": {
+      "type": "string",
+      "description": "IBAN para pagamento"
+    },
+    "salario_base_anual": {
+      "type": "number",
+      "description": "Sal\u00e1rio base anual"
+    },
+    "salario_base_mensal": {
+      "type": "number",
+      "description": "Sal\u00e1rio base mensal (12\u00aa)"
+    },
+    "subsidio_alimentacao_mensal": {
+      "type": "number",
+      "description": "Subs\u00eddio de alimenta\u00e7\u00e3o mensal"
+    },
+    "subsidio_alimentacao_tipo": {
+      "type": "string",
+      "enum": [
+        "dinheiro",
+        "cartao_refeicao"
+      ],
+      "default": "cartao_refeicao"
+    },
+    "subsidio_ferias_anual": {
+      "type": "number",
+      "description": "Subs\u00eddio de f\u00e9rias anual"
+    },
+    "subsidio_natal_anual": {
+      "type": "number",
+      "description": "Subs\u00eddio de natal anual"
+    },
+    "outros_subsidios": {
+      "type": "number",
+      "default": 0,
+      "description": "Outros subs\u00eddios mensais"
+    },
+    "descricao_outros": {
+      "type": "string"
+    },
+    "taxa_ss_trabalhador": {
+      "type": "number",
+      "default": 11,
+      "description": "Taxa SS trabalhador (%)"
+    },
+    "taxa_irs": {
+      "type": "number",
+      "default": 0,
+      "description": "Taxa IRS (%)"
+    },
+    "estado_civil": {
+      "type": "string",
+      "enum": [
+        "solteiro",
+        "casado",
+        "divorciado",
+        "viuvo"
+      ],
+      "description": "Para c\u00e1lculo IRS"
+    },
+    "dependentes": {
+      "type": "number",
+      "default": 0,
+      "description": "N\u00famero de dependentes"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id"
+  ]
+}

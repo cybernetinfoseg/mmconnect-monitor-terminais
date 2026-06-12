@@ -1,0 +1,80 @@
+{
+  "name": "Adiantamento",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "adiantamento_salario",
+        "adiantamento_ferias",
+        "deducao",
+        "outro"
+      ],
+      "description": "Tipo de movimento"
+    },
+    "valor": {
+      "type": "number",
+      "description": "Valor (\u20ac)"
+    },
+    "data_solicitacao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da solicita\u00e7\u00e3o"
+    },
+    "data_pagamento": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do pagamento/desconto"
+    },
+    "motivo": {
+      "type": "string",
+      "description": "Motivo"
+    },
+    "estado": {
+      "type": "string",
+      "enum": [
+        "pendente",
+        "aprovado",
+        "pago",
+        "recusado"
+      ],
+      "default": "pendente"
+    },
+    "aprovado_por": {
+      "type": "string",
+      "description": "Email de quem aprovou"
+    },
+    "parcelas": {
+      "type": "number",
+      "default": 1,
+      "description": "N\u00famero de parcelas de devolu\u00e7\u00e3o"
+    },
+    "valor_parcela": {
+      "type": "number",
+      "description": "Valor de cada parcela"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "tipo",
+    "valor"
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "name": "Organigrama",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "nome": {
+      "type": "string",
+      "description": "Nome"
+    },
+    "cargo": {
+      "type": "string",
+      "description": "Cargo/posi\u00e7\u00e3o"
+    },
+    "departamento": {
+      "type": "string",
+      "description": "Departamento"
+    },
+    "nivel": {
+      "type": "number",
+      "description": "N\u00edvel hier\u00e1rquico (1=CEO, 2=Diretores, etc)"
+    },
+    "gestor_id": {
+      "type": "string",
+      "description": "ID do gestor direto"
+    },
+    "gestor_nome": {
+      "type": "string",
+      "description": "Nome do gestor (cache)"
+    },
+    "equipa": {
+      "type": "string",
+      "description": "JSON array com IDs dos subordinados diretos"
+    },
+    "numero_subordinados": {
+      "type": "number",
+      "default": 0,
+      "description": "N\u00famero de subordinados diretos"
+    },
+    "responsabilidades": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o de responsabilidades"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true
+    },
+    "data_atualizacao": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "nome",
+    "cargo"
+  ]
+}

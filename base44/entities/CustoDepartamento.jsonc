@@ -1,0 +1,60 @@
+{
+  "name": "CustoDepartamento",
+  "type": "object",
+  "properties": {
+    "departamento": {
+      "type": "string",
+      "description": "Nome do departamento"
+    },
+    "ano": {
+      "type": "number",
+      "description": "Ano de refer\u00eancia"
+    },
+    "mes": {
+      "type": "number",
+      "description": "M\u00eas (1-12), null = anual"
+    },
+    "numero_colaboradores": {
+      "type": "number",
+      "description": "N\u00famero de colaboradores no per\u00edodo"
+    },
+    "salarios_brutos": {
+      "type": "number",
+      "description": "Soma dos sal\u00e1rios brutos"
+    },
+    "subsidios_alimentacao": {
+      "type": "number",
+      "description": "Soma dos subs\u00eddios de alimenta\u00e7\u00e3o"
+    },
+    "subsidios_ferias_natal": {
+      "type": "number",
+      "description": "Propor\u00e7\u00e3o do m\u00eas"
+    },
+    "outros_subsidios": {
+      "type": "number",
+      "description": "Outros subs\u00eddios"
+    },
+    "custo_ss_empresa": {
+      "type": "number",
+      "description": "Contribui\u00e7\u00f5es SS empresa (23.75%)"
+    },
+    "custo_total_bruto": {
+      "type": "number",
+      "description": "Sal\u00e1rios + subs\u00eddios + SS"
+    },
+    "custo_medio_colaborador": {
+      "type": "number",
+      "description": "Custo m\u00e9dio por colaborador"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "departamento",
+    "ano"
+  ]
+}

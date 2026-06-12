@@ -1,0 +1,65 @@
+{
+  "name": "JustificacaoFalta",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "data_falta": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da falta"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "injustificada",
+        "justificada_documento",
+        "justificada_verbal",
+        "falta_autorizada"
+      ],
+      "description": "Tipo de justifica\u00e7\u00e3o"
+    },
+    "motivo": {
+      "type": "string",
+      "description": "Motivo da falta"
+    },
+    "documento_url": {
+      "type": "string",
+      "description": "URL do documento comprovativo"
+    },
+    "aprovado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se foi aprovado"
+    },
+    "aprovado_por": {
+      "type": "string",
+      "description": "Email de quem aprovou"
+    },
+    "aprovado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Quando foi aprovado"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "data_falta"
+  ]
+}

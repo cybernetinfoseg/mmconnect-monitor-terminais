@@ -1,0 +1,105 @@
+{
+  "name": "DesempenhoAvaliacao",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "ano": {
+      "type": "number",
+      "description": "Ano da avalia\u00e7\u00e3o"
+    },
+    "periodo": {
+      "type": "string",
+      "enum": [
+        "anual",
+        "semestral",
+        "trimestral"
+      ],
+      "default": "anual",
+      "description": "Per\u00edodo de avalia\u00e7\u00e3o"
+    },
+    "avaliador_id": {
+      "type": "string",
+      "description": "ID do avaliador (gestor)"
+    },
+    "avaliador_nome": {
+      "type": "string",
+      "description": "Nome do avaliador (cache)"
+    },
+    "competencias_tecnicas": {
+      "type": "number",
+      "description": "Nota 1-5 em compet\u00eancias t\u00e9cnicas"
+    },
+    "competencias_interpessoais": {
+      "type": "number",
+      "description": "Nota 1-5 em interpessoais"
+    },
+    "iniciativa": {
+      "type": "number",
+      "description": "Nota 1-5 em iniciativa"
+    },
+    "qualidade_trabalho": {
+      "type": "number",
+      "description": "Nota 1-5 em qualidade"
+    },
+    "cumprimento_prazos": {
+      "type": "number",
+      "description": "Nota 1-5 em prazos"
+    },
+    "media_geral": {
+      "type": "number",
+      "description": "M\u00e9dia geral"
+    },
+    "classificacao": {
+      "type": "string",
+      "enum": [
+        "insuficiente",
+        "satisfatorio",
+        "bom",
+        "muito_bom",
+        "excelente"
+      ],
+      "description": "Classifica\u00e7\u00e3o final"
+    },
+    "objetivos_periodo": {
+      "type": "string",
+      "description": "Objetivos para o per\u00edodo"
+    },
+    "areas_melhoria": {
+      "type": "string",
+      "description": "\u00c1reas de melhoria identificadas"
+    },
+    "plano_desenvolvimento": {
+      "type": "string",
+      "description": "Plano de desenvolvimento"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "data_avaliacao": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "assinado": {
+      "type": "boolean",
+      "default": false
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "ano"
+  ]
+}

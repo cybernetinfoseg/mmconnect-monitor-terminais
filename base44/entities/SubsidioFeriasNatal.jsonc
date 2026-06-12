@@ -1,0 +1,71 @@
+{
+  "name": "SubsidioFeriasNatal",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "ano": {
+      "type": "number",
+      "description": "Ano"
+    },
+    "mes_subsidio": {
+      "type": "number",
+      "description": "M\u00eas do subs\u00eddio (6=F\u00e9rias, 12=Natal)"
+    },
+    "salario_base": {
+      "type": "number",
+      "description": "Sal\u00e1rio base para c\u00e1lculo"
+    },
+    "dias_direito": {
+      "type": "number",
+      "description": "Dias de direito (22 ou propor\u00e7\u00e3o)"
+    },
+    "valor_bruto": {
+      "type": "number",
+      "description": "Valor bruto (100% do sal\u00e1rio + subs\u00eddios)"
+    },
+    "valor_ss": {
+      "type": "number",
+      "description": "Desconto SS"
+    },
+    "valor_irs": {
+      "type": "number",
+      "description": "Desconto IRS"
+    },
+    "valor_liquido": {
+      "type": "number",
+      "description": "Valor l\u00edquido"
+    },
+    "pagamento_antecipado": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se foi pago antecipadamente"
+    },
+    "data_pagamento": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do pagamento"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "ano",
+    "mes_subsidio"
+  ]
+}

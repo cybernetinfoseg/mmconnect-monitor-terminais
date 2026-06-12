@@ -32,6 +32,15 @@ import RelatoriMovimentos from './pages/RelatoriMovimentos.jsx';
 import DashboardRHExecutivo from './pages/DashboardRHExecutivo.jsx';
 import RelatorioAbsentismo from './pages/RelatorioAbsentismo.jsx';
 import AlertasCompliance from './pages/AlertasCompliance.jsx';
+import JustificacaoFaltas from './pages/JustificacaoFaltas.jsx';
+import GestAoBaixas from './pages/GestAoBaixas.jsx';
+import GestaoDesempenho from './pages/GestaoDesempenho.jsx';
+import GestaoFormacao from './pages/GestaoFormacao.jsx';
+import DocumentosColaborador from './pages/DocumentosColaborador.jsx';
+import FichaSalarial from './pages/FichaSalarial.jsx';
+import CustosDepartamentos from './pages/CustosDepartamentos.jsx';
+import Adiantamentos from './pages/Adiantamentos.jsx';
+import Organigrama from './pages/Organigrama.jsx';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -114,6 +123,15 @@ const AuthenticatedApp = () => {
       <Route path="/DashboardRHExecutivo" element={<LayoutWrapper currentPageName="DashboardRHExecutivo"><DashboardRHExecutivo /></LayoutWrapper>} />
       <Route path="/RelatorioAbsentismo" element={<LayoutWrapper currentPageName="RelatorioAbsentismo"><RelatorioAbsentismo /></LayoutWrapper>} />
       <Route path="/AlertasCompliance" element={<LayoutWrapper currentPageName="AlertasCompliance"><AlertasCompliance /></LayoutWrapper>} />
+      <Route path="/JustificacaoFaltas" element={<LayoutWrapper currentPageName="JustificacaoFaltas"><JustificacaoFaltas /></LayoutWrapper>} />
+      <Route path="/GestAoBaixas" element={<LayoutWrapper currentPageName="GestAoBaixas"><GestAoBaixas /></LayoutWrapper>} />
+      <Route path="/GestaoDesempenho" element={<LayoutWrapper currentPageName="GestaoDesempenho"><GestaoDesempenho /></LayoutWrapper>} />
+      <Route path="/GestaoFormacao" element={<LayoutWrapper currentPageName="GestaoFormacao"><GestaoFormacao /></LayoutWrapper>} />
+      <Route path="/DocumentosColaborador" element={<LayoutWrapper currentPageName="DocumentosColaborador"><DocumentosColaborador /></LayoutWrapper>} />
+      <Route path="/FichaSalarial" element={<LayoutWrapper currentPageName="FichaSalarial"><FichaSalarial /></LayoutWrapper>} />
+      <Route path="/CustosDepartamentos" element={<LayoutWrapper currentPageName="CustosDepartamentos"><CustosDepartamentos /></LayoutWrapper>} />
+      <Route path="/Adiantamentos" element={<LayoutWrapper currentPageName="Adiantamentos"><Adiantamentos /></LayoutWrapper>} />
+      <Route path="/Organigrama" element={<LayoutWrapper currentPageName="Organigrama"><Organigrama /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

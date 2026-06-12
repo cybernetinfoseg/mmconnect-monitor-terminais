@@ -1,0 +1,89 @@
+{
+  "name": "BaixaMedica",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid (cache)"
+    },
+    "data_inicio": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio"
+    },
+    "data_fim": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de fim"
+    },
+    "dias_total": {
+      "type": "number",
+      "description": "Total de dias"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "doenca",
+        "acidente_trabalho",
+        "licenca_maternidade",
+        "outro"
+      ],
+      "description": "Tipo de baixa"
+    },
+    "numero_certificado": {
+      "type": "string",
+      "description": "N\u00famero do certificado m\u00e9dico"
+    },
+    "percentual_incapacidade": {
+      "type": "number",
+      "description": "Percentual de incapacidade"
+    },
+    "cit_url": {
+      "type": "string",
+      "description": "URL do Certificado de Incapacidade Tempor\u00e1ria"
+    },
+    "ss_confirmada": {
+      "type": "boolean",
+      "default": false,
+      "description": "Confirmado pela Seguran\u00e7a Social"
+    },
+    "pagamento_ss": {
+      "type": "boolean",
+      "default": false,
+      "description": "Pago pela Seguran\u00e7a Social"
+    },
+    "percentual_empresa": {
+      "type": "number",
+      "default": 0,
+      "description": "Percentual pago pela empresa (30% dias 4-20)"
+    },
+    "valor_ss_dia": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor di\u00e1rio pago pela SS"
+    },
+    "valor_empresa_dia": {
+      "type": "number",
+      "default": 0,
+      "description": "Valor di\u00e1rio pago pela empresa"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "data_inicio"
+  ]
+}
