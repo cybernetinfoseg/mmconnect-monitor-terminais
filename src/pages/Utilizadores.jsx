@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import ColaboradorForm from '@/components/colaboradores/ColaboradorForm';
 import SyncPanel from '@/components/colaboradores/SyncPanel';
+import { useUserTimezone } from '@/hooks/useUserTimezone';
 
 export default function Utilizadores() {
   const [search, setSearch] = useState('');
@@ -51,12 +52,46 @@ export default function Utilizadores() {
   }, []);
 
   const isAdmin = currentUser?.role === 'admin';
+  const { timezone: userTimezone } = useUserTimezone();
 
   const { data: appUsers = [] } = useQuery({
     queryKey: ['app-users-list'],
     queryFn: () => base44.entities.User.list(),
     enabled: !!currentUser && isAdmin,
   });
+
+  // Últimas marcações e ausências activas para enriquecer a listagem
+  const { data: ultimasMarcacoes = [] } = useQuery({
+    queryKey: ['ultimas-marcacoes-colabs'],
+    queryFn: () => base44.entities.Marcacao.list('-timestamp', 500),
+    enabled: !!currentUser,
+    refetchInterval: 60000,
+  });
+
+  const { data: ausenciasAtivas = [] } = useQuery({
+    queryKey: ['ausencias-colabs-ativas'],
+    queryFn: () => base44.entities.AusenciaFalta.list('-data_inicio', 200),
+    enabled: !!currentUser,
+  });
+
+  // Mapa enrollid → última marcação
+  const ultimaMarcacaoMap = useMemo(() => {
+    const m = {};
+    [...ultimasMarcacoes].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(marc => {
+      m[marc.enrollid] = marc;
+    });
+    return m;
+  }, [ultimasMarcacoes]);
+
+  // Mapa enrollid → ausência activa hoje
+  const ausenciaAtivaMap = useMemo(() => {
+    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+    const m = {};
+    ausenciasAtivas.forEach(a => {
+      if (a.data_inicio <= hoje && a.data_fim >= hoje) m[a.enrollid] = a;
+    });
+    return m;
+  }, [ausenciasAtivas, userTimezone]);
 
   const { data: allUsers = [], isLoading, refetch } = useQuery({
     queryKey: ['terminal-users', currentUser?.email, isAdmin],
@@ -522,6 +557,7 @@ export default function Utilizadores() {
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Departamento</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Biometria</th>
                     <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Terminais</th>
+                    <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase hidden xl:table-cell">Última Marcação</th>
                     {isAdmin && <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Dono</th>}
                     <th className="text-right px-4 py-3 font-semibold text-slate-600 text-xs uppercase">Ações</th>
                   </tr>
@@ -562,9 +598,31 @@ export default function Utilizadores() {
                             </div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-xs text-slate-500">{userTerminals.length > 0 ? `${userTerminals.length} terminal(is)` : '—'}</span>
-                          </td>
-                          {isAdmin && <td className="px-4 py-3 text-xs text-slate-400 max-w-[120px] truncate">{u.owner_email || '—'}</td>}
+                                            <span className="text-xs text-slate-500">{userTerminals.length > 0 ? `${userTerminals.length} terminal(is)` : '—'}</span>
+                                          </td>
+                                          <td className="px-4 py-3 hidden xl:table-cell">
+                                            {(() => {
+                                              const ult = ultimaMarcacaoMap[u.enrollid];
+                                              const aus = ausenciaAtivaMap[u.enrollid];
+                                              const AUSENCIA_LABELS = { ferias: '🌴 Férias', baixa_medica: '🏥 Baixa', feriado: '🎉 Feriado', justificada: '📋 Just.', injustificada: '⚠️ Injust.' };
+                                              return (
+                                                <div className="space-y-0.5">
+                                                  {aus && (
+                                                    <Badge className="text-[10px] bg-orange-100 text-orange-700 border-orange-200 block w-fit">
+                                                      {AUSENCIA_LABELS[aus.tipo] || aus.tipo}
+                                                    </Badge>
+                                                  )}
+                                                  {ult ? (
+                                                    <div>
+                                                      <p className="text-[10px] font-mono text-slate-500">{new Date(ult.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                                                      <Badge className={`text-[9px] ${ult.tipo === 'entrada' ? 'bg-emerald-100 text-emerald-700' : ult.tipo === 'saida' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-500'}`}>{ult.tipo}</Badge>
+                                                    </div>
+                                                  ) : <span className="text-[10px] text-slate-300">Sem registo</span>}
+                                                </div>
+                                              );
+                                            })()}
+                                          </td>
+                                          {isAdmin && <td className="px-4 py-3 text-xs text-slate-400 max-w-[120px] truncate">{u.owner_email || '—'}</td>}
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-1">
                               <Button size="sm" variant="outline" className="h-7 px-2 text-teal-600 hover:bg-teal-50" onClick={() => setExpandedUser(isExpanded ? null : u.id)}>
@@ -576,7 +634,7 @@ export default function Utilizadores() {
                           </td>
                         </tr>
                         {isExpanded && (
-                          <tr><td colSpan={isAdmin ? 7 : 6} className="px-4 pb-4 bg-slate-50 border-b border-slate-200">{renderExpandedPanel(u, false)}</td></tr>
+                          <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 pb-4 bg-slate-50 border-b border-slate-200">{renderExpandedPanel(u, false)}</td></tr>
                         )}
                       </React.Fragment>
                     );

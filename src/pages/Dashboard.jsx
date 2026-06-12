@@ -23,6 +23,7 @@ import AlertsList from '../components/dashboard/AlertsList';
 import PullToRefresh from '../components/dashboard/PullToRefresh';
 import AlertRulesWidget from '../components/dashboard/AlertRulesWidget';
 import RecentAuditWidget from '../components/dashboard/RecentAuditWidget';
+import PresencaWidget from '../components/dashboard/PresencaWidget';
 
 export default function Dashboard() {
   const [localFilter, setLocalFilter] = useState(null);
@@ -350,6 +351,9 @@ export default function Dashboard() {
             </Card>
           </motion.div>
         </div>
+
+        {/* Presença Widget */}
+        <PresencaWidget />
 
         {/* Extras Modal */}
         {showExtrasModal && (

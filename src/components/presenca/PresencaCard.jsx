@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LogIn, LogOut, Clock, Moon, TrendingUp, AlertCircle } from 'lucide-react';
+import { LogIn, LogOut, Clock, Moon, TrendingUp, AlertCircle, CalendarOff } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { calcularDia, fmtMin } from '@/lib/calculoHoras';
 
-export default function PresencaCard({ pessoa, timezone, horarioMap }) {
+const AUSENCIA_LABELS = { ferias: '🌴 Férias', baixa_medica: '🏥 Baixa', feriado: '🎉 Feriado', justificada: '📋 Justificada', injustificada: '⚠️ Injustificada' };
+
+export default function PresencaCard({ pessoa, timezone, horarioMap, ausenciaAtiva }) {
   const dentro = pessoa.dentro;
   const [now, setNow] = useState(new Date());
 
@@ -144,6 +146,12 @@ export default function PresencaCard({ pessoa, timezone, horarioMap }) {
           {temExtra && <Badge className="text-[10px] bg-violet-100 text-violet-700">Extra</Badge>}
           {temNoturno && <Badge className="text-[10px] bg-indigo-100 text-indigo-700">Noturno</Badge>}
           {temAtraso && <Badge className="text-[10px] bg-amber-100 text-amber-700">Atraso</Badge>}
+          {ausenciaAtiva && (
+            <Badge className="text-[10px] bg-orange-100 text-orange-700 border-orange-200 flex items-center gap-0.5">
+              <CalendarOff className="h-2.5 w-2.5" />
+              {AUSENCIA_LABELS[ausenciaAtiva.tipo] || ausenciaAtiva.tipo}
+            </Badge>
+          )}
         </div>
       </CardContent>
     </Card>

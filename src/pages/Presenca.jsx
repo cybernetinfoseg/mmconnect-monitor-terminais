@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, Moon, TrendingUp } from 'lucide-react';
+import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, Moon, TrendingUp, CalendarOff, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import PresencaCard from '@/components/presenca/PresencaCard';
+import { getDay } from 'date-fns';
 
 export default function Presenca() {
   const [search, setSearch] = useState('');
@@ -53,11 +55,49 @@ export default function Presenca() {
     enabled: !!currentUser,
   });
 
+  // Ausências activas hoje
+  const { data: ausencias = [] } = useQuery({
+    queryKey: ['ausencias-presenca'],
+    queryFn: () => base44.entities.AusenciaFalta.list('-data_inicio', 200),
+    enabled: !!currentUser,
+    refetchInterval: 60000,
+  });
+
+  // EscalaDia de hoje (para saber quem tem dia de folga/férias na escala)
+  const { data: escalaHoje = [] } = useQuery({
+    queryKey: ['escala-hoje'],
+    queryFn: () => {
+      const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+      return base44.entities.EscalaDia.filter({ data: hoje }, '-created_date', 500);
+    },
+    enabled: !!currentUser,
+    refetchInterval: 60000,
+  });
+
   const horarioMap = useMemo(() => {
     const m = {};
     horarios.forEach(h => { m[h.id] = h; });
     return m;
   }, [horarios]);
+
+  // Mapa enrollid → ausência activa hoje
+  const ausenciaMap = useMemo(() => {
+    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+    const m = {};
+    ausencias.forEach(a => {
+      if (a.data_inicio <= hoje && a.data_fim >= hoje) {
+        m[a.enrollid] = a;
+      }
+    });
+    return m;
+  }, [ausencias, userTimezone]);
+
+  // Mapa colaborador_id → escala de hoje
+  const escalaHojeMap = useMemo(() => {
+    const m = {};
+    escalaHoje.forEach(e => { m[e.colaborador_id] = e; });
+    return m;
+  }, [escalaHoje]);
 
   const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
 
@@ -119,12 +159,35 @@ export default function Presenca() {
   const dentroCount = presencaStatus.filter(p => p.dentro).length;
   const foraCount = presencaStatus.filter(p => !p.dentro).length;
 
-  // Totais extras e noturno para KPIs
-  const { totalExtra, totalNoturno } = useMemo(() => {
-    let totalExtra = 0, totalNoturno = 0;
-    // Calculamos aqui apenas para os KPIs globais (não re-calcula por tick)
-    return { totalExtra, totalNoturno };
-  }, [presencaStatus]);
+  // Colaboradores que deviam trabalhar hoje mas não marcaram
+  const ausentesNaoMarcaram = useMemo(() => {
+    const dowHoje = getDay(new Date());
+    const enrollidsComMarcacao = new Set(presencaStatus.map(p => p.enrollid));
+
+    return terminalUsers.filter(u => {
+      if (!u.ativo) return false;
+      if (enrollidsComMarcacao.has(u.enrollid)) return false;
+      if (ausenciaMap[u.enrollid]) return false;
+
+      const escala = escalaHojeMap[u.id];
+      if (escala) {
+        if (escala.tipo === 'folga' || escala.tipo === 'ferias' || escala.tipo === 'feriado') return false;
+        if (escala.tipo === 'normal' && escala.horario_id) {
+          const h = horarioMap[escala.horario_id];
+          if (h) {
+            const dias = (() => { try { return JSON.parse(h.dias_semana || '[]'); } catch { return []; } })();
+            return dias.length === 0 || dias.includes(dowHoje);
+          }
+        }
+      }
+
+      if (!u.horario_id) return false;
+      const h = horarioMap[u.horario_id];
+      if (!h) return false;
+      const dias = (() => { try { return JSON.parse(h.dias_semana || '[]'); } catch { return []; } })();
+      return dias.length === 0 || dias.includes(dowHoje);
+    });
+  }, [terminalUsers, presencaStatus, ausenciaMap, escalaHojeMap, horarioMap]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return presencaStatus;
@@ -200,6 +263,15 @@ export default function Presenca() {
               </div>
             </CardContent>
           </Card>
+          <Card className="bg-orange-50 border-orange-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <AlertTriangle className="h-8 w-8 text-orange-400" />
+              <div>
+                <p className="text-2xl font-bold text-orange-700">{ausentesNaoMarcaram.length}</p>
+                <p className="text-xs text-orange-600 font-medium">Não marcaram</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search */}
@@ -218,6 +290,7 @@ export default function Presenca() {
           <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3 text-violet-500" /> Horas extra (art. 268º CT)</span>
           <span className="flex items-center gap-1"><Moon className="h-3 w-3 text-indigo-500" /> Noturno 22h–07h (+25%, art. 266º CT)</span>
           <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-amber-500" /> Atraso além da tolerância</span>
+          <span className="flex items-center gap-1"><CalendarOff className="h-3 w-3 text-orange-500" /> Ausência registada</span>
         </div>
 
         {/* Grid de presença */}
@@ -242,7 +315,7 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} horarioMap={horarioMap} />
+                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} horarioMap={horarioMap} ausenciaAtiva={ausenciaMap[p.enrollid]} />
                   ))}
                 </div>
               </div>
@@ -257,8 +330,34 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => !p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} horarioMap={horarioMap} />
+                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} horarioMap={horarioMap} ausenciaAtiva={ausenciaMap[p.enrollid]} />
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Não marcaram hoje (mas deviam trabalhar) */}
+            {ausentesNaoMarcaram.length > 0 && !search && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="w-3 h-3 text-orange-500" />
+                  <h2 className="text-sm font-semibold text-orange-600">Esperados hoje · Sem registo ({ausentesNaoMarcaram.length})</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                  {ausentesNaoMarcaram.map(u => {
+                    const h = u.horario_id ? horarioMap[u.horario_id] : null;
+                    return (
+                      <div key={u.id} className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-center gap-2.5 opacity-70">
+                        <div className="w-8 h-8 rounded-full bg-orange-200 flex items-center justify-center shrink-0 text-xs font-bold text-orange-700">{u.nome[0]?.toUpperCase()}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 truncate">{u.nome}</p>
+                          {h && <p className="text-[10px] text-slate-400 truncate">{h.nome} · {h.hora_entrada}–{h.hora_saida}</p>}
+                          {u.departamento && <p className="text-[10px] text-slate-400 truncate">{u.departamento}</p>}
+                        </div>
+                        <Badge className="text-[9px] bg-orange-100 text-orange-600 border-orange-200 shrink-0">Ausente</Badge>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
