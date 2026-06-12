@@ -27,7 +27,10 @@ import {
   Share2,
   Building2,
   CalendarOff,
-  Clock
+  Clock,
+  Briefcase,
+  FileSignature,
+  Palmtree
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -50,6 +53,10 @@ const ALL_NAV_ITEMS = [
   { name: 'Horários', page: 'GestaoHorarios', icon: Clock },
   { name: 'Ausências', page: 'GestaoAusencias', icon: CalendarOff },
   { name: 'Ponto Diário', page: 'RelatorioPresencaDiaria', icon: FileBarChart2 },
+  { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
+  { name: 'Fichas RH', page: 'FichaColaborador', icon: Users },
+  { name: 'Contratos', page: 'GestaoContratos', icon: FileSignature },
+  { name: 'Férias RH', page: 'GestaoFeriasRH', icon: Palmtree },
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },

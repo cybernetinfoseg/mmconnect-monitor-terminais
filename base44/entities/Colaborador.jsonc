@@ -1,0 +1,196 @@
+{
+  "name": "Colaborador",
+  "type": "object",
+  "properties": {
+    "enrollid": {
+      "type": "number",
+      "description": "ID no terminal biom\u00e9trico (liga\u00e7\u00e3o ao TerminalUser)"
+    },
+    "terminal_user_id": {
+      "type": "string",
+      "description": "ID do TerminalUser correspondente"
+    },
+    "nome": {
+      "type": "string",
+      "description": "Nome completo"
+    },
+    "numero_colaborador": {
+      "type": "string",
+      "description": "N\u00famero interno do colaborador (ex: COL-001)"
+    },
+    "data_nascimento": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de nascimento"
+    },
+    "nif": {
+      "type": "string",
+      "description": "N\u00famero de Identifica\u00e7\u00e3o Fiscal"
+    },
+    "niss": {
+      "type": "string",
+      "description": "N\u00famero de Identifica\u00e7\u00e3o da Seguran\u00e7a Social"
+    },
+    "num_cartao_cidadao": {
+      "type": "string",
+      "description": "N\u00famero do Cart\u00e3o de Cidad\u00e3o"
+    },
+    "validade_cc": {
+      "type": "string",
+      "format": "date",
+      "description": "Validade do Cart\u00e3o de Cidad\u00e3o"
+    },
+    "iban": {
+      "type": "string",
+      "description": "IBAN para pagamento de sal\u00e1rio"
+    },
+    "genero": {
+      "type": "string",
+      "enum": [
+        "masculino",
+        "feminino",
+        "outro",
+        "nao_especificado"
+      ],
+      "default": "nao_especificado"
+    },
+    "estado_civil": {
+      "type": "string",
+      "enum": [
+        "solteiro",
+        "casado",
+        "uniao_facto",
+        "divorciado",
+        "viuvo"
+      ],
+      "description": "Estado civil (afeta tabelas IRS)"
+    },
+    "num_dependentes": {
+      "type": "number",
+      "default": 0,
+      "description": "N\u00famero de dependentes (afeta tabelas IRS)"
+    },
+    "deficiencia": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se tem defici\u00eancia \u226560% (afeta reten\u00e7\u00e3o IRS)"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email pessoal"
+    },
+    "email_profissional": {
+      "type": "string",
+      "description": "Email profissional"
+    },
+    "telefone": {
+      "type": "string",
+      "description": "Telefone pessoal"
+    },
+    "telemovel": {
+      "type": "string",
+      "description": "Telem\u00f3vel"
+    },
+    "morada": {
+      "type": "string",
+      "description": "Morada completa"
+    },
+    "codigo_postal": {
+      "type": "string",
+      "description": "C\u00f3digo postal"
+    },
+    "localidade": {
+      "type": "string",
+      "description": "Localidade"
+    },
+    "pais": {
+      "type": "string",
+      "default": "Portugal",
+      "description": "Pa\u00eds de resid\u00eancia"
+    },
+    "nacionalidade": {
+      "type": "string",
+      "default": "Portuguesa",
+      "description": "Nacionalidade"
+    },
+    "departamento": {
+      "type": "string",
+      "description": "Departamento"
+    },
+    "secao": {
+      "type": "string",
+      "description": "Sec\u00e7\u00e3o ou equipa"
+    },
+    "cargo": {
+      "type": "string",
+      "description": "Cargo ou fun\u00e7\u00e3o"
+    },
+    "categoria_profissional": {
+      "type": "string",
+      "description": "Categoria profissional (ex: T\u00e9cnico Superior, Assistente Operacional)"
+    },
+    "nivel_salarial": {
+      "type": "string",
+      "description": "N\u00edvel ou escal\u00e3o salarial"
+    },
+    "local_trabalho": {
+      "type": "string",
+      "description": "Local de trabalho habitual"
+    },
+    "data_admissao": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de admiss\u00e3o na empresa"
+    },
+    "data_saida": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de sa\u00edda (se aplic\u00e1vel)"
+    },
+    "motivo_saida": {
+      "type": "string",
+      "enum": [
+        "",
+        "rescisao_acordo",
+        "demissao",
+        "despedimento",
+        "reforma",
+        "fim_contrato",
+        "outro"
+      ],
+      "description": "Motivo de sa\u00edda"
+    },
+    "ativo": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se o colaborador est\u00e1 ativo"
+    },
+    "foto_url": {
+      "type": "string",
+      "description": "URL da foto do colaborador"
+    },
+    "horario_id": {
+      "type": "string",
+      "description": "ID do hor\u00e1rio de trabalho atribu\u00eddo"
+    },
+    "gestor_id": {
+      "type": "string",
+      "description": "ID do colaborador gestor/respons\u00e1vel direto"
+    },
+    "gestor_nome": {
+      "type": "string",
+      "description": "Nome do gestor (cache)"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es internas"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Email do respons\u00e1vel pelo registo"
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}

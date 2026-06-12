@@ -17,6 +17,10 @@ import ControloAcesso from './pages/ControloAcesso';
 import GestaoHorarios from './pages/GestaoHorarios';
 import GestaoAusencias from './pages/GestaoAusencias';
 import RelatorioPresencaDiaria from './pages/RelatorioPresencaDiaria';
+import RH from './pages/RH';
+import FichaColaborador from './pages/FichaColaborador';
+import GestaoContratos from './pages/GestaoContratos';
+import GestaoFeriasRH from './pages/GestaoFeriasRH';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -84,6 +88,10 @@ const AuthenticatedApp = () => {
       <Route path="/GestaoHorarios" element={<LayoutWrapper currentPageName="GestaoHorarios"><GestaoHorarios /></LayoutWrapper>} />
       <Route path="/GestaoAusencias" element={<LayoutWrapper currentPageName="GestaoAusencias"><GestaoAusencias /></LayoutWrapper>} />
       <Route path="/RelatorioPresencaDiaria" element={<LayoutWrapper currentPageName="RelatorioPresencaDiaria"><RelatorioPresencaDiaria /></LayoutWrapper>} />
+      <Route path="/RH" element={<LayoutWrapper currentPageName="RH"><RH /></LayoutWrapper>} />
+      <Route path="/FichaColaborador" element={<LayoutWrapper currentPageName="FichaColaborador"><FichaColaborador /></LayoutWrapper>} />
+      <Route path="/GestaoContratos" element={<LayoutWrapper currentPageName="GestaoContratos"><GestaoContratos /></LayoutWrapper>} />
+      <Route path="/GestaoFeriasRH" element={<LayoutWrapper currentPageName="GestaoFeriasRH"><GestaoFeriasRH /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

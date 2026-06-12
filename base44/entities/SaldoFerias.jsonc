@@ -1,0 +1,54 @@
+{
+  "name": "SaldoFerias",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do Colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome do colaborador (cache)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid do colaborador (cache)"
+    },
+    "ano": {
+      "type": "number",
+      "description": "Ano a que se refere o saldo"
+    },
+    "dias_direito": {
+      "type": "number",
+      "default": 22,
+      "description": "Dias de f\u00e9rias a que tem direito (art. 238\u00ba CT: 22 dias \u00fateis)"
+    },
+    "dias_gozados": {
+      "type": "number",
+      "default": 0,
+      "description": "Dias j\u00e1 gozados"
+    },
+    "dias_marcados": {
+      "type": "number",
+      "default": 0,
+      "description": "Dias j\u00e1 marcados/aprovados mas ainda n\u00e3o gozados"
+    },
+    "dias_transita_anterior": {
+      "type": "number",
+      "default": 0,
+      "description": "Dias transitados do ano anterior (at\u00e9 30 de Abril)"
+    },
+    "observacoes": {
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Email do respons\u00e1vel"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "ano"
+  ]
+}

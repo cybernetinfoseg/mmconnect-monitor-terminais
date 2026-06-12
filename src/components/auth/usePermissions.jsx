@@ -16,6 +16,7 @@ const ALL_PAGES = [
   'Auditoria', 'Configuracoes', 'Administracao',
   'Utilizadores', 'Marcacoes', 'ExportacaoMarcacoes',
   'Presenca', 'GestaoHorarios', 'GestaoAusencias', 'ControloAcesso', 'RelatorioPresencaDiaria',
+  'RH', 'FichaColaborador', 'GestaoContratos', 'GestaoFeriasRH',
 ];
 
 const ADMIN_ONLY_PAGES = ['Administracao', 'Configuracoes', 'ExportacaoMarcacoes'];
