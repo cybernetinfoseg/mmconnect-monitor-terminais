@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { X, Bell, Mail, Save, Slack } from 'lucide-react';
+import { Bell, Mail, Save, Slack } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -103,26 +104,18 @@ export default function AlertRuleModal({ rule, currentUser, onClose, onSaved }) 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Bell className="h-5 w-5 text-orange-600" />
-            </div>
-            <h2 className="text-lg font-bold text-slate-900">
-              {isEdit ? 'Editar Regra' : 'Nova Regra de Alerta'}
-            </h2>
+    <Dialog open={!!rule || false} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="flex items-center gap-3">
+          <div className="p-2 bg-orange-100 rounded-lg">
+            <Bell className="h-5 w-5 text-orange-600" />
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          <DialogTitle>
+            {isEdit ? 'Editar Regra' : 'Nova Regra de Alerta'}
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Body */}
-        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+        <div className="space-y-5">
           {/* Nome + Ativo */}
           <div className="flex items-end gap-4">
             <div className="flex-1 space-y-1.5">
@@ -311,8 +304,7 @@ export default function AlertRuleModal({ rule, currentUser, onClose, onSaved }) 
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
+        <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             onClick={handleSave}
@@ -322,8 +314,8 @@ export default function AlertRuleModal({ rule, currentUser, onClose, onSaved }) 
             <Save className="h-4 w-4" />
             {saving ? 'Salvando...' : 'Salvar Regra'}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
