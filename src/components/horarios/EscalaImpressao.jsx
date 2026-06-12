@@ -202,89 +202,126 @@ export default function EscalaImpressao({ colaboradores, horarios, escalaDiaMap,
     }));
   }, [weekStart, numSemanas]);
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    const tipoColors = { folga: '#94a3b8', ferias: '#f59e0b', feriado: '#3b82f6', extra: '#10b981' };
+    const tipoLabels = { folga: 'Folga', ferias: 'Férias', feriado: 'Feriado', extra: 'Extra' };
+
+    const cellHtml = (colab, day) => {
+      const horarioAtual = colab.horario_id ? horarioMap[colab.horario_id] : null;
+      const diasAtivos = horarioAtual ? parseDias(horarioAtual.dias_semana) : [];
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const escala = escalaDiaMap[colab.id]?.[dateStr];
+      const dow = getDay(day);
+      let color = null, label = '';
+      if (escala) {
+        if (escala.tipo !== 'normal') {
+          color = tipoColors[escala.tipo] || '#8b5cf6';
+          label = tipoLabels[escala.tipo] || escala.tipo;
+        } else if (escala.horario_id && horarioMap[escala.horario_id]) {
+          const h = horarioMap[escala.horario_id];
+          color = h.cor || '#8b5cf6'; label = h.hora_entrada + '–' + h.hora_saida;
+        }
+      } else if (horarioAtual && diasAtivos.includes(dow)) {
+        color = horarioAtual.cor || '#8b5cf6'; label = horarioAtual.hora_entrada + '–' + horarioAtual.hora_saida;
+      }
+      return color
+        ? `<span style="background:${color};color:#fff;border-radius:3px;padding:1px 4px;font-size:9px;font-weight:600;white-space:nowrap">${label}</span>`
+        : `<span style="color:#e2e8f0">—</span>`;
+    };
+
+    let body = '';
+
+    if (modo === 'massa') {
+      semanas.forEach(({ weekStart: ws }) => {
+        const wdays = getWeekDays(ws);
+        const label = `${format(wdays[0], "d 'de' MMM", { locale: ptBR })} – ${format(wdays[6], "d 'de' MMM yyyy", { locale: ptBR })}`;
+        body += `<div style="margin-bottom:20px;page-break-inside:avoid">
+          <h2 style="font-size:11px;color:#475569;border-bottom:1px solid #cbd5e1;padding-bottom:4px;margin-bottom:8px">Semana: ${label}</h2>
+          <table style="width:100%;border-collapse:collapse;font-size:10px">
+            <thead><tr style="background:#f1f5f9;border-bottom:1px solid #cbd5e1">
+              <th style="text-align:left;padding:4px 6px;min-width:140px">Colaborador</th>
+              <th style="text-align:left;padding:4px 6px;min-width:100px">Turno</th>
+              ${DIAS_HEADER.map(d => `<th style="text-align:center;padding:4px 4px">${d}</th>`).join('')}
+            </tr></thead>
+            <tbody>
+              ${colaboradores.map(c => {
+                const h = c.horario_id ? horarioMap[c.horario_id] : null;
+                return `<tr style="border-bottom:1px solid #f1f5f9">
+                  <td style="padding:4px 6px;font-weight:600;color:#1e293b">${c.nome}</td>
+                  <td style="padding:4px 6px;color:${h?.cor || '#94a3b8'};font-weight:600">${h ? h.nome : '<i style="color:#cbd5e1">Sem turno</i>'}</td>
+                  ${wdays.map(day => `<td style="text-align:center;padding:3px 2px">${cellHtml(c, day)}</td>`).join('')}
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`;
+      });
+    } else {
+      colaboradores.forEach(c => {
+        const h = c.horario_id ? horarioMap[c.horario_id] : null;
+        body += `<div style="margin-bottom:24px;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;page-break-inside:avoid">
+          <div style="background:#f8fafc;padding:8px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #e2e8f0">
+            <div style="width:28px;height:28px;border-radius:50%;background:${h?.cor || '#8b5cf6'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">${c.nome.charAt(0)}</div>
+            <div>
+              <div style="font-weight:700;color:#1e293b;font-size:12px">${c.nome}</div>
+              <div style="font-size:9px;color:#64748b">#${c.enrollid}${c.departamento ? ' · ' + c.departamento : ''}${h ? ' · Turno: ' + h.nome + ' ' + h.hora_entrada + '–' + h.hora_saida : ''}</div>
+            </div>
+          </div>
+          <div style="padding:10px 12px">
+            ${semanas.map(({ weekStart: ws }) => {
+              const wdays = getWeekDays(ws);
+              const rangeLabel = `${format(wdays[0], "d 'de' MMM", { locale: ptBR })} – ${format(wdays[6], "d 'de' MMM yyyy", { locale: ptBR })}`;
+              return `<div style="margin-bottom:8px">
+                <div style="font-size:9px;font-weight:600;color:#64748b;margin-bottom:4px">${rangeLabel}</div>
+                <table style="width:100%;border-collapse:collapse;font-size:9px">
+                  <thead><tr>${DIAS_HEADER.map(d => `<th style="text-align:center;color:#94a3b8;font-weight:600;padding-bottom:2px;width:14.28%">${d}</th>`).join('')}</tr></thead>
+                  <tbody><tr>${wdays.map(day => `<td style="text-align:center;padding:3px 1px">
+                    <div style="font-size:8px;color:#94a3b8">${format(day, 'd/M')}</div>
+                    ${cellHtml(c, day)}
+                  </td>`).join('')}</tr></tbody>
+                </table>
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="border-top:1px solid #e2e8f0;padding:4px 12px;display:flex;justify-content:space-between;font-size:8px;color:#94a3b8">
+            <span>Gerado em ${format(new Date(), "d/MM/yyyy", { locale: ptBR })}</span><span>NOC Monitor</span>
+          </div>
+        </div>`;
+      });
+    }
+
+    const rangeLabel = `${format(semanas[0].weekStart, "d 'de' MMM", { locale: ptBR })}${semanas.length > 1 ? ' – ' + format(addDays(semanas[semanas.length - 1].weekStart, 6), "d 'de' MMM yyyy", { locale: ptBR }) : ''}`;
+
+    const html = `<!DOCTYPE html><html><head>
+      <meta charset="utf-8">
+      <title>${titulo}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; color: #1e293b; padding: 12mm; font-size: 10px; }
+        @page { size: A4 portrait; margin: 10mm; }
+      </style>
+    </head><body>
+      <div style="margin-bottom:16px;border-bottom:2px solid #e2e8f0;padding-bottom:8px">
+        <h1 style="font-size:16px;font-weight:700;color:#0f172a">${titulo}</h1>
+        <p style="font-size:10px;color:#64748b;margin-top:2px">${rangeLabel} · ${colaboradores.length} colaborador(es)</p>
+      </div>
+      ${body}
+      <div style="margin-top:16px;border-top:1px solid #e2e8f0;padding-top:6px;text-align:center;font-size:8px;color:#94a3b8">
+        NOC Monitor · Gerado em ${format(new Date(), "d/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+      </div>
+    </body></html>`;
+
+    const w = window.open('', '_blank', 'width=900,height=700');
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(() => { w.print(); }, 300);
+  };
 
   if (!open) return null;
 
   return (
-    <>
-      {/* Styles para impressão */}
-      <style>{`
-        @media print {
-          body > * { display: none !important; }
-          #escala-print-root { display: block !important; }
-          .no-print { display: none !important; }
-          @page { size: A4 portrait; margin: 10mm; }
-          .print-block { page-break-inside: avoid; }
-        }
-        #escala-print-root { display: none; }
-      `}</style>
-
-      {/* Área de impressão (escondida, fora do Dialog) */}
-      <div id="escala-print-root" className="p-6 bg-white font-sans text-slate-800">
-        <div className="mb-6 border-b border-slate-300 pb-3">
-          <h1 className="text-lg font-bold text-slate-900">{titulo}</h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {format(semanas[0].weekStart, "d 'de' MMM", { locale: ptBR })}
-            {semanas.length > 1 && ` – ${format(addDays(semanas[semanas.length - 1].weekStart, 6), "d 'de' MMM yyyy", { locale: ptBR })}`}
-            {' · '}{colaboradores.length} colaborador(es)
-          </p>
-        </div>
-
-        {modo === 'massa' ? (
-          /* ── Vista em tabela (massa) ─────────────────────────────────── */
-          semanas.map(({ weekStart: ws }, wi) => {
-            const weekDays = getWeekDays(ws);
-            return (
-              <div key={wi} className="mb-8 print-block">
-                <h2 className="text-xs font-semibold text-slate-600 mb-2 border-b border-slate-200 pb-1">
-                  Semana: {format(weekDays[0], "d 'de' MMM", { locale: ptBR })} – {format(weekDays[6], "d 'de' MMM yyyy", { locale: ptBR })}
-                </h2>
-                <table className="w-full border-collapse text-[10px]">
-                  <thead>
-                    <tr className="bg-slate-100 border-b border-slate-300">
-                      <th className="text-left py-1.5 px-2 font-semibold text-slate-700 w-[160px]">Colaborador</th>
-                      <th className="text-left py-1.5 px-2 font-semibold text-slate-700 w-[120px]">Turno</th>
-                      {DIAS_HEADER.map(d => (
-                        <th key={d} className="text-center py-1.5 px-1 font-semibold text-slate-600">{d}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {colaboradores.map(c => (
-                      <LinhaColaborador
-                        key={c.id}
-                        colab={c}
-                        horarioMap={horarioMap}
-                        escalaDiaMap={escalaDiaMap}
-                        weekDays={weekDays}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })
-        ) : (
-          /* ── Vista individual (um bloco por colaborador) ─────────────── */
-          colaboradores.map(c => (
-            <BlocoIndividual
-              key={c.id}
-              colab={c}
-              horarioMap={horarioMap}
-              escalaDiaMap={escalaDiaMap}
-              semanas={semanas}
-            />
-          ))
-        )}
-
-        <div className="mt-4 pt-2 border-t border-slate-200 text-[9px] text-slate-400 text-center">
-          NOC Monitor · Gerado em {format(new Date(), "d/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-        </div>
-      </div>
-
-      {/* Dialog de configuração (não impresso) */}
-      <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm">
@@ -371,7 +408,6 @@ export default function EscalaImpressao({ colaboradores, horarios, escalaDiaMap,
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
-    </>
+    </Dialog>
   );
 }
