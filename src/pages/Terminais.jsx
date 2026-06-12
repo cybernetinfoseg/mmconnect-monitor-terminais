@@ -882,11 +882,20 @@ export default function Terminais() {
                     />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label>IP / Hostname do Servidor Timmy WS <span className="text-red-500">*</span></Label>
+                  <Input
+                    value={formData.ip_publico || ''}
+                    onChange={(e) => setFormData({...formData, ip_publico: e.target.value})}
+                    placeholder="51.91.219.145 ou noc.meudominio.com"
+                  />
+                  <p className="text-xs text-slate-500">IP público ou hostname da máquina onde corre o <strong>timmy_ws_server.py</strong>. Necessário para controlo remoto (porta 7789).</p>
+                </div>
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono space-y-0.5">
                   <p className="font-sans text-slate-600 font-semibold mb-1">Configuração no terminal Timmy:</p>
                   <p className="text-slate-700">MENU → Comm Set → Server</p>
                   <p className="text-violet-700">Server Req: <strong>Yes</strong> | Use domainNm: <strong>Yes</strong></p>
-                  <p className="text-violet-700">DomainNm: <strong>IP_DO_SERVIDOR</strong> | SerPortNo: <strong>7788</strong></p>
+                  <p className="text-violet-700">DomainNm: <strong>{formData.ip_publico || 'IP_DO_SERVIDOR'}</strong> | SerPortNo: <strong>7788</strong></p>
                   <p className="text-violet-700">Heartbeat: <strong>3s</strong> | Server approval: <strong>No</strong></p>
                 </div>
               </div>
