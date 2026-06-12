@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UserActionForm from './UserActionForm';
+import TerminalParamForm from './TerminalParamForm';
 
 // Mapeia tipo de conexão / fabricante para ações suportadas
 function getSupportedActions(terminal) {
@@ -50,7 +51,7 @@ function getSupportedActions(terminal) {
     opendoor:    { label: 'Abrir Porta',             icon: DoorOpen,     color: 'amber',   desc: 'Acionar abertura de porta remotamente', confirm: true },
     reboot:      { label: 'Reiniciar Terminal',      icon: RefreshCw,    color: 'orange',  desc: 'Reiniciar o terminal imediatamente', confirm: true, danger: true },
     getdevinfo:  { label: 'Info do Dispositivo',     icon: Info,         color: 'slate',   desc: 'Obter capacidades e estado do hardware' },
-    getparam:    { label: 'Parâmetros',              icon: Settings2,    color: 'slate',   desc: 'Ler configurações actuais do terminal' },
+    getparam:    { label: 'Configurar Terminal',      icon: Settings2,    color: 'slate',   desc: 'Ler e alterar configurações do terminal (idioma, volume, modo verificação…)', form: true },
     lockctrl:    { label: 'Estado da Porta',         icon: LockOpen,     color: 'violet',  desc: 'Forçar porta aberta, fechada ou abrir momentaneamente', form: true },
     getuserlist: { label: 'Listar Utilizadores',     icon: Users,        color: 'teal',    desc: 'Ver todos os utilizadores registados no terminal' },
     adduser:     { label: 'Adicionar Utilizador',    icon: UserPlus,     color: 'teal',    desc: 'Registar novo utilizador no terminal', form: true },
@@ -346,7 +347,13 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
                     </button>
 
                     {/* Formulário inline para ações que precisam de dados */}
-                    {activeForm === action.key && (
+                    {activeForm === action.key && action.key === 'getparam' && (
+                      <TerminalParamForm
+                        terminal={terminal}
+                        onClose={() => setActiveForm(null)}
+                      />
+                    )}
+                    {activeForm === action.key && action.key !== 'getparam' && (
                       <UserActionForm
                         action={action.key}
                         loading={loading === action.key}

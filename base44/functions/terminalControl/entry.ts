@@ -631,6 +631,22 @@ async function actionGetParam(terminal) {
   return { success: resp.result === true, message: 'Parâmetros do terminal obtidos', data: resp };
 }
 
+async function actionSetParam(terminal, params) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'setdevinfo apenas suportado via WebSocket Cloud (Timmy)' };
+  // Protocolo oficial Timmy: cmd = "setdevinfo" (pág. 20-21)
+  // Apenas enviar os campos fornecidos (todos opcionais conforme protocolo)
+  const allowed = ['language', 'volume', 'screensaver', 'verifymode', 'sleep', 'userfpnum', 'loghint', 'reverifytime'];
+  const cmd = { cmd: 'setdevinfo' };
+  for (const key of allowed) {
+    if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
+      cmd[key] = Number(params[key]);
+    }
+  }
+  if (Object.keys(cmd).length === 1) return { success: false, error: 'Nenhum parâmetro fornecido' };
+  const resp = await sendTimmyCommand(terminal, cmd);
+  return { success: resp.result === true, message: 'Configurações aplicadas com sucesso', data: resp };
+}
+
 async function actionInitDevice(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initsys apenas suportado via WebSocket Cloud (Timmy)' };
   const resp = await sendTimmyCommand(terminal, { cmd: 'initsys' });
@@ -702,6 +718,7 @@ Deno.serve(async (req) => {
       case 'clearlog':    result = await actionClearLogs(terminal); break;
       case 'clearusers':  result = await actionClearUsers(terminal); break;
       case 'getparam':    result = await actionGetParam(terminal); break;
+      case 'setparam':    result = await actionSetParam(terminal, params); break;
       case 'initdevice':  result = await actionInitDevice(terminal); break;
       case 'gettime':     result = await actionGetTime(terminal); break;
       case 'getdevcap':   result = await actionGetDevCap(terminal); break;
