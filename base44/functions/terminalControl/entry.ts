@@ -80,8 +80,21 @@ async function sendAdmsCommand(terminal, action, params = {}) {
  * Isto permite servidores Timmy locais/diferentes por terminal.
  */
 async function sendTimmyCommand(terminal, command, maxAttempts = 2) {
-  // Usar IP/host específico do terminal se disponível, caso contrário usar o servidor global
-  const host = terminal.ip_publico || terminal.dns || getNocServerHost();
+  // Para websocket_cloud: usar ip_publico do terminal (servidor Timmy WS), ou NOC_SERVER_HOST global
+  let host;
+  if (terminal.ip_publico || terminal.dns) {
+    host = terminal.ip_publico || terminal.dns;
+  } else {
+    const envHost = Deno.env.get('NOC_SERVER_HOST');
+    if (!envHost) {
+      throw new Error(
+        `[Timmy WebSocket Cloud] Endereço do servidor Timmy WS não configurado para o terminal "${terminal.nome}".\n` +
+        `Solução: Preencha o campo "IP Público" do terminal com o IP/hostname da máquina onde corre o timmy_ws_server.py (ex: 51.91.219.145).\n` +
+        `Alternativa: Configure a variável de ambiente NOC_SERVER_HOST com esse endereço.`
+      );
+    }
+    host = envHost;
+  }
   const ctrlPort = 7789;
   const sn = terminal.numero_serie || '';
 
