@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Search, Filter, Users,
   ChevronLeft, ChevronRight, RefreshCw,
-  SortAsc, SortDesc, X, Check, Zap, Pencil
+  SortAsc, SortDesc, X, Check, Zap, Pencil, Printer
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,9 @@ import { cn } from '@/lib/utils';
 import { addDays, startOfWeek, format, isToday, addWeeks, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import EscalaEditModal from './EscalaEditModal';
+import EscalaImpressao from './EscalaImpressao';
+import { useQuery } from '@tanstack/react-query';
+import { base44 } from '@/api/base44Client';
 
 const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -35,6 +38,29 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
   const [selected, setSelected] = useState(new Set()); // selected colaborador ids
   const [bulkHorario, setBulkHorario] = useState('');
   const [applyingBulk, setApplyingBulk] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [printColabs, setPrintColabs] = useState([]); // colaboradores a imprimir
+
+  // Carregar todas as EscalaDia para uso na impressão
+  const { data: todasEscalas = [] } = useQuery({
+    queryKey: ['escala-dia-todas'],
+    queryFn: () => base44.entities.EscalaDia.list('-data', 2000),
+  });
+
+  // Mapa: colaborador_id → { dateStr → escala }
+  const escalaDiaMap = useMemo(() => {
+    const m = {};
+    todasEscalas.forEach(e => {
+      if (!m[e.colaborador_id]) m[e.colaborador_id] = {};
+      m[e.colaborador_id][e.data] = e;
+    });
+    return m;
+  }, [todasEscalas]);
+
+  const openPrint = (colabs) => {
+    setPrintColabs(colabs);
+    setPrintModalOpen(true);
+  };
 
   const horarioMap = useMemo(() => {
     const m = {};
@@ -250,14 +276,23 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
             {applyingBulk ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
             Aplicar
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs border-violet-300 text-violet-700 hover:bg-violet-100 gap-1"
+            onClick={() => openPrint(filtered.filter(c => selected.has(c.id)))}
+          >
+            <Printer className="h-3 w-3" />
+            Imprimir selecionados
+          </Button>
           <button onClick={() => setSelected(new Set())} className="ml-auto text-slate-400 hover:text-slate-600">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* Week navigation */}
-      <div className="flex items-center justify-between">
+      {/* Week navigation + print all */}
+      <div className="flex items-center justify-between gap-2">
         <button onClick={() => setWeekStart(w => subWeeks(w, 1))} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100">
           <ChevronLeft className="h-4 w-4 text-slate-600" />
         </button>
@@ -272,9 +307,21 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
             Semana atual
           </button>
         </div>
-        <button onClick={() => setWeekStart(w => addWeeks(w, 1))} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100">
-          <ChevronRight className="h-4 w-4 text-slate-600" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setWeekStart(w => addWeeks(w, 1))} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100">
+            <ChevronRight className="h-4 w-4 text-slate-600" />
+          </button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1 border-slate-300 text-slate-600"
+            onClick={() => openPrint(filtered)}
+            title="Imprimir escala dos colaboradores visíveis"
+          >
+            <Printer className="h-3 w-3" />
+            <span className="hidden sm:inline">Imprimir</span>
+          </Button>
+        </div>
       </div>
 
       {/* Main table */}
@@ -415,15 +462,24 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
                     </Select>
                   </td>
 
-                  {/* Editar escala button */}
+                  {/* Editar + imprimir individual */}
                   <td className="px-2 py-2.5">
-                    <button
-                      onClick={() => setEditModalColab(c)}
-                      className="p-1 rounded-lg border border-slate-200 hover:bg-violet-50 hover:border-violet-300 transition-colors"
-                      title="Editar escala semanal/mensal"
-                    >
-                      <Pencil className="h-3 w-3 text-slate-400 hover:text-violet-600" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setEditModalColab(c)}
+                        className="p-1 rounded-lg border border-slate-200 hover:bg-violet-50 hover:border-violet-300 transition-colors"
+                        title="Editar escala semanal/mensal"
+                      >
+                        <Pencil className="h-3 w-3 text-slate-400" />
+                      </button>
+                      <button
+                        onClick={() => openPrint([c])}
+                        className="p-1 rounded-lg border border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+                        title="Imprimir escala deste colaborador"
+                      >
+                        <Printer className="h-3 w-3 text-slate-400" />
+                      </button>
+                    </div>
                   </td>
 
                   {/* Day cells */}
@@ -467,6 +523,18 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
           open={!!editModalColab}
           onClose={() => setEditModalColab(null)}
           ownerEmail={ownerEmail}
+        />
+      )}
+
+      {/* Impressão modal */}
+      {printModalOpen && (
+        <EscalaImpressao
+          colaboradores={printColabs}
+          horarios={horarios}
+          escalaDiaMap={escalaDiaMap}
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          titulo="Escala de Trabalho"
         />
       )}
 
