@@ -21,9 +21,11 @@ import { getTimmyCapabilities, resolvePrimaryBackupnum } from '@/lib/timmyModels
 export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh }) {
   const [syncTerminalId, setSyncTerminalId] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [syncDir, setSyncDir] = useState(null); // 'push' | 'pull'
+  const [syncDir, setSyncDir] = useState(null); // 'push' | 'pull' | 'replicate'
   const [syncProgress, setSyncProgress] = useState(null);
   const [syncResults, setSyncResults] = useState(null);
+  const [masterTerminalId, setMasterTerminalId] = useState('');
+  const [slaveTerminalIds, setSlaveTerminalIds] = useState([]);
 
   // Inclui apenas terminais Timmy que suportam getuserlist (Timmy Face ID, não AlfaceII)
   const timmyTerminals = terminals.filter(t => 
@@ -73,6 +75,40 @@ export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh 
     setSyncing(false); setSyncProgress(null);
     setSyncResults({ direction: 'push', ok, fail, details, terminal: selectedTerminal?.nome });
     fail === 0 ? toast.success(`${ok} colaboradores enviados para "${selectedTerminal?.nome}"`) : toast.error(`${ok} OK / ${fail} erros`);
+  };
+
+  // Terminal → Terminal (replicate - master to slave)
+  const handleReplicate = async () => {
+    if (!masterTerminalId) { toast.error('Selecione um terminal mestre'); return; }
+    if (!slaveTerminalIds.length) { toast.error('Selecione pelo menos um terminal escravo'); return; }
+    
+    setSyncing(true); setSyncDir('replicate');
+    setSyncProgress({ done: 0, total: slaveTerminalIds.length, label: 'A replicar de mestre para escravos' });
+    setSyncResults(null);
+
+    let ok = 0, fail = 0;
+    const details = [];
+    const masterTerminal = terminals.find(t => t.id === masterTerminalId);
+
+    for (const slaveId of slaveTerminalIds) {
+      try {
+        const resp = await base44.functions.invoke('terminalControl', {
+          terminal_id: masterTerminalId,
+          action: 'replicate',
+          params: { slave_terminal_ip: terminals.find(t => t.id === slaveId)?.ip_address, slave_terminal_port: 5005 }
+        });
+        resp.data?.success ? ok++ : fail++;
+        details.push({ slave: terminals.find(t => t.id === slaveId)?.nome, success: resp.data?.success, message: resp.data?.message || resp.data?.error });
+      } catch (e) {
+        fail++;
+        details.push({ slave: terminals.find(t => t.id === slaveId)?.nome, success: false, message: e.message });
+      }
+      setSyncProgress(prev => ({ ...prev, done: prev.done + 1 }));
+    }
+
+    setSyncing(false); setSyncProgress(null);
+    setSyncResults({ direction: 'replicate', ok, fail, details, terminal: masterTerminal?.nome });
+    fail === 0 ? toast.success(`${ok} escravos sincronizados com mestre`) : toast.error(`${ok} OK / ${fail} erros`);
   };
 
   // Terminal → Sistema (pull)
@@ -156,7 +192,7 @@ export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh 
       {timmyTerminals.length === 0 ? (
         <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
           <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
-          <p className="text-xs text-amber-700">Nenhum terminal Timmy (WebSocket Cloud) configurado. A sincronização bidirecional requer terminais Timmy Face ID.</p>
+          <p className="text-xs text-amber-700">Nenhum terminal Timmy (WebSocket Cloud) configurado. A sincronização requer terminais Timmy Face ID.</p>
         </div>
       ) : (
         <>
@@ -197,8 +233,58 @@ export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh 
             </div>
           </div>
 
+          {/* Terminal-to-Terminal Replication Section */}
+          <div className="border-t border-slate-200 pt-4 mt-4">
+            <p className="text-xs font-semibold text-slate-600 mb-3">Replicação Terminal-a-Terminal (Mestre → Escravo)</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Terminal Mestre</label>
+                  <Select value={masterTerminalId || 'none'} onValueChange={v => setMasterTerminalId(v === 'none' ? '' : v)} disabled={syncing}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Escolher mestre..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Escolher mestre —</SelectItem>
+                      {timmyTerminals.map(t => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.nome} ({t.local || 'local?'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Terminais Escravos</label>
+                  <div className="space-y-1 max-h-[150px] overflow-y-auto border border-slate-200 rounded-lg p-2 bg-slate-50">
+                    {timmyTerminals.filter(t => t.id !== masterTerminalId).length === 0 ? (
+                      <p className="text-xs text-slate-400">Selecione um mestre</p>
+                    ) : (
+                      timmyTerminals.filter(t => t.id !== masterTerminalId).map(t => (
+                        <label key={t.id} className="flex items-center gap-2 cursor-pointer text-xs">
+                          <input
+                            type="checkbox"
+                            checked={slaveTerminalIds.includes(t.id)}
+                            onChange={(e) => setSlaveTerminalIds(e.target.checked ? [...slaveTerminalIds, t.id] : slaveTerminalIds.filter(id => id !== t.id))}
+                            disabled={syncing}
+                            className="rounded"
+                          />
+                          <span>{t.nome}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+              <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700 gap-1.5 text-xs" disabled={!masterTerminalId || !slaveTerminalIds.length || syncing} onClick={handleReplicate}>
+                {syncing && syncDir === 'replicate' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowDownUp className="h-3.5 w-3.5" />}
+                Replicar Mestre → Escravos ({slaveTerminalIds.length})
+              </Button>
+            </div>
+          </div>
+
           {/* Progress bar */}
-          {syncProgress && (
+           {syncProgress && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>{syncProgress.label}... {syncProgress.done}/{syncProgress.total}</span>
@@ -227,6 +313,11 @@ export default function SyncPanel({ terminals, allUsers, currentUser, onRefresh 
                   {syncResults.direction === 'push' ? (
                     <>
                       <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">{syncResults.ok} OK</Badge>
+                      {syncResults.fail > 0 && <Badge className="bg-red-100 text-red-700 border-red-200 text-xs">{syncResults.fail} erro(s)</Badge>}
+                    </>
+                  ) : syncResults.direction === 'replicate' ? (
+                    <>
+                      <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-xs">{syncResults.ok} OK</Badge>
                       {syncResults.fail > 0 && <Badge className="bg-red-100 text-red-700 border-red-200 text-xs">{syncResults.fail} erro(s)</Badge>}
                     </>
                   ) : (
