@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const TIMMY_WS_CODE = `# timmy_ws_server.py — NOC Monitor: Servidor WebSocket Cloud Ultimate (Protocolo Timmy/THbio)
-# ✅ VERSÃO DINÂMICA v3.0: Sincronização de Timezone da conta do utilizador NOC Monitor
+# ✅ VERSÃO DINÂMICA v3.1: Sincronização de Timezone + Fix seg_offline inflado após timezone change
 # Compatível com: Timmy TM-AI07F, TM-AIFace11F, TFS30, TFS50 e outros modelos THbio
 # Protocolo: WebSocket + JSON (RFC 6455) — porta padrão 7788 (configurável)
 #
@@ -599,7 +599,13 @@ def ciclo_reporte_ws(intervalo=30, stop_event=None):
             if not connected and disconnected_at and (time.time() - disconnected_at) < RECONNECT_GRACE:
                 continue
 
-            seg_offline = int(time.time() - last_seen) if not connected and last_seen > 0 else 0
+            # Calcular segundos offline usando disconnected_at (mais preciso que last_seen)
+            # Evita valores inflados quando o servidor reiniciou ou last_seen é muito antigo
+            if not connected and last_seen > 0:
+                ref_time = disconnected_at if disconnected_at and disconnected_at > last_seen else last_seen
+                seg_offline = int(time.time() - ref_time)
+            else:
+                seg_offline = 0
             status = "online" if connected else "offline"
 
             try:
@@ -631,6 +637,13 @@ def ciclo_reload_terminais(stop_event=None):
                             ws_state[sn]["local"] = t.get("local", "")
             sn_to_terminal = new_map
             sn_to_nome     = new_nomes
+            # Garantir que terminais offline sem disconnected_at o tenham definido agora
+            # (evita seg_offline inflado após restart do servidor)
+            now = time.time()
+            with ws_lock:
+                for sn_k, st in ws_state.items():
+                    if not st.get("connected") and not st.get("disconnected_at"):
+                        ws_state[sn_k]["disconnected_at"] = now
             logger.info(f"[RELOAD] {len(sn_to_terminal)} terminais sincronizados | tz={USER_TIMEZONE}")
         except Exception as e:
             logger.error(f"[RELOAD] Erro ao recarregar: {e}")
@@ -793,8 +806,8 @@ export default function TimmyWsServerCode() {
       {/* Versão e modelos */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold bg-violet-100 text-violet-800 px-2 py-1 rounded-full">v3.0</span>
-          <span className="text-xs text-slate-500">Timezone dinâmico sincronizado da conta NOC Monitor</span>
+          <span className="text-xs font-bold bg-violet-100 text-violet-800 px-2 py-1 rounded-full">v3.1</span>
+          <span className="text-xs text-slate-500">Timezone dinâmico + fix seg_offline inflado após mudança de região</span>
         </div>
         <div className="flex flex-wrap gap-1">
           {MODELS.map(m => (
@@ -917,7 +930,7 @@ export default function TimmyWsServerCode() {
 
       {/* Novidades v3 */}
       <div className="p-3 bg-slate-800 rounded-lg text-xs text-slate-300 space-y-1.5">
-        <p className="font-semibold text-white">🆕 Novidades v3.0 — Timezone Dinâmico</p>
+        <p className="font-semibold text-white">🆕 Novidades v3.1 — Fix seg_offline inflado</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
           {[
             ['Timezone', 'Sincronizado da conta NOC Monitor (Configurações → Conta)'],
@@ -925,6 +938,8 @@ export default function TimmyWsServerCode() {
             ['ZoneInfo', 'Python nativo — DST (horário verão) automático'],
             ['Reload 60s', 'Terminais e timezone sincronizados a cada 60 segundos'],
             ['RECONNECT_GRACE', 'Período de graça 30s evita falso offline em reconexão'],
+            ['seg_offline fix', 'Usa disconnected_at em vez de last_seen — evita valores inflados após restart ou timezone change'],
+            ['reload fix', 'Reload define disconnected_at em terminais offline sem referência temporal'],
             ['Filtro enrollid', 'IDs inválidos/sistema ignorados automaticamente'],
             ['inout/InOutStatus', 'Suporte nativo a tipo entrada/saída'],
             ['websockets v12+', 'API asyncio moderna (from websockets.asyncio.server)'],
@@ -941,7 +956,7 @@ export default function TimmyWsServerCode() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
           <Server className="h-4 w-4 text-slate-500" />
-          timmy_ws_server.py — v3.0
+          timmy_ws_server.py — v3.1
         </p>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => setExpanded(v => !v)}>
