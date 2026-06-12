@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
-  Search, Filter, CheckCircle2, AlertCircle, Users, Clock,
-  ChevronLeft, ChevronRight, RefreshCw, Download, UserCheck,
-  SortAsc, SortDesc, X, Check, Zap
+  Search, Filter, Users,
+  ChevronLeft, ChevronRight, RefreshCw,
+  SortAsc, SortDesc, X, Check, Zap, Pencil
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { addDays, startOfWeek, format, isToday, addWeeks, subWeeks } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import EscalaEditModal from './EscalaEditModal';
 
 const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -22,7 +23,8 @@ function parseDias(str) {
   try { return JSON.parse(str || '[]'); } catch { return []; }
 }
 
-export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assigningId }) {
+export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assigningId, ownerEmail }) {
+  const [editModalColab, setEditModalColab] = useState(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [search, setSearch] = useState('');
   const [filterDep, setFilterDep] = useState('all');
@@ -311,6 +313,8 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
               <th className="px-3 py-2.5 text-left font-semibold text-slate-600 min-w-[180px]">
                 Turno Atribuído
               </th>
+              {/* Editar escala */}
+              <th className="px-3 py-2.5 w-10"></th>
               {/* Days of week */}
               {weekDays.map((day, i) => (
                 <th key={i} className={cn(
@@ -411,6 +415,17 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
                     </Select>
                   </td>
 
+                  {/* Editar escala button */}
+                  <td className="px-2 py-2.5">
+                    <button
+                      onClick={() => setEditModalColab(c)}
+                      className="p-1 rounded-lg border border-slate-200 hover:bg-violet-50 hover:border-violet-300 transition-colors"
+                      title="Editar escala semanal/mensal"
+                    >
+                      <Pencil className="h-3 w-3 text-slate-400 hover:text-violet-600" />
+                    </button>
+                  </td>
+
                   {/* Day cells */}
                   {weekDays.map((day, i) => {
                     const dow = day.getDay();
@@ -443,6 +458,17 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
           </tbody>
         </table>
       </div>
+
+      {/* Edit modal */}
+      {editModalColab && (
+        <EscalaEditModal
+          colaborador={editModalColab}
+          horarios={horarios}
+          open={!!editModalColab}
+          onClose={() => setEditModalColab(null)}
+          ownerEmail={ownerEmail}
+        />
+      )}
 
       {/* Legend */}
       {horarios.length > 0 && (

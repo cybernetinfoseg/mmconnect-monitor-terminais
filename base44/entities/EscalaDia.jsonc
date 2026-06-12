@@ -1,0 +1,51 @@
+{
+  "name": "EscalaDia",
+  "type": "object",
+  "properties": {
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do TerminalUser (colaborador)"
+    },
+    "enrollid": {
+      "type": "number",
+      "description": "Enrollid do colaborador"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome do colaborador (cache)"
+    },
+    "data": {
+      "type": "string",
+      "format": "date",
+      "description": "Data espec\u00edfica (YYYY-MM-DD)"
+    },
+    "horario_id": {
+      "type": "string",
+      "description": "ID do Horario atribu\u00eddo neste dia espec\u00edfico (null = folga/aus\u00eancia)"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "folga",
+        "ferias",
+        "feriado",
+        "extra"
+      ],
+      "default": "normal",
+      "description": "Tipo de escala para este dia"
+    },
+    "observacao": {
+      "type": "string",
+      "description": "Observa\u00e7\u00e3o sobre este dia"
+    },
+    "owner_email": {
+      "type": "string",
+      "description": "Email do respons\u00e1vel"
+    }
+  },
+  "required": [
+    "colaborador_id",
+    "data"
+  ]
+}

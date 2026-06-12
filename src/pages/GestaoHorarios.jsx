@@ -259,6 +259,7 @@ export default function GestaoHorarios() {
                       horarios={horarios}
                       onAssign={handleAssign}
                       assigningId={assigningId}
+                      ownerEmail={currentUser?.email}
                     />
                   )}
                 </CardContent>
