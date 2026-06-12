@@ -1,0 +1,77 @@
+{
+  "name": "Antipassback",
+  "type": "object",
+  "properties": {
+    "enrollid": {
+      "type": "number",
+      "description": "ID do colaborador"
+    },
+    "nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "zona_id": {
+      "type": "string",
+      "description": "ID da zona"
+    },
+    "zona_nome": {
+      "type": "string",
+      "description": "Nome da zona (cache)"
+    },
+    "data_entrada": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Momento da primeira entrada"
+    },
+    "data_saida_esperada": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Hora aproximada em que deveria ter sa\u00eddo"
+    },
+    "data_saida_real": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Quando realmente saiu"
+    },
+    "segundas_entradas": {
+      "type": "number",
+      "default": 0,
+      "description": "N\u00famero de entradas adicionais sem sa\u00edda"
+    },
+    "tipo_fraude": {
+      "type": "string",
+      "enum": [
+        "entrada_dupla",
+        "entrada_multipla",
+        "entrada_fora_horario_saida"
+      ],
+      "default": "entrada_dupla",
+      "description": "Tipo de tentativa"
+    },
+    "detectado_em": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Quando o sistema detectou"
+    },
+    "resolvido": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se foi validado manualmente"
+    },
+    "motivo_resolucao": {
+      "type": "string",
+      "description": "Explica\u00e7\u00e3o se for fraude leg\u00edtima (ex: outro colaborador com mesmo badge)"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "enrollid",
+    "zona_id",
+    "data_entrada"
+  ]
+}

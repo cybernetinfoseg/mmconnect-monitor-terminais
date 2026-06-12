@@ -35,7 +35,11 @@ import {
   Archive,
   LayoutGrid,
   Banknote,
-  FileText
+  FileText,
+  DoorOpen,
+  UserCheck,
+  BarChart3,
+  Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -67,6 +71,15 @@ const ALL_NAV_ITEMS = [
   { name: 'Mapa Assiduidade', page: 'MapaAssiduidade', icon: LayoutGrid },
   { name: 'Payroll', page: 'Payroll', icon: Banknote },
   { name: 'Recibos', page: 'Recibos', icon: FileText },
+  
+  { name: 'Zonas de Acesso', page: 'ZonasAcesso', icon: DoorOpen },
+  { name: 'Visitantes', page: 'Visitantes', icon: UserCheck },
+  { name: 'Relatório Movimentos', page: 'RelatorioMovimentos', icon: BarChart3 },
+  
+  { name: 'Dashboard RH Exec', page: 'DashboardRHExecutivo', icon: Activity },
+  { name: 'Relatório Absentismo', page: 'RelatorioAbsentismo', icon: FileBarChart2 },
+  { name: 'Alertas Compliance', page: 'AlertasCompliance', icon: AlertTriangle },
+  
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },

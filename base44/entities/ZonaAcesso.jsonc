@@ -1,0 +1,45 @@
+{
+  "name": "ZonaAcesso",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da zona (ex: Escrit\u00f3rio, Armaz\u00e9m, Lab)"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o detalhada"
+    },
+    "local": {
+      "type": "string",
+      "description": "Localiza\u00e7\u00e3o f\u00edsica"
+    },
+    "terminal_ids": {
+      "type": "string",
+      "description": "JSON array com IDs dos terminais que controlam esta zona"
+    },
+    "colaboradores_autorizados_ids": {
+      "type": "string",
+      "description": "JSON array com IDs dos colaboradores autorizados"
+    },
+    "horarios_acesso": {
+      "type": "string",
+      "description": "JSON array com per\u00edodos de acesso permitido: [{inicio: 'HH:MM', fim: 'HH:MM', dias: [0-6]}]"
+    },
+    "requer_badge_temporario": {
+      "type": "boolean",
+      "default": false,
+      "description": "Se visitantes precisam de badge"
+    },
+    "ativa": {
+      "type": "boolean",
+      "default": true
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}

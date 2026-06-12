@@ -1,0 +1,72 @@
+{
+  "name": "Visitante",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome completo do visitante"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email do visitante"
+    },
+    "telefone": {
+      "type": "string",
+      "description": "Contacto do visitante"
+    },
+    "empresa": {
+      "type": "string",
+      "description": "Empresa/organiza\u00e7\u00e3o"
+    },
+    "motivo_visita": {
+      "type": "string",
+      "description": "Motivo da visita"
+    },
+    "responsavel_interno": {
+      "type": "string",
+      "description": "Email do colaborador respons\u00e1vel"
+    },
+    "responsavel_interno_nome": {
+      "type": "string",
+      "description": "Nome do respons\u00e1vel (cache)"
+    },
+    "data_entrada": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de entrada"
+    },
+    "data_saida": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Data/hora de sa\u00edda"
+    },
+    "numero_badge": {
+      "type": "string",
+      "description": "N\u00famero ou ID do badge tempor\u00e1rio"
+    },
+    "zonas_autorizadas_ids": {
+      "type": "string",
+      "description": "JSON array com IDs das zonas permitidas"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "dentro",
+        "saido",
+        "cancelado"
+      ],
+      "default": "dentro",
+      "description": "Estado atual do visitante"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome",
+    "data_entrada"
+  ]
+}

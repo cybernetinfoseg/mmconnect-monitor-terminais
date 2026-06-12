@@ -26,6 +26,12 @@ import BancoHoras from './pages/BancoHoras.jsx';
 import MapaAssiduidade from './pages/MapaAssiduidade.jsx';
 import Payroll from './pages/Payroll.jsx';
 import Recibos from './pages/Recibos.jsx';
+import ZonasAcesso from './pages/ZonasAcesso.jsx';
+import Visitantes from './pages/Visitantes.jsx';
+import RelatoriMovimentos from './pages/RelatoriMovimentos.jsx';
+import DashboardRHExecutivo from './pages/DashboardRHExecutivo.jsx';
+import RelatorioAbsentismo from './pages/RelatorioAbsentismo.jsx';
+import AlertasCompliance from './pages/AlertasCompliance.jsx';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -102,6 +108,12 @@ const AuthenticatedApp = () => {
       <Route path="/MapaAssiduidade" element={<LayoutWrapper currentPageName="MapaAssiduidade"><MapaAssiduidade /></LayoutWrapper>} />
       <Route path="/Payroll" element={<LayoutWrapper currentPageName="Payroll"><Payroll /></LayoutWrapper>} />
       <Route path="/Recibos" element={<LayoutWrapper currentPageName="Recibos"><Recibos /></LayoutWrapper>} />
+      <Route path="/ZonasAcesso" element={<LayoutWrapper currentPageName="ZonasAcesso"><ZonasAcesso /></LayoutWrapper>} />
+      <Route path="/Visitantes" element={<LayoutWrapper currentPageName="Visitantes"><Visitantes /></LayoutWrapper>} />
+      <Route path="/RelatorioMovimentos" element={<LayoutWrapper currentPageName="RelatorioMovimentos"><RelatoriMovimentos /></LayoutWrapper>} />
+      <Route path="/DashboardRHExecutivo" element={<LayoutWrapper currentPageName="DashboardRHExecutivo"><DashboardRHExecutivo /></LayoutWrapper>} />
+      <Route path="/RelatorioAbsentismo" element={<LayoutWrapper currentPageName="RelatorioAbsentismo"><RelatorioAbsentismo /></LayoutWrapper>} />
+      <Route path="/AlertasCompliance" element={<LayoutWrapper currentPageName="AlertasCompliance"><AlertasCompliance /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

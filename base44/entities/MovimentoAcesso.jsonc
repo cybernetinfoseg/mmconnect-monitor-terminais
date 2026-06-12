@@ -1,0 +1,73 @@
+{
+  "name": "MovimentoAcesso",
+  "type": "object",
+  "properties": {
+    "enrollid": {
+      "type": "number",
+      "description": "ID do colaborador/visitante no terminal"
+    },
+    "nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "tipo_pessoa": {
+      "type": "string",
+      "enum": [
+        "colaborador",
+        "visitante"
+      ],
+      "default": "colaborador"
+    },
+    "zona_id": {
+      "type": "string",
+      "description": "ID da ZonaAcesso"
+    },
+    "zona_nome": {
+      "type": "string",
+      "description": "Nome da zona (cache)"
+    },
+    "terminal_id": {
+      "type": "string",
+      "description": "ID do Terminal onde ocorreu"
+    },
+    "terminal_nome": {
+      "type": "string",
+      "description": "Nome do terminal (cache)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Momento exato do acesso"
+    },
+    "tipo_acesso": {
+      "type": "string",
+      "enum": [
+        "entrada",
+        "saida"
+      ],
+      "default": "entrada"
+    },
+    "autorizado": {
+      "type": "boolean",
+      "default": true,
+      "description": "Se o acesso foi permitido"
+    },
+    "motivo_negacao": {
+      "type": "string",
+      "description": "Raz\u00e3o se n\u00e3o autorizado (ex: fora de horas, zona n\u00e3o permitida)"
+    },
+    "alertas": {
+      "type": "string",
+      "description": "JSON array com alertas gerados: ex: antipassback, tentativa n\u00e3o autorizada"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "enrollid",
+    "tipo_pessoa",
+    "timestamp",
+    "tipo_acesso"
+  ]
+}

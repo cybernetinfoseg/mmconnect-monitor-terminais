@@ -1,0 +1,79 @@
+{
+  "name": "AlertaAcesso",
+  "type": "object",
+  "properties": {
+    "enrollid": {
+      "type": "number",
+      "description": "ID do colaborador/visitante"
+    },
+    "nome": {
+      "type": "string",
+      "description": "Nome (cache)"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "tentativa_falhada",
+        "acesso_fora_horas",
+        "zona_nao_permitida",
+        "antipassback",
+        "multiplas_tentativas",
+        "badge_expirado"
+      ],
+      "description": "Tipo de alerta"
+    },
+    "severidade": {
+      "type": "string",
+      "enum": [
+        "info",
+        "aviso",
+        "critico"
+      ],
+      "default": "aviso"
+    },
+    "zona_id": {
+      "type": "string",
+      "description": "Zona onde ocorreu"
+    },
+    "zona_nome": {
+      "type": "string",
+      "description": "Nome da zona (cache)"
+    },
+    "terminal_id": {
+      "type": "string",
+      "description": "Terminal envolvido"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Quando ocorreu"
+    },
+    "descricao": {
+      "type": "string",
+      "description": "Detalhes do alerta"
+    },
+    "resolvido": {
+      "type": "boolean",
+      "default": false
+    },
+    "resolvido_em": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolvido_por": {
+      "type": "string",
+      "description": "Email de quem resolveu"
+    },
+    "observacoes": {
+      "type": "string"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "enrollid",
+    "tipo",
+    "timestamp"
+  ]
+}
