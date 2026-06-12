@@ -16,6 +16,7 @@ import Presenca from './pages/Presenca';
 import ControloAcesso from './pages/ControloAcesso';
 import GestaoHorarios from './pages/GestaoHorarios';
 import GestaoAusencias from './pages/GestaoAusencias';
+import RelatorioPresencaDiaria from './pages/RelatorioPresencaDiaria';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -82,6 +83,7 @@ const AuthenticatedApp = () => {
       <Route path="/ControloAcesso" element={<LayoutWrapper currentPageName="ControloAcesso"><ControloAcesso /></LayoutWrapper>} />
       <Route path="/GestaoHorarios" element={<LayoutWrapper currentPageName="GestaoHorarios"><GestaoHorarios /></LayoutWrapper>} />
       <Route path="/GestaoAusencias" element={<LayoutWrapper currentPageName="GestaoAusencias"><GestaoAusencias /></LayoutWrapper>} />
+      <Route path="/RelatorioPresencaDiaria" element={<LayoutWrapper currentPageName="RelatorioPresencaDiaria"><RelatorioPresencaDiaria /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

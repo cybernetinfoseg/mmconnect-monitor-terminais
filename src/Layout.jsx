@@ -49,6 +49,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Controlo Acesso', page: 'ControloAcesso', icon: Shield },
   { name: 'Horários', page: 'GestaoHorarios', icon: Clock },
   { name: 'Ausências', page: 'GestaoAusencias', icon: CalendarOff },
+  { name: 'Ponto Diário', page: 'RelatorioPresencaDiaria', icon: FileBarChart2 },
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
   { name: 'Histórico', page: 'History', icon: History },
   { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
