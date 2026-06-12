@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Plus, Pencil, Trash2, Clock, Users, Calendar, LayoutGrid } from 'lucide-react';
+import { CalendarClock, Plus, Pencil, Trash2, Clock, Users, LayoutGrid, TableProperties } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,16 +10,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import CalendarioEscala from '@/components/horarios/CalendarioEscala';
-import AtribuicaoHorario from '@/components/horarios/AtribuicaoHorario';
+import EscalaTrabalho from '@/components/horarios/EscalaTrabalho';
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const CORES = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
 const TABS = [
   { key: 'turnos', label: 'Turnos', icon: LayoutGrid },
-  { key: 'calendario', label: 'Calendário', icon: Calendar },
-  { key: 'atribuicao', label: 'Atribuição', icon: Users },
+  { key: 'escala', label: 'Escala', icon: TableProperties },
 ];
 
 export default function GestaoHorarios() {
@@ -237,27 +235,8 @@ export default function GestaoHorarios() {
               </>
             )}
 
-            {/* === CALENDÁRIO TAB === */}
-            {activeTab === 'calendario' && (
-              <Card className="bg-white border-slate-200">
-                <CardContent className="p-4">
-                  {colaboradores.length === 0 || horarios.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400">
-                      <Calendar className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                      <p className="font-medium">Sem dados de escala</p>
-                      <p className="text-sm mt-1">
-                        {horarios.length === 0 ? 'Crie horários primeiro' : 'Atribua horários aos colaboradores'}
-                      </p>
-                    </div>
-                  ) : (
-                    <CalendarioEscala horarios={horarios} colaboradores={colaboradores} />
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* === ATRIBUIÇÃO TAB === */}
-            {activeTab === 'atribuicao' && (
+            {/* === ESCALA TAB === */}
+            {activeTab === 'escala' && (
               <Card className="bg-white border-slate-200">
                 <CardContent className="p-4">
                   {colaboradores.length === 0 ? (
@@ -269,13 +248,13 @@ export default function GestaoHorarios() {
                   ) : horarios.length === 0 ? (
                     <div className="text-center py-12 text-slate-400">
                       <CalendarClock className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                      <p className="font-medium">Sem horários criados</p>
+                      <p className="font-medium">Sem turnos criados</p>
                       <Button onClick={handleNew} className="mt-3 bg-violet-600 hover:bg-violet-700 gap-1.5 text-xs">
-                        <Plus className="h-3.5 w-3.5" /> Criar Horário
+                        <Plus className="h-3.5 w-3.5" /> Criar Turno
                       </Button>
                     </div>
                   ) : (
-                    <AtribuicaoHorario
+                    <EscalaTrabalho
                       colaboradores={colaboradores}
                       horarios={horarios}
                       onAssign={handleAssign}
