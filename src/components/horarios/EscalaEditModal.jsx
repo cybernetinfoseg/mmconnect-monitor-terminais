@@ -33,6 +33,9 @@ export default function EscalaEditModal({ colaborador, horarios, open, onClose, 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [editingDay, setEditingDay] = useState(null); // { date, escala }
   const [editForm, setEditForm] = useState({ horario_id: '', tipo: 'normal', observacao: '' });
+  const [rangeForm, setRangeForm] = useState({ dataInicio: '', dataFim: '', horario_id: '', tipo: 'normal', observacao: '' });
+  const [showRangeForm, setShowRangeForm] = useState(false);
+  const [applyingRange, setApplyingRange] = useState(false);
   const queryClient = useQueryClient();
 
   const horarioMap = useMemo(() => {
@@ -153,6 +156,57 @@ export default function EscalaEditModal({ colaborador, horarios, open, onClose, 
     ? setCurrentDate(d => addDays(startOfWeek(d, { weekStartsOn: 1 }), 7))
     : setCurrentDate(d => addMonths(d, 1));
 
+  const applyRange = async () => {
+    if (!rangeForm.dataInicio || !rangeForm.dataFim) {
+      toast.error('Preencha a data de início e fim');
+      return;
+    }
+    if (rangeForm.dataFim < rangeForm.dataInicio) {
+      toast.error('A data de fim deve ser posterior à de início');
+      return;
+    }
+    setApplyingRange(true);
+    try {
+      const start = parseISO(rangeForm.dataInicio);
+      const end = parseISO(rangeForm.dataFim);
+      // Build list of all dates in range
+      const dates = [];
+      let d = start;
+      while (d <= end) {
+        dates.push(format(d, 'yyyy-MM-dd'));
+        d = addDays(d, 1);
+      }
+      // Fetch existing escalas for this colaborador to know which to update vs create
+      const existing = await base44.entities.EscalaDia.filter({ colaborador_id: colaborador.id });
+      const existingMap = {};
+      existing.forEach(e => { existingMap[e.data] = e; });
+
+      await Promise.all(dates.map(dateStr => {
+        const payload = {
+          colaborador_id: colaborador.id,
+          enrollid: colaborador.enrollid,
+          colaborador_nome: colaborador.nome,
+          data: dateStr,
+          horario_id: rangeForm.horario_id || '',
+          tipo: rangeForm.tipo,
+          observacao: rangeForm.observacao,
+          owner_email: ownerEmail,
+        };
+        if (existingMap[dateStr]) return base44.entities.EscalaDia.update(existingMap[dateStr].id, payload);
+        return base44.entities.EscalaDia.create(payload);
+      }));
+
+      queryClient.invalidateQueries(['escala-dia', colaborador?.id]);
+      toast.success(`Escala aplicada a ${dates.length} dia(s)`);
+      setShowRangeForm(false);
+      setRangeForm({ dataInicio: '', dataFim: '', horario_id: '', tipo: 'normal', observacao: '' });
+    } catch (e) {
+      toast.error('Erro ao aplicar escala');
+    } finally {
+      setApplyingRange(false);
+    }
+  };
+
   const DIAS_HEADER = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
   if (!colaborador) return null;
@@ -205,6 +259,88 @@ export default function EscalaEditModal({ colaborador, horarios, open, onClose, 
               className="text-[11px] text-violet-500 hover:underline px-1"
             >hoje</button>
           </div>
+        </div>
+
+        {/* Apply range button */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden">
+          <button
+            onClick={() => setShowRangeForm(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <span className="flex items-center gap-1.5">
+              <Calendar className="h-3.5 w-3.5 text-violet-500" />
+              Aplicar escala por intervalo de datas
+            </span>
+            <ChevronRight className={cn('h-3.5 w-3.5 text-slate-400 transition-transform', showRangeForm && 'rotate-90')} />
+          </button>
+
+          {showRangeForm && (
+            <div className="px-3 pb-3 pt-1 border-t border-slate-100 space-y-2.5 bg-slate-50">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 block mb-1">Data início</label>
+                  <Input type="date" className="h-8 text-xs" value={rangeForm.dataInicio}
+                    onChange={e => setRangeForm(f => ({ ...f, dataInicio: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 block mb-1">Data fim</label>
+                  <Input type="date" className="h-8 text-xs" value={rangeForm.dataFim}
+                    onChange={e => setRangeForm(f => ({ ...f, dataFim: e.target.value }))} />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-medium text-slate-500 block mb-1">Tipo</label>
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(TIPO_CONFIG).map(([key, cfg]) => {
+                    const Icon = cfg.icon;
+                    return (
+                      <button key={key}
+                        onClick={() => setRangeForm(f => ({ ...f, tipo: key }))}
+                        className={cn('flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-medium transition-all',
+                          rangeForm.tipo === key ? 'text-white border-transparent' : 'bg-white border-slate-200 text-slate-600')}
+                        style={rangeForm.tipo === key ? { backgroundColor: cfg.color || '#8b5cf6' } : {}}
+                      >
+                        {Icon && <Icon className="h-3 w-3" />}{cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {(rangeForm.tipo === 'normal' || rangeForm.tipo === 'extra') && (
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 block mb-1">Turno</label>
+                  <Select value={rangeForm.horario_id || 'none'} onValueChange={val => setRangeForm(f => ({ ...f, horario_id: val === 'none' ? '' : val }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="— Sem turno —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— Sem turno —</SelectItem>
+                      {horarios.map(h => (
+                        <SelectItem key={h.id} value={h.id}>
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: h.cor || '#8b5cf6' }} />
+                            {h.nome} ({h.hora_entrada}–{h.hora_saida})
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] font-medium text-slate-500 block mb-1">Observação (opcional)</label>
+                <Input className="h-8 text-xs" placeholder="Ex: férias de verão..." value={rangeForm.observacao}
+                  onChange={e => setRangeForm(f => ({ ...f, observacao: e.target.value }))} />
+              </div>
+
+              <Button className="w-full bg-violet-600 hover:bg-violet-700 text-xs h-8 gap-1"
+                onClick={applyRange} disabled={applyingRange}>
+                {applyingRange ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                Aplicar intervalo
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Turno padrão info */}
