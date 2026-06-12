@@ -61,6 +61,22 @@ export default function GestaoAusencias() {
     enabled: !!currentUser && isAdmin,
   });
 
+  // Últimas marcações para mostrar na tabela de ausências
+  const { data: ultimasMarcacoes = [] } = useQuery({
+    queryKey: ['ausencias-ultimas-marcacoes'],
+    queryFn: () => base44.entities.Marcacao.list('-timestamp', 300),
+    enabled: !!currentUser,
+    refetchInterval: 60000,
+  });
+
+  const ultimaMarcacaoMap = useMemo(() => {
+    const m = {};
+    [...ultimasMarcacoes].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(marc => {
+      m[marc.enrollid] = marc;
+    });
+    return m;
+  }, [ultimasMarcacoes]);
+
   const colaboradoresFiltrados = useMemo(() => {
     let list = colaboradores;
     if (isAdmin && ownerFilter !== 'all') list = list.filter(c => c.owner_email === ownerFilter);
@@ -122,6 +138,18 @@ export default function GestaoAusencias() {
         <td className="px-4 py-3">
           <p className="text-xs font-medium text-slate-800">{a.utilizador_nome || `ID:${a.enrollid}`}</p>
           <p className="text-[10px] text-slate-400 font-mono">#{a.enrollid}</p>
+          {(() => {
+            const ult = ultimaMarcacaoMap[a.enrollid];
+            if (!ult) return null;
+            const isHoje = new Date(ult.timestamp).toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' }) === hoje;
+            return (
+              <p className={`text-[10px] mt-0.5 flex items-center gap-0.5 ${isHoje ? 'text-emerald-600' : 'text-slate-400'}`}>
+                {isHoje ? '🟢' : '⚫'}
+                {new Date(ult.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                {' '}({ult.tipo})
+              </p>
+            );
+          })()}
         </td>
         <td className="px-4 py-3">
           <Badge className={cn('text-[10px]', TIPO_COLORS[a.tipo] || TIPO_COLORS.justificada)}>{TIPO_LABELS[a.tipo] || a.tipo}</Badge>

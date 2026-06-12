@@ -80,6 +80,31 @@ export default function Marcacoes() {
     return m;
   }, [terminalUsers]);
 
+  // Mapa enrollid → TerminalUser (para horário)
+  const terminalUserMap = useMemo(() => {
+    const m = {};
+    terminalUsers.forEach(u => { m[u.enrollid] = u; });
+    return m;
+  }, [terminalUsers]);
+
+  const { data: horarios = [] } = useQuery({
+    queryKey: ['horarios-marcacoes'],
+    queryFn: () => base44.entities.Horario.list('nome'),
+    enabled: !!currentUser,
+  });
+
+  const horarioMap = useMemo(() => {
+    const m = {};
+    horarios.forEach(h => { m[h.id] = h; });
+    return m;
+  }, [horarios]);
+
+  const { data: ausenciasMarcacoes = [] } = useQuery({
+    queryKey: ['ausencias-marcacoes'],
+    queryFn: () => base44.entities.AusenciaFalta.list('-data_inicio', 300),
+    enabled: !!currentUser,
+  });
+
   // Set of terminal IDs belonging to this user
   const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
 
@@ -428,6 +453,9 @@ export default function Marcacoes() {
                 dateFrom={dateFrom}
                 dateTo={dateTo}
                 userTimezone={userTimezone}
+                horarioMap={horarioMap}
+                terminalUserMap={terminalUserMap}
+                ausencias={ausenciasMarcacoes}
               />
             </div>
           </TabsContent>

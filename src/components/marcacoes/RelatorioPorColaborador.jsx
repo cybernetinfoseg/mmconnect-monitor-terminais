@@ -4,8 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { getModeInfo } from '@/lib/timmyModels';
 import { cn } from '@/lib/utils';
-import { Clock, User, Search, AlertTriangle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { Clock, User, Search, AlertTriangle, CalendarOff, TrendingUp } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { calcularDia, fmtMin } from '@/lib/calculoHoras';
+
+const AUSENCIA_LABELS = { ferias: '🌴 Férias', baixa_medica: '🏥 Baixa', feriado: '🎉 Feriado', justificada: '📋 Just.', injustificada: '⚠️ Injust.' };
 
 const TIPO_COLORS = {
   entrada: 'bg-emerald-100 text-emerald-700',
@@ -40,7 +43,7 @@ function formatMinutos(min) {
   return `${h}h${m > 0 ? String(m).padStart(2, '0') : ''}`;
 }
 
-export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, dateTo, userTimezone = 'UTC' }) {
+export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, dateTo, userTimezone = 'UTC', horarioMap = {}, terminalUserMap = {}, ausencias = [] }) {
   const [search, setSearch] = useState('');
 
   const diasIntervalo = useMemo(() => {
@@ -91,27 +94,38 @@ export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, 
       mapa[id].porModo[modeKey] = (mapa[id].porModo[modeKey] || 0) + 1;
     });
 
-    // Calcular horas trabalhadas e dias sem saída por colaborador
+    // Calcular horas trabalhadas, esperadas e dias sem saída por colaborador
     Object.values(mapa).forEach(col => {
       const porDia = {};
       col.marcacoes.forEach(m => {
         if (!m.timestamp) return;
-        // Usar timezone do utilizador para agrupar por dia correto
         const dia = new Date(m.timestamp).toLocaleDateString('en-CA', { timeZone: userTimezone });
         if (!porDia[dia]) porDia[dia] = [];
         porDia[dia].push(m);
       });
+      const tu = terminalUserMap[col.enrollid];
+      const horario = tu?.horario_id ? horarioMap[tu.horario_id] : null;
       let totalMin = 0;
+      let totalEsperadoMin = 0;
+      let totalExtraMin = 0;
       let diasSemSaida = 0;
-      Object.values(porDia).forEach(ms => {
-        const min = calcularMinutosDia(ms);
-        totalMin += min;
+      Object.entries(porDia).forEach(([, ms]) => {
+        const calc = calcularDia(ms, horario);
+        totalMin += calc.minutosEfetivos;
+        totalExtraMin += calc.minutosExtra;
+        if (horario?.horas_diarias) totalEsperadoMin += horario.horas_diarias * 60;
         const temEntrada = ms.some(m => m.tipo === 'entrada');
         const temSaida   = ms.some(m => m.tipo === 'saida');
         if (temEntrada && !temSaida) diasSemSaida++;
       });
       col.totalMinutos = totalMin;
+      col.totalEsperadoMin = totalEsperadoMin;
+      col.totalExtraMin = totalExtraMin;
       col.diasSemSaida = diasSemSaida;
+      col.horario = horario;
+      // Ausências no período
+      col.ausencias = ausencias.filter(a => a.enrollid === col.enrollid &&
+        a.data_inicio <= (dateTo || '9999') && a.data_fim >= (dateFrom || '0000'));
     });
 
     return Object.values(mapa).sort((a, b) => b.totalMinutos - a.totalMinutos || b.marcacoes.length - a.marcacoes.length);
@@ -153,6 +167,10 @@ export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
           <p className="text-xl font-bold text-blue-700">{formatMinutos(totalHoras)}</p>
           <p className="text-xs text-blue-600">Total trabalhado</p>
+        </div>
+        <div className="bg-violet-50 border border-violet-200 rounded-lg p-2">
+          <p className="text-xl font-bold text-violet-700">{formatMinutos(agrupado.reduce((s,c) => s + (c.totalExtraMin||0), 0))}</p>
+          <p className="text-xs text-violet-600">Horas extra</p>
         </div>
       </div>
 
@@ -197,8 +215,9 @@ export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, 
               <th className="text-center px-2 py-2 text-xs font-semibold text-slate-600 uppercase hidden sm:table-cell">Entradas</th>
               <th className="text-center px-2 py-2 text-xs font-semibold text-slate-600 uppercase hidden sm:table-cell">Saídas</th>
               <th className="text-center px-2 py-2 text-xs font-semibold text-slate-600 uppercase">⏱ Trabalhado</th>
-              <th className="text-left px-2 py-2 text-xs font-semibold text-slate-600 uppercase hidden md:table-cell">Modos</th>
-              <th className="text-left px-2 py-2 text-xs font-semibold text-slate-600 uppercase hidden lg:table-cell">Última marcação</th>
+              <th className="text-center px-2 py-2 text-xs font-semibold text-slate-600 uppercase hidden md:table-cell">Esperado / Extra</th>
+              <th className="text-left px-2 py-2 text-xs font-semibold text-slate-600 uppercase hidden lg:table-cell">Ausências</th>
+              <th className="text-left px-2 py-2 text-xs font-semibold text-slate-600 uppercase hidden xl:table-cell">Última marcação</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -254,19 +273,35 @@ export default function RelatorioPorColaborador({ marcacoes, userMap, dateFrom, 
                       )}
                     </div>
                   </td>
-                  <td className="px-2 py-2.5 hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(col.porModo).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([mode, count]) => {
-                        const info = getModeInfo(isNaN(Number(mode)) ? mode : null, isNaN(Number(mode)) ? null : Number(mode));
-                        return (
-                          <span key={mode} className={cn('text-[10px] px-1.5 py-0.5 rounded border', info.color)}>
-                            {info.icon} {info.label} <span className="font-bold">×{count}</span>
-                          </span>
-                        );
-                      })}
+                  <td className="px-2 py-2.5 hidden md:table-cell text-center">
+                    <div className="space-y-0.5">
+                      {col.totalEsperadoMin > 0 && (
+                        <p className="text-[10px] text-slate-400">
+                          Esp: <span className="font-semibold text-slate-600">{formatMinutos(col.totalEsperadoMin)}</span>
+                        </p>
+                      )}
+                      {col.totalExtraMin > 0 && (
+                        <p className="text-[10px] text-violet-500 flex items-center justify-center gap-0.5">
+                          <TrendingUp className="h-2.5 w-2.5" />+{formatMinutos(col.totalExtraMin)}
+                        </p>
+                      )}
+                      {col.totalEsperadoMin > 0 && col.totalMinutos < col.totalEsperadoMin && (
+                        <p className="text-[10px] text-amber-500">-{formatMinutos(col.totalEsperadoMin - col.totalMinutos)}</p>
+                      )}
+                      {!col.horario && <span className="text-[10px] text-slate-300">—</span>}
                     </div>
                   </td>
                   <td className="px-2 py-2.5 hidden lg:table-cell">
+                    <div className="flex flex-wrap gap-1">
+                      {col.ausencias.slice(0, 2).map((a, i) => (
+                        <Badge key={i} className="text-[9px] bg-orange-50 text-orange-600 border-orange-200">
+                          <CalendarOff className="h-2.5 w-2.5 mr-0.5" />{AUSENCIA_LABELS[a.tipo] || a.tipo}
+                        </Badge>
+                      ))}
+                      {col.ausencias.length === 0 && <span className="text-[10px] text-slate-300">—</span>}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2.5 hidden xl:table-cell">
                     {ultima?.timestamp ? (
                       <div>
                         <p className="text-xs font-mono text-slate-600">{format(new Date(ultima.timestamp), 'dd/MM HH:mm')}</p>

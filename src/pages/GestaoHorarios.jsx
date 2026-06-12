@@ -121,6 +121,27 @@ export default function GestaoHorarios() {
     return map;
   }, [horarios, colaboradores]);
 
+  // Presença de hoje para mostrar nos cards de turno
+  const { data: marcacoesHoje = [] } = useQuery({
+    queryKey: ['horarios-presenca-hoje'],
+    queryFn: async () => {
+      const all = await base44.entities.Marcacao.list('-timestamp', 500);
+      const hoje = new Date().toLocaleDateString('en-CA');
+      return all.filter(m => m.timestamp && new Date(m.timestamp).toLocaleDateString('en-CA') === hoje);
+    },
+    enabled: !!currentUser,
+    refetchInterval: 60000,
+  });
+
+  // Mapa enrollid → último tipo de hoje
+  const presencaHojeMap = useMemo(() => {
+    const porColab = {};
+    [...marcacoesHoje].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(m => {
+      porColab[m.enrollid] = m.tipo;
+    });
+    return porColab; // enrollid → 'entrada' | 'saida'
+  }, [marcacoesHoje]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full">
       <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
@@ -244,13 +265,28 @@ export default function GestaoHorarios() {
                               ))}
                             </div>
                             <div className="pt-2 border-t border-slate-100">
-                              <p className="text-xs text-slate-500 mb-1.5 flex items-center gap-1">
-                                <Users className="h-3 w-3" /> {colabs.length} colaborador(es)
+                              <p className="text-xs text-slate-500 mb-1.5 flex items-center gap-1 justify-between">
+                                <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {colabs.length} colaborador(es)</span>
+                                {(() => {
+                                  const presentes = colabs.filter(c => presencaHojeMap[c.enrollid] === 'entrada').length;
+                                  return presentes > 0 ? (
+                                    <span className="flex items-center gap-0.5 text-emerald-600 font-semibold">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                      {presentes} presentes
+                                    </span>
+                                  ) : null;
+                                })()}
                               </p>
                               <div className="flex flex-wrap gap-1">
-                                {colabs.slice(0, 4).map(c => (
-                                  <span key={c.id} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full truncate max-w-[100px]">{c.nome}</span>
-                                ))}
+                                {colabs.slice(0, 4).map(c => {
+                                  const presente = presencaHojeMap[c.enrollid] === 'entrada';
+                                  return (
+                                    <span key={c.id} className={`text-[10px] px-1.5 py-0.5 rounded-full truncate max-w-[100px] flex items-center gap-0.5 ${presente ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                      {presente && <span className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />}
+                                      {c.nome}
+                                    </span>
+                                  );
+                                })}
                                 {colabs.length > 4 && <span className="text-[10px] text-slate-400">+{colabs.length - 4}</span>}
                               </div>
                             </div>

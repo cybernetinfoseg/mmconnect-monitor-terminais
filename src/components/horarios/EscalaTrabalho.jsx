@@ -47,6 +47,24 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
     queryFn: () => base44.entities.EscalaDia.list('-data', 2000),
   });
 
+  // Ausências ativas na semana visível (para overlay nas células)
+  const { data: ausenciasEscala = [] } = useQuery({
+    queryKey: ['ausencias-escala', format(weekStart, 'yyyy-MM-dd')],
+    queryFn: () => base44.entities.AusenciaFalta.list('-data_inicio', 300),
+  });
+
+  // Mapa enrollid → ausências (array) para a semana visível
+  const ausenciaEnrollidMap = useMemo(() => {
+    const weekEnd = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+    const weekStartStr = format(weekStart, 'yyyy-MM-dd');
+    const m = {};
+    ausenciasEscala.filter(a => a.data_inicio <= weekEnd && a.data_fim >= weekStartStr).forEach(a => {
+      if (!m[a.enrollid]) m[a.enrollid] = [];
+      m[a.enrollid].push(a);
+    });
+    return m;
+  }, [ausenciasEscala, weekStart]);
+
   // Mapa: colaborador_id → { dateStr → escala }
   const escalaDiaMap = useMemo(() => {
     const m = {};
@@ -487,12 +505,34 @@ export default function EscalaTrabalho({ colaboradores, horarios, onAssign, assi
                     const dow = day.getDay();
                     const escalado = diasAtivos.includes(dow);
                     const today = isToday(day);
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const escalaDia = escalaDiaMap[c.id]?.[dateStr];
+                    const ausencias = ausenciaEnrollidMap[c.enrollid];
+                    const ausenciaAtiva = ausencias?.find(a => a.data_inicio <= dateStr && a.data_fim >= dateStr);
+                    const tipoColors = { folga: '#94a3b8', ferias: '#f59e0b', feriado: '#3b82f6', extra: '#10b981' };
+                    const tipoEmojis = { ferias: '🌴', baixa_medica: '🏥', feriado: '🎉', justificada: '📋', injustificada: '⚠️', folga: '😴', extra: '⚡' };
                     return (
                       <td key={i} className={cn(
                         'text-center px-1 py-2',
                         today ? 'bg-violet-50/40' : ''
                       )}>
-                        {escalado ? (
+                        {ausenciaAtiva ? (
+                          <div
+                            className="w-6 h-6 rounded-full mx-auto flex items-center justify-center text-[10px]"
+                            style={{ backgroundColor: '#fed7aa', border: '1px solid #fb923c' }}
+                            title={`${ausenciaAtiva.tipo}: ${ausenciaAtiva.utilizador_nome}`}
+                          >
+                            {tipoEmojis[ausenciaAtiva.tipo] || '✕'}
+                          </div>
+                        ) : escalaDia && escalaDia.tipo !== 'normal' ? (
+                          <div
+                            className="w-6 h-6 rounded-full mx-auto flex items-center justify-center text-white text-[8px] font-bold shadow-sm"
+                            style={{ backgroundColor: tipoColors[escalaDia.tipo] || '#8b5cf6' }}
+                            title={escalaDia.tipo}
+                          >
+                            {tipoEmojis[escalaDia.tipo] || '~'}
+                          </div>
+                        ) : escalado ? (
                           <div
                             className="w-6 h-6 rounded-full mx-auto flex items-center justify-center shadow-sm"
                             style={{ backgroundColor: horarioAtual?.cor || '#8b5cf6' }}
