@@ -21,6 +21,9 @@ import RH from './pages/RH';
 import FichaColaborador from './pages/FichaColaborador';
 import GestaoContratos from './pages/GestaoContratos';
 import GestaoFeriasRH from './pages/GestaoFeriasRH';
+import HorasExtra from './pages/HorasExtra.jsx';
+import BancoHoras from './pages/BancoHoras.jsx';
+import MapaAssiduidade from './pages/MapaAssiduidade.jsx';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -92,6 +95,9 @@ const AuthenticatedApp = () => {
       <Route path="/FichaColaborador" element={<LayoutWrapper currentPageName="FichaColaborador"><FichaColaborador /></LayoutWrapper>} />
       <Route path="/GestaoContratos" element={<LayoutWrapper currentPageName="GestaoContratos"><GestaoContratos /></LayoutWrapper>} />
       <Route path="/GestaoFeriasRH" element={<LayoutWrapper currentPageName="GestaoFeriasRH"><GestaoFeriasRH /></LayoutWrapper>} />
+      <Route path="/HorasExtra" element={<LayoutWrapper currentPageName="HorasExtra"><HorasExtra /></LayoutWrapper>} />
+      <Route path="/BancoHoras" element={<LayoutWrapper currentPageName="BancoHoras"><BancoHoras /></LayoutWrapper>} />
+      <Route path="/MapaAssiduidade" element={<LayoutWrapper currentPageName="MapaAssiduidade"><MapaAssiduidade /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
