@@ -72,7 +72,13 @@ export default function TerminalMarker({ terminal, position, isEditMode, onDragE
       >
         {terminal.status === 'offline' && (
           <span className="absolute rounded-full animate-ping bg-red-400 opacity-40 pointer-events-none"
-            style={{ width: iconSize + 8, height: iconSize + 8, top: -4, left: -4 }} />
+            style={{
+              width: iconSize + 8,
+              height: iconSize + 8,
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+            }} />
         )}
         <div className={cn(
           "rounded-xl overflow-hidden shadow-lg",
