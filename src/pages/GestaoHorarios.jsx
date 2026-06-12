@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Plus, Pencil, Trash2, Clock, Users, Calendar, LayoutGrid } from 'lucide-react';
+import { CalendarClock, Plus, Pencil, Trash2, Clock, Users, Calendar, LayoutGrid, TableProperties } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,12 +12,14 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import CalendarioEscala from '@/components/horarios/CalendarioEscala';
 import AtribuicaoHorario from '@/components/horarios/AtribuicaoHorario';
+import EscalaManager from '@/components/horarios/EscalaManager';
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const CORES = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
 
 const TABS = [
   { key: 'turnos', label: 'Turnos', icon: LayoutGrid },
+  { key: 'escala', label: 'Escala', icon: TableProperties },
   { key: 'calendario', label: 'Calendário', icon: Calendar },
   { key: 'atribuicao', label: 'Atribuição', icon: Users },
 ];
@@ -235,6 +237,19 @@ export default function GestaoHorarios() {
                   </div>
                 )}
               </>
+            )}
+
+            {/* === ESCALA TAB === */}
+            {activeTab === 'escala' && (
+              <Card className="bg-white border-slate-200">
+                <CardContent className="p-4">
+                  <EscalaManager
+                    colaboradores={colaboradores}
+                    horarios={horarios}
+                    currentUser={currentUser}
+                  />
+                </CardContent>
+              </Card>
             )}
 
             {/* === CALENDÁRIO TAB === */}

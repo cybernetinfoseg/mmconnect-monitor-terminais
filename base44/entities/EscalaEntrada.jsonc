@@ -1,0 +1,53 @@
+{
+  "name": "EscalaEntrada",
+  "type": "object",
+  "properties": {
+    "escala_id": {
+      "type": "string",
+      "description": "ID da EscalaTrabalho a que pertence"
+    },
+    "colaborador_id": {
+      "type": "string",
+      "description": "ID do TerminalUser"
+    },
+    "colaborador_nome": {
+      "type": "string",
+      "description": "Nome do colaborador (cache)"
+    },
+    "data": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do dia escalado (YYYY-MM-DD)"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "trabalho",
+        "folga",
+        "ferias",
+        "feriado",
+        "falta"
+      ],
+      "default": "trabalho",
+      "description": "Tipo de entrada na escala"
+    },
+    "horario_id": {
+      "type": "string",
+      "description": "ID do Horario (turno) para este dia espec\u00edfico"
+    },
+    "horario_nome": {
+      "type": "string",
+      "description": "Nome do hor\u00e1rio (cache)"
+    },
+    "nota": {
+      "type": "string",
+      "description": "Nota espec\u00edfica para este dia"
+    }
+  },
+  "required": [
+    "escala_id",
+    "colaborador_id",
+    "data",
+    "tipo"
+  ]
+}
