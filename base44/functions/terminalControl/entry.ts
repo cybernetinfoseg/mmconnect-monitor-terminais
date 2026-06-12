@@ -32,8 +32,23 @@ function getNocServerHost() {
   return host;
 }
 
-function nowStr() {
-  return new Date().toISOString().replace('T', ' ').substring(0, 19);
+function nowStr(timezone) {
+  const now = new Date();
+  if (timezone) {
+    try {
+      // Format in the target timezone as "YYYY-MM-DD HH:MM:SS"
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false,
+      }).formatToParts(now);
+      const p = {};
+      parts.forEach(({ type, value }) => { p[type] = value; });
+      return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
+    } catch {}
+  }
+  return now.toISOString().replace('T', ' ').substring(0, 19);
 }
 
 // ─── Helpers de comunicação ──────────────────────────────────────────────────
@@ -220,8 +235,8 @@ async function dahuaRequest(terminal, cgiPath) {
 
 // ─── Action Handlers ─────────────────────────────────────────────────────────
 
-async function actionSetTime(terminal) {
-  const now = nowStr();
+async function actionSetTime(terminal, _params, userTimezone) {
+  const now = nowStr(userTimezone);
   const tipo = terminal.tipo_conexao;
   const fab = terminal.fabricante || '';
 
@@ -649,9 +664,12 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Sem permissão para controlar este terminal' }, { status: 403 });
     }
 
+    // Fetch user's configured timezone for clock sync
+    const userTimezone = user.timezone || 'UTC';
+
     let result;
     switch (action) {
-      case 'settime':     result = await actionSetTime(terminal); break;
+      case 'settime':     result = await actionSetTime(terminal, params, userTimezone); break;
       case 'getlogs':     result = await actionGetLogs(terminal); break;
       case 'getalllog':   result = await actionGetAllLogs(terminal, params); break;
       case 'opendoor':    result = await actionOpenDoor(terminal); break;
