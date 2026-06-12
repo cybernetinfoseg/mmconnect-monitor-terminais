@@ -73,8 +73,11 @@ Deno.serve(async (req) => {
             ativo: t.ativo,
         }));
 
-        console.log(`nocServerGetTerminals OK: ${ownerEmail} → ${result.length} terminais (${terminals.map(t => t.tipo_conexao).join(', ')})`);
-        return Response.json({ success: true, terminals: result, owner: ownerEmail });
+        // Buscar timezone do utilizador para sincronização com o servidor Timmy
+        const user_timezone = ownerUser?.timezone || 'Europe/Lisbon';
+
+        console.log(`nocServerGetTerminals OK: ${ownerEmail} → ${result.length} terminais | timezone=${user_timezone}`);
+        return Response.json({ success: true, terminals: result, owner: ownerEmail, user_timezone });
 
     } catch (error) {
         console.error('nocServerGetTerminals erro:', error.message);
