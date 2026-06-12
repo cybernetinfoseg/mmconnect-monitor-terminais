@@ -218,6 +218,7 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
   const [loading, setLoading] = useState(null);
   const [results, setResults] = useState({});
   const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmButtonRef, setConfirmButtonRef] = useState(null);
   const [activeForm, setActiveForm] = useState(null);
 
   // Fetch terminal users associated with this terminal
@@ -332,17 +333,18 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
                 const result = results[action.key];
 
                 return (
-                  <div key={action.key} className="space-y-2">
-                    <button
-                      onClick={() => handleActionClick(action)}
-                      disabled={!!loading}
-                      className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
-                        COLOR_MAP[action.color],
-                        loading && loading !== action.key ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-                        isLoading && 'opacity-75'
-                      )}
-                    >
+                   <div key={action.key} className="space-y-2">
+                     <button
+                       ref={confirmAction?.key === action.key ? setConfirmButtonRef : null}
+                       onClick={() => handleActionClick(action)}
+                       disabled={!!loading}
+                       className={cn(
+                         'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
+                         COLOR_MAP[action.color],
+                         loading && loading !== action.key ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                         isLoading && 'opacity-75'
+                       )}
+                     >
                       {isLoading
                         ? <Loader2 className="h-5 w-5 animate-spin shrink-0" />
                         : <Icon className="h-5 w-5 shrink-0" />
@@ -380,10 +382,18 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
             </div>
           )}
 
-          {/* Confirm dialog */}
-          {confirmAction && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-              <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm mx-4 space-y-4">
+          {/* Confirm dialog — posicionado junto ao botão */}
+          {confirmAction && confirmButtonRef && (
+            <div 
+              className="fixed z-50"
+              style={{
+                top: `${confirmButtonRef.getBoundingClientRect().bottom + 8}px`,
+                left: `${confirmButtonRef.getBoundingClientRect().left}px`,
+                width: `${confirmButtonRef.getBoundingClientRect().width}px`,
+                maxWidth: 'min(90vw, 500px)',
+              }}
+            >
+              <div className="bg-white rounded-xl shadow-2xl p-6 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'p-2 rounded-lg',
