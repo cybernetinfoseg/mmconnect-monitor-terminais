@@ -51,6 +51,10 @@
     "observacoes": {
       "type": "string",
       "description": "Observa\u00e7\u00f5es adicionais"
+    },
+    "horario_id": {
+      "type": "string",
+      "description": "ID do hor\u00e1rio atribu\u00eddo a este colaborador"
     }
   },
   "required": [
