@@ -32,6 +32,8 @@ import {
   Settings2,
   RotateCcw,
   ListChecks,
+  Timer,
+  Cpu,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UserActionForm from './UserActionForm';
@@ -57,10 +59,12 @@ function getSupportedActions(terminal) {
     clearlog:    { label: 'Limpar Logs',             icon: Trash2,       color: 'orange',  desc: 'Apagar todos os registos de ponto do terminal', confirm: true, danger: true },
     clearusers:  { label: 'Limpar Utilizadores',     icon: Trash2,       color: 'red',     desc: 'Apagar TODOS os utilizadores e dados biométricos', confirm: true, danger: true },
     initdevice:  { label: 'Reset de Fábrica',        icon: RotateCcw,    color: 'red',     desc: 'Inicializar terminal — apaga tudo e repõe configurações de fábrica', confirm: true, danger: true },
+    gettime:     { label: 'Ver Hora do Terminal',     icon: Timer,        color: 'blue',    desc: 'Obter hora atual do terminal e comparar com o servidor' },
+    getdevcap:   { label: 'Capacidade do Dispositivo', icon: Cpu,         color: 'slate',   desc: 'Ver slots usados: utilizadores, faces, impressões digitais, logs' },
   };
 
   if (tipo === 'websocket_cloud') {
-    return ['settime', 'getlogs', 'getalllog', 'opendoor', 'reboot', 'getdevinfo', 'getparam', 'lockctrl', 'getuserlist', 'adduser', 'blockuser', 'deleteuser', 'clearlog', 'clearusers', 'initdevice'].map(k => ({ key: k, ...all[k] }));
+    return ['settime', 'gettime', 'getlogs', 'getalllog', 'opendoor', 'reboot', 'getdevinfo', 'getdevcap', 'getparam', 'lockctrl', 'getuserlist', 'adduser', 'blockuser', 'deleteuser', 'clearlog', 'clearusers', 'initdevice'].map(k => ({ key: k, ...all[k] }));
   }
   if (tipo === 'adms_push') {
     return ['settime', 'getlogs', 'opendoor', 'reboot', 'getdevinfo', 'adduser', 'blockuser', 'deleteuser'].map(k => ({ key: k, ...all[k] }));
@@ -144,6 +148,42 @@ function ResultBox({ result }) {
                   <p className="text-[10px] text-slate-400 text-center">...e mais {result.data.total - 20}</p>
                 )}
               </div>
+            </div>
+          )}
+          {/* Hora do terminal (gettime) */}
+          {result.data?.terminal_time && (
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white rounded p-2 border border-blue-100">
+                <p className="text-slate-400">Terminal</p>
+                <p className="font-mono font-semibold text-slate-700">{result.data.terminal_time}</p>
+              </div>
+              <div className="bg-white rounded p-2 border border-blue-100">
+                <p className="text-slate-400">Servidor</p>
+                <p className="font-mono font-semibold text-slate-700">{result.data.server_time}</p>
+              </div>
+              {result.data.desvio && (
+                <div className="col-span-2 bg-amber-50 rounded p-2 border border-amber-100 text-amber-700 font-medium">
+                  ⏱ Desvio: {result.data.desvio}
+                </div>
+              )}
+            </div>
+          )}
+          {/* Capacidade do dispositivo (getdevcap) */}
+          {result.data?.usersize && (
+            <div className="mt-2 grid grid-cols-3 gap-1 text-xs">
+              {[
+                { label: 'Utilizadores', used: result.data.useduser, total: result.data.usersize },
+                { label: 'Faces', used: result.data.usedface, total: result.data.facesize },
+                { label: 'Impressões', used: result.data.usedfp, total: result.data.fpsize },
+                { label: 'Cartões', used: result.data.usedcard, total: result.data.cardsize },
+                { label: 'Senhas', used: result.data.usedpwd, total: result.data.pwdsize },
+                { label: 'Logs', used: result.data.usedlog, total: result.data.logsize },
+              ].map(item => (
+                <div key={item.label} className="bg-white rounded p-1.5 border border-slate-100 text-center">
+                  <p className="text-slate-400 text-[10px]">{item.label}</p>
+                  <p className="font-semibold text-slate-700">{item.used ?? '—'}<span className="text-slate-300">/{item.total ?? '?'}</span></p>
+                </div>
+              ))}
             </div>
           )}
           {hasData && result.data && (

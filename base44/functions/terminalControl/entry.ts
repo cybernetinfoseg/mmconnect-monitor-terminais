@@ -633,10 +633,28 @@ async function actionGetParam(terminal) {
 
 async function actionInitDevice(terminal) {
   if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'initsys apenas suportado via WebSocket Cloud (Timmy)' };
-  // Protocolo oficial Timmy: cmd = "initsys" (pág. 19 — "Initialize system")
-  // Atenção: apaga todos os utilizadores e logs mas mantém configurações
   const resp = await sendTimmyCommand(terminal, { cmd: 'initsys' });
   return { success: resp.result === true, message: 'Sistema inicializado — utilizadores e logs eliminados (configurações mantidas)', data: resp };
+}
+
+async function actionGetTime(terminal) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'gettime apenas suportado via WebSocket Cloud (Timmy)' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'gettime' });
+  const terminalTime = resp.time || 'Desconhecido';
+  const serverTime = nowStr();
+  // Calcular desvio
+  let desvio = '';
+  if (resp.time) {
+    const diff = Math.round((new Date(serverTime) - new Date(resp.time)) / 1000);
+    desvio = diff >= 0 ? `+${diff}s adiantado no servidor` : `${Math.abs(diff)}s atrasado no terminal`;
+  }
+  return { success: true, message: `Hora do terminal: ${terminalTime}`, data: { terminal_time: terminalTime, server_time: serverTime, desvio } };
+}
+
+async function actionGetDevCap(terminal) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') return { success: false, error: 'getdevcap apenas suportado via WebSocket Cloud (Timmy)' };
+  const resp = await sendTimmyCommand(terminal, { cmd: 'getdevcap' });
+  return { success: resp.result === true, message: 'Capacidades do dispositivo obtidas', data: resp };
 }
 
 // ─── Main Handler ─────────────────────────────────────────────────────────────
@@ -685,6 +703,8 @@ Deno.serve(async (req) => {
       case 'clearusers':  result = await actionClearUsers(terminal); break;
       case 'getparam':    result = await actionGetParam(terminal); break;
       case 'initdevice':  result = await actionInitDevice(terminal); break;
+      case 'gettime':     result = await actionGetTime(terminal); break;
+      case 'getdevcap':   result = await actionGetDevCap(terminal); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }
