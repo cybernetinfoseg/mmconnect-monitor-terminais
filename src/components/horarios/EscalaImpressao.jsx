@@ -49,8 +49,14 @@ function LinhaColaborador({ colab, horarioMap, escalaDiaMap, weekDays }) {
             cellLabel = tipoLabels[escala.tipo] || escala.tipo;
           } else if (escala.horario_id && horarioMap[escala.horario_id]) {
             const h = horarioMap[escala.horario_id];
-            cellColor = h.cor || '#8b5cf6';
-            cellLabel = h.hora_entrada + '–' + h.hora_saida;
+            const diasH = parseDias(h.dias_semana);
+            if (diasH.length === 0 || diasH.includes(dow)) {
+              cellColor = h.cor || '#8b5cf6';
+              cellLabel = h.hora_entrada + '–' + h.hora_saida;
+            }
+          } else if (horarioAtual && diasAtivos.includes(dow)) {
+            cellColor = horarioAtual.cor || '#8b5cf6';
+            cellLabel = horarioAtual.hora_entrada + '–' + horarioAtual.hora_saida;
           }
         } else if (horarioAtual && diasAtivos.includes(dow)) {
           cellColor = horarioAtual.cor || '#8b5cf6';
@@ -141,8 +147,14 @@ function BlocoIndividual({ colab, horarioMap, escalaDiaMap, semanas }) {
                           cellLabel = tipoLabels[escala.tipo] || escala.tipo;
                         } else if (escala.horario_id && horarioMap[escala.horario_id]) {
                           const h = horarioMap[escala.horario_id];
-                          cellColor = h.cor || '#8b5cf6';
-                          cellLabel = h.hora_entrada + '–' + h.hora_saida;
+                          const diasH = parseDias(h.dias_semana);
+                          if (diasH.length === 0 || diasH.includes(dow)) {
+                            cellColor = h.cor || '#8b5cf6';
+                            cellLabel = h.hora_entrada + '–' + h.hora_saida;
+                          }
+                        } else if (horarioAtual && diasAtivos.includes(dow)) {
+                          cellColor = horarioAtual.cor || '#8b5cf6';
+                          cellLabel = horarioAtual.hora_entrada + '–' + horarioAtual.hora_saida;
                         }
                       } else if (horarioAtual && diasAtivos.includes(dow)) {
                         cellColor = horarioAtual.cor || '#8b5cf6';
@@ -218,8 +230,17 @@ export default function EscalaImpressao({ colaboradores, horarios, escalaDiaMap,
           color = tipoColors[escala.tipo] || '#8b5cf6';
           label = tipoLabels[escala.tipo] || escala.tipo;
         } else if (escala.horario_id && horarioMap[escala.horario_id]) {
+          // Override manual de horário — respeitar os dias_semana do horário override
           const h = horarioMap[escala.horario_id];
-          color = h.cor || '#8b5cf6'; label = h.hora_entrada + '–' + h.hora_saida;
+          const diasH = parseDias(h.dias_semana);
+          if (diasH.length === 0 || diasH.includes(dow)) {
+            color = h.cor || '#8b5cf6'; label = h.hora_entrada + '–' + h.hora_saida;
+          }
+        } else {
+          // EscalaDia tipo normal sem horario_id: usar horário base respeitando dias_semana
+          if (horarioAtual && diasAtivos.includes(dow)) {
+            color = horarioAtual.cor || '#8b5cf6'; label = horarioAtual.hora_entrada + '–' + horarioAtual.hora_saida;
+          }
         }
       } else if (horarioAtual && diasAtivos.includes(dow)) {
         color = horarioAtual.cor || '#8b5cf6'; label = horarioAtual.hora_entrada + '–' + horarioAtual.hora_saida;
