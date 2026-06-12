@@ -15,6 +15,7 @@
  * Deduplicação: janela de ±30s por terminal+enrollid para tolerância a retries do terminal.
  */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { validateApiKey, isUserAdmin, isInMaintenanceWindow, updateStatusCache, handleStatusChange, processMarcacoes } from './helpers.js';
 
 const NOC_TYPES = ['heartbeat', 'adms_push', 'sdk_tcp', 'websocket_cloud'];
 
@@ -26,41 +27,30 @@ const DEDUP_WINDOW_MS = 30000;
 
 Deno.serve(async (req) => {
     try {
-        const apiKey = (req.headers.get('X-Api-Key') || req.headers.get('x-api-key') || '').trim();
-        if (!apiKey || apiKey.length < 16) {
-            return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
-        }
-
         const body = await req.json();
         const base44 = createClientFromRequest(req);
-        const allApiKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
-        const keyRecord = allApiKeys.find(k => k.key === apiKey);
+        const authResult = await validateApiKey(req, base44);
 
-        if (!keyRecord) {
-            return Response.json({ error: 'API Key inválida' }, { status: 401 });
+        if (!authResult.valid) {
+            return Response.json({ error: authResult.error }, { status: authResult.status });
         }
 
-        const ownerEmail = keyRecord.user_email;
+        const ownerEmail = authResult.ownerEmail;
         const { terminal_id, status, latencia_ms, segundos_sem_ping, marcacoes } = body;
 
         if (!terminal_id || !status) {
             return Response.json({ error: 'terminal_id e status são obrigatórios' }, { status: 400 });
         }
 
-        const allUsers = await base44.asServiceRole.entities.User.filter({ email: ownerEmail });
-        const isAdmin = allUsers[0]?.role === 'admin';
-
+        const isAdmin = await isUserAdmin(base44, ownerEmail);
         const terminal = await base44.asServiceRole.entities.Terminal.get(terminal_id).catch(() => null);
 
         if (!terminal) {
             return Response.json({ error: `Terminal não encontrado: ${terminal_id}` }, { status: 404 });
         }
 
-        if (!isAdmin) {
-            const isOwner = terminal.usuario_email === ownerEmail || terminal.created_by === ownerEmail;
-            if (!isOwner) {
-                return Response.json({ error: 'Sem permissão para reportar este terminal' }, { status: 403 });
-            }
+        if (!isAdmin && !(terminal.usuario_email === ownerEmail || terminal.created_by === ownerEmail)) {
+            return Response.json({ error: 'Sem permissão para reportar este terminal' }, { status: 403 });
         }
 
         if (!NOC_TYPES.includes(terminal.tipo_conexao)) {
@@ -72,13 +62,7 @@ Deno.serve(async (req) => {
         const statusEfetivo = statusValido === 'warning' ? 'online' : statusValido;
 
         // Verificar janela de manutenção
-        const janelasManu = await base44.asServiceRole.entities.MaintenanceWindow.filter({ terminal_id, ativo: true });
-        const agora_ms = Date.now();
-        const emManutencao = janelasManu.some(j => {
-            const ini = new Date(j.inicio).getTime();
-            const fim = new Date(j.fim).getTime();
-            return agora_ms >= ini && agora_ms <= fim;
-        });
+        const emManutencao = await isInMaintenanceWindow(base44, terminal_id);
 
         if (emManutencao && statusEfetivo === 'offline') {
             console.log(`[nocServerReport] '${terminal.nome}' em manutenção — ignorado`);
@@ -88,7 +72,6 @@ Deno.serve(async (req) => {
         // Verificar cache de status
         const cacheResults = await base44.asServiceRole.entities.StatusCache.filter({ terminal_id });
         const cache = cacheResults.length > 0 ? cacheResults[0] : null;
-        const statusAnterior = cache?.ultimo_status ?? null;
         const offlineCount = cache?.offline_count ?? 0;
 
         // ── ANTI-FALSO-OFFLINE ────────────────────────────────────────────────────
@@ -118,8 +101,6 @@ Deno.serve(async (req) => {
         }
         // ─────────────────────────────────────────────────────────────────────────
 
-        const mudouDeEstado = statusAnterior !== null && statusAnterior !== statusConfirmado;
-
         // Actualizar terminal com status confirmado
         await base44.asServiceRole.entities.Terminal.update(terminal_id, {
             status: statusConfirmado,
@@ -129,58 +110,14 @@ Deno.serve(async (req) => {
             ...(statusConfirmado === 'online' && { ultimo_ping: agora }),
         });
 
+        // Obter status anterior e lidar com mudanças
+        const statusAnterior = cache?.ultimo_status ?? null;
+        const mudouDeEstado = statusAnterior !== null && statusAnterior !== statusConfirmado;
+        
         if (mudouDeEstado) {
             console.log(`[nocServerReport] '${terminal.nome}' mudou: ${statusAnterior} → ${statusConfirmado}`);
-
-            await base44.asServiceRole.entities.StatusHistory.create({
-                terminal_id,
-                terminal_nome: terminal.nome,
-                status: statusConfirmado,
-                timestamp: agora,
-                local: terminal.local || '',
-                cliente: terminal.cliente_nome || '',
-            });
-
-            if (statusConfirmado === 'offline') {
-                await Promise.all([
-                    base44.asServiceRole.entities.AlertIncident.create({
-                        terminal_id, terminal_nome: terminal.nome,
-                        local: terminal.local || '', cliente: terminal.cliente_nome || '',
-                        tipo: 'offline', timestamp: agora, resolvido: false, notificado: false,
-                    }),
-                    base44.asServiceRole.entities.EscalationAlert.create({
-                        terminal_id, terminal_nome: terminal.nome,
-                        local: terminal.local || '', cliente: terminal.cliente_nome || '',
-                        owner_email: ownerEmail, offline_desde: agora,
-                        escalado: false, resolvido: false, notificacao_inicial_enviada: false,
-                    }).catch(() => {}),
-                    base44.asServiceRole.functions.invoke('pushNotify', {
-                        action: 'notify_offline', terminal_id, terminal_nome: terminal.nome,
-                        local: terminal.local || '', cliente: terminal.cliente_nome || '',
-                        owner_email: terminal.created_by || '',
-                    }).catch(() => {}),
-                ]);
-
-            } else if (statusConfirmado === 'online') {
-                const [incidentes, escalations] = await Promise.all([
-                    base44.asServiceRole.entities.AlertIncident.filter({ terminal_id, resolvido: false }).catch(() => []),
-                    base44.asServiceRole.entities.EscalationAlert.filter({ terminal_id, resolvido: false }).catch(() => []),
-                ]);
-                await Promise.all([
-                    ...incidentes.map(inc => {
-                        const duracao = Math.round((Date.now() - new Date(inc.timestamp).getTime()) / 60000);
-                        return base44.asServiceRole.entities.AlertIncident.update(inc.id, {
-                            resolvido: true, resolvido_em: agora, duracao_minutos: duracao,
-                        }).catch(() => {});
-                    }),
-                    ...escalations.map(esc => base44.asServiceRole.entities.EscalationAlert.update(esc.id, { resolvido: true }).catch(() => {})),
-                    base44.asServiceRole.entities.AlertIncident.create({
-                        terminal_id, terminal_nome: terminal.nome,
-                        local: terminal.local || '', cliente: terminal.cliente_nome || '',
-                        tipo: 'restored', timestamp: agora, resolvido: true, notificado: false,
-                    }).catch(() => {}),
-                ]);
-            }
+            const agoraObj = new Date(agora);
+            await handleStatusChange(base44, terminal, statusConfirmado, statusAnterior, agoraObj);
         }
 
         // Actualizar cache com status confirmado e reset de contador
@@ -200,7 +137,6 @@ Deno.serve(async (req) => {
         let marcacoesGuardadas = 0;
         if (Array.isArray(marcacoes) && marcacoes.length > 0) {
             // Buscar utilizadores do terminal para enriquecer marcações com nome
-            // Filtra por owner do terminal para evitar carregar toda a BD
             const terminalOwnerEmail = terminal.usuario_email || terminal.created_by || '';
             const terminalUsers = terminalOwnerEmail
                 ? await base44.asServiceRole.entities.TerminalUser.filter({ owner_email: terminalOwnerEmail }).catch(() => [])
@@ -208,56 +144,7 @@ Deno.serve(async (req) => {
             const enrollMap = {};
             terminalUsers.forEach(u => { enrollMap[u.enrollid] = u.nome; });
 
-            // Buscar marcações recentes do terminal (últimas 2 horas) para deduplicação eficiente
-            const duasHorasAtras = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-            const recentesRaw = await base44.asServiceRole.entities.Marcacao.filter({ terminal_id }).catch(() => []);
-            // Índice de deduplicação: "enrollid|timestamp_ms_arredondado" → true
-            const dedupSet = new Set();
-            recentesRaw.forEach(m => {
-                if (m.timestamp) {
-                    const ms = new Date(m.timestamp).getTime();
-                    // Arredondar para janela de 30s (DEDUP_WINDOW_MS)
-                    const bucket = Math.floor(ms / DEDUP_WINDOW_MS);
-                    dedupSet.add(`${m.enrollid}|${bucket}`);
-                }
-            });
-
-            for (const m of marcacoes) {
-                try {
-                    const tsStr = m.timestamp || agora;
-                    const tsMs = new Date(tsStr).getTime();
-                    if (isNaN(tsMs)) continue;
-
-                    const enrollid = Number(m.enrollid) || 0;
-                    const bucket = Math.floor(tsMs / DEDUP_WINDOW_MS);
-                    const dedupKey = `${enrollid}|${bucket}`;
-
-                    if (dedupSet.has(dedupKey)) continue; // duplicado dentro da janela de 30s
-                    dedupSet.add(dedupKey);
-
-                    // Normalizar tipo: aceita string ("entrada"/"saida") ou número (0=entrada, 1=saida)
-                    let tipo = 'desconhecido';
-                    const inoutVal = m.inout;
-                    if (inoutVal === 'entrada' || inoutVal === 0) tipo = 'entrada';
-                    else if (inoutVal === 'saida' || inoutVal === 1) tipo = 'saida';
-
-                    await base44.asServiceRole.entities.Marcacao.create({
-                        terminal_id,
-                        terminal_nome: terminal.nome,
-                        enrollid,
-                        utilizador_nome: enrollMap[enrollid] || '',
-                        timestamp: tsStr,
-                        modo: m.mode || 'desconhecido',
-                        raw_mode: m.raw_mode ?? null,
-                        tipo,
-                        local: terminal.local || '',
-                        exportado: false,
-                    });
-                    marcacoesGuardadas++;
-                } catch (e) {
-                    console.warn(`[nocServerReport] Erro ao guardar marcação enrollid=${m.enrollid}: ${e.message}`);
-                }
-            }
+            marcacoesGuardadas = await processMarcacoes(base44, terminal_id, terminal, marcacoes, enrollMap, DEDUP_WINDOW_MS);
             console.log(`[nocServerReport] '${terminal.nome}' → ${marcacoesGuardadas}/${marcacoes.length} marcações guardadas`);
         }
         // ─────────────────────────────────────────────────────────────────────────
