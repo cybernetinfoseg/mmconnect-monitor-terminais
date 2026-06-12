@@ -27,8 +27,9 @@ export default function GestaoHorarios() {
   const [deleteId, setDeleteId] = useState(null);
   const [assigningId, setAssigningId] = useState(null);
   const [form, setForm] = useState({
-    nome: '', hora_entrada: '08:00', hora_saida: '17:00',
-    tolerancia_minutos: 10, dias_semana: '[1,2,3,4,5]', ativo: true, cor: '#10b981'
+    nome: '', hora_entrada: '08:00', hora_saida_almoco: '', hora_entrada_almoco: '',
+    hora_saida: '17:00', horas_diarias: 8, tolerancia_minutos: 10,
+    dias_semana: '[1,2,3,4,5]', ativo: true, cor: '#10b981'
   });
   const [currentUser, setCurrentUser] = useState(null);
 
@@ -84,13 +85,22 @@ export default function GestaoHorarios() {
 
   const handleNew = () => {
     setEditingId(null);
-    setForm({ nome: '', hora_entrada: '08:00', hora_saida: '17:00', tolerancia_minutos: 10, dias_semana: '[1,2,3,4,5]', ativo: true, cor: '#10b981' });
+    setForm({ nome: '', hora_entrada: '08:00', hora_saida_almoco: '', hora_entrada_almoco: '', hora_saida: '17:00', horas_diarias: 8, tolerancia_minutos: 10, dias_semana: '[1,2,3,4,5]', ativo: true, cor: '#10b981' });
     setDialogOpen(true);
   };
 
   const handleEdit = (h) => {
     setEditingId(h.id);
-    setForm({ nome: h.nome, hora_entrada: h.hora_entrada, hora_saida: h.hora_saida, tolerancia_minutos: h.tolerancia_minutos ?? 10, dias_semana: h.dias_semana || '[1,2,3,4,5]', ativo: h.ativo !== false, cor: h.cor || '#10b981' });
+    setForm({
+      nome: h.nome, hora_entrada: h.hora_entrada,
+      hora_saida_almoco: h.hora_saida_almoco || '',
+      hora_entrada_almoco: h.hora_entrada_almoco || '',
+      hora_saida: h.hora_saida,
+      horas_diarias: h.horas_diarias ?? 8,
+      tolerancia_minutos: h.tolerancia_minutos ?? 10,
+      dias_semana: h.dias_semana || '[1,2,3,4,5]',
+      ativo: h.ativo !== false, cor: h.cor || '#10b981'
+    });
     setDialogOpen(true);
   };
 
@@ -193,17 +203,35 @@ export default function GestaoHorarios() {
                                 <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-500 hover:bg-red-50" onClick={() => setDeleteId(h.id)}><Trash2 className="h-3 w-3" /></Button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 text-sm">
-                              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1">
-                                <Clock className="h-3.5 w-3.5 text-emerald-600" />
-                                <span className="font-mono font-semibold text-emerald-700">{h.hora_entrada}</span>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2 text-sm flex-wrap">
+                                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-lg px-2 py-0.5">
+                                  <Clock className="h-3 w-3 text-emerald-600" />
+                                  <span className="font-mono text-xs font-semibold text-emerald-700">{h.hora_entrada}</span>
+                                </div>
+                                {h.hora_saida_almoco && (
+                                  <>
+                                    <span className="text-slate-300 text-xs">→</span>
+                                    <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">
+                                      <span className="text-[10px] text-amber-600">🍽 {h.hora_saida_almoco}</span>
+                                    </div>
+                                    {h.hora_entrada_almoco && (
+                                      <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-lg px-2 py-0.5">
+                                        <span className="text-[10px] text-amber-600">🔁 {h.hora_entrada_almoco}</span>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                                <span className="text-slate-300 text-xs">→</span>
+                                <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 rounded-lg px-2 py-0.5">
+                                  <Clock className="h-3 w-3 text-rose-500" />
+                                  <span className="font-mono text-xs font-semibold text-rose-600">{h.hora_saida}</span>
+                                </div>
                               </div>
-                              <span className="text-slate-400 text-xs">→</span>
-                              <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1">
-                                <Clock className="h-3.5 w-3.5 text-rose-500" />
-                                <span className="font-mono font-semibold text-rose-600">{h.hora_saida}</span>
+                              <div className="flex gap-2 text-[10px] text-slate-400">
+                                <span>{h.horas_diarias ?? 8}h/dia</span>
+                                <span>±{h.tolerancia_minutos ?? 10}min tolerância</span>
                               </div>
-                              <span className="text-xs text-slate-400">±{h.tolerancia_minutos ?? 10}min</span>
                             </div>
                             <div className="flex gap-1 flex-wrap">
                               {[0,1,2,3,4,5,6].map(d => (
@@ -278,19 +306,40 @@ export default function GestaoHorarios() {
               <label className="text-xs font-medium text-slate-600 block mb-1">Nome do horário</label>
               <Input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} placeholder="Ex: Turno Manhã, Administrativo..." />
             </div>
+            {/* Entradas/saídas */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Hora de entrada</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">🟢 Entrada trabalho</label>
                 <Input type="time" value={form.hora_entrada} onChange={e => setForm(f => ({ ...f, hora_entrada: e.target.value }))} />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Hora de saída</label>
+                <label className="text-xs font-medium text-slate-600 block mb-1">🔴 Saída trabalho</label>
                 <Input type="time" value={form.hora_saida} onChange={e => setForm(f => ({ ...f, hora_saida: e.target.value }))} />
               </div>
             </div>
+            {/* Pausa almoço/jantar */}
             <div>
-              <label className="text-xs font-medium text-slate-600 block mb-1">Tolerância (minutos)</label>
-              <Input type="number" min={0} max={60} value={form.tolerancia_minutos} onChange={e => setForm(f => ({ ...f, tolerancia_minutos: Number(e.target.value) }))} />
+              <label className="text-xs font-medium text-slate-500 block mb-1.5">Pausa almoço/jantar <span className="text-slate-400 font-normal">(opcional)</span></label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-1">🍽 Saída pausa</label>
+                  <Input type="time" value={form.hora_saida_almoco} onChange={e => setForm(f => ({ ...f, hora_saida_almoco: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 block mb-1">🔁 Regresso pausa</label>
+                  <Input type="time" value={form.hora_entrada_almoco} onChange={e => setForm(f => ({ ...f, hora_entrada_almoco: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Horas diárias</label>
+                <Input type="number" min={1} max={24} step={0.5} value={form.horas_diarias} onChange={e => setForm(f => ({ ...f, horas_diarias: Number(e.target.value) }))} />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Tolerância (min)</label>
+                <Input type="number" min={0} max={60} value={form.tolerancia_minutos} onChange={e => setForm(f => ({ ...f, tolerancia_minutos: Number(e.target.value) }))} />
+              </div>
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 block mb-2">Dias da semana</label>

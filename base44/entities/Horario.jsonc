@@ -10,6 +10,14 @@
       "type": "string",
       "description": "Hora de entrada esperada (HH:MM)"
     },
+    "hora_saida_almoco": {
+      "type": "string",
+      "description": "Hora de sa\u00edda para almo\u00e7o/jantar (HH:MM) \u2014 opcional"
+    },
+    "hora_entrada_almoco": {
+      "type": "string",
+      "description": "Hora de entrada do almo\u00e7o/jantar (HH:MM) \u2014 opcional"
+    },
     "hora_saida": {
       "type": "string",
       "description": "Hora de sa\u00edda esperada (HH:MM)"
@@ -22,6 +30,11 @@
       "type": "number",
       "default": 10,
       "description": "Toler\u00e2ncia em minutos para atrasos"
+    },
+    "horas_diarias": {
+      "type": "number",
+      "default": 8,
+      "description": "Horas de trabalho efectivo di\u00e1rio esperadas (ex: 8)"
     },
     "owner_email": {
       "type": "string",

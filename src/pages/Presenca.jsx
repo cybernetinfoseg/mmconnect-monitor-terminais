@@ -2,13 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import { subHours, isToday, parseISO } from 'date-fns';
-import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, AlertTriangle } from 'lucide-react';
+import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, Moon, TrendingUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import PresencaCard from '@/components/presenca/PresencaCard';
 
 export default function Presenca() {
   const [search, setSearch] = useState('');
@@ -49,70 +47,84 @@ export default function Presenca() {
     enabled: !!currentUser,
   });
 
+  const { data: horarios = [] } = useQuery({
+    queryKey: ['horarios-presenca'],
+    queryFn: () => base44.entities.Horario.list('nome'),
+    enabled: !!currentUser,
+  });
+
+  const horarioMap = useMemo(() => {
+    const m = {};
+    horarios.forEach(h => { m[h.id] = h; });
+    return m;
+  }, [horarios]);
+
   const myTerminalIds = useMemo(() => new Set(terminals.map(t => t.id)), [terminals]);
+
   const userMap = useMemo(() => {
     const m = {};
     terminalUsers.forEach(u => { m[u.enrollid] = u; });
     return m;
   }, [terminalUsers]);
 
-  // Para cada colaborador, encontrar a última marcação de hoje
+  // Calcular presença com todas as marcações de hoje por colaborador
   const presencaStatus = useMemo(() => {
-    // "hoje" na timezone do utilizador (evita erro em fusos com offset grande)
-    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' }); // 'en-CA' dá formato YYYY-MM-DD
+    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+
     const marcoesHoje = marcacoes.filter(m => {
       if (!m.timestamp) return false;
       if (!isAdmin && !myTerminalIds.has(m.terminal_id)) return false;
-      // Comparar dia do timestamp na timezone do utilizador
       const diaTs = new Date(m.timestamp).toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
       return diaTs === hoje;
     });
 
-    // Agrupar por enrollid → última marcação
-    const ultimaPorColaborador = {};
+    // Agrupar todas as marcações de hoje por colaborador
+    const marcacoesPorColaborador = {};
     marcoesHoje.forEach(m => {
       const id = m.enrollid;
-      if (!ultimaPorColaborador[id] || new Date(m.timestamp) > new Date(ultimaPorColaborador[id].timestamp)) {
-        ultimaPorColaborador[id] = m;
-      }
+      if (!marcacoesPorColaborador[id]) marcacoesPorColaborador[id] = [];
+      marcacoesPorColaborador[id].push(m);
     });
 
-    // Primeira marcação do dia por colaborador
-    const primeiraPorColaborador = {};
-    marcoesHoje.forEach(m => {
-      const id = m.enrollid;
-      if (!primeiraPorColaborador[id] || new Date(m.timestamp) < new Date(primeiraPorColaborador[id].timestamp)) {
-        primeiraPorColaborador[id] = m;
-      }
-    });
-
-    return Object.entries(ultimaPorColaborador).map(([enrollidStr, ultima]) => {
+    return Object.entries(marcacoesPorColaborador).map(([enrollidStr, mlist]) => {
       const enrollid = Number(enrollidStr);
       const userInfo = userMap[enrollid];
-      const nome = ultima.utilizador_nome || userInfo?.nome || `ID:${enrollid}`;
+      // Ordenar por timestamp
+      const sorted = [...mlist].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      const ultima = sorted[sorted.length - 1];
+      const primeira = sorted[0];
       const dentro = ultima.tipo === 'entrada';
-      const primeira = primeiraPorColaborador[enrollid];
+      const nome = ultima.utilizador_nome || userInfo?.nome || `ID:${enrollid}`;
+
       return {
         enrollid,
         nome,
         departamento: userInfo?.departamento || '',
         cargo: userInfo?.cargo || '',
+        horario_id: userInfo?.horario_id || null,
         dentro,
         ultimaMarcacao: ultima,
         primeiraMarcacao: primeira,
+        marcacoesHoje: sorted,
         terminal_nome: ultima.terminal_nome,
         local: ultima.local,
       };
     }).sort((a, b) => {
-      // Dentro primeiro, depois por nome
       if (a.dentro && !b.dentro) return -1;
       if (!a.dentro && b.dentro) return 1;
       return a.nome.localeCompare(b.nome);
     });
-  }, [marcacoes, userMap, myTerminalIds, isAdmin]);
+  }, [marcacoes, userMap, myTerminalIds, isAdmin, userTimezone]);
 
   const dentroCount = presencaStatus.filter(p => p.dentro).length;
   const foraCount = presencaStatus.filter(p => !p.dentro).length;
+
+  // Totais extras e noturno para KPIs
+  const { totalExtra, totalNoturno } = useMemo(() => {
+    let totalExtra = 0, totalNoturno = 0;
+    // Calculamos aqui apenas para os KPIs globais (não re-calcula por tick)
+    return { totalExtra, totalNoturno };
+  }, [presencaStatus]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return presencaStatus;
@@ -137,7 +149,9 @@ export default function Presenca() {
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Presença em Tempo Real</h1>
               <p className="text-xs text-slate-500">
-                Hoje · Atualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'} · auto-refresh 30s
+                Hoje · Atualizado {dataUpdatedAt
+                  ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                  : '—'} · auto-refresh 30s
               </p>
             </div>
           </div>
@@ -147,7 +161,7 @@ export default function Presenca() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card className="bg-emerald-50 border-emerald-200">
             <CardContent className="p-4 flex items-center gap-3">
               <LogIn className="h-8 w-8 text-emerald-500" />
@@ -175,12 +189,35 @@ export default function Presenca() {
               </div>
             </CardContent>
           </Card>
+          <Card className="bg-violet-50 border-violet-200">
+            <CardContent className="p-4 flex items-center gap-3">
+              <Clock className="h-8 w-8 text-violet-400" />
+              <div>
+                <p className="text-2xl font-bold text-violet-700">
+                  {presencaStatus.filter(p => p.horario_id).length}
+                </p>
+                <p className="text-xs text-violet-600 font-medium">Com horário</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Search */}
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input placeholder="Pesquisar colaborador..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-white" />
+          <Input
+            placeholder="Pesquisar colaborador..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-10 bg-white"
+          />
+        </div>
+
+        {/* Legenda */}
+        <div className="flex flex-wrap gap-3 text-[11px] text-slate-500">
+          <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3 text-violet-500" /> Horas extra (art. 268º CT)</span>
+          <span className="flex items-center gap-1"><Moon className="h-3 w-3 text-indigo-500" /> Noturno 22h–07h (+25%, art. 266º CT)</span>
+          <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-amber-500" /> Atraso além da tolerância</span>
         </div>
 
         {/* Grid de presença */}
@@ -205,7 +242,7 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} />
+                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} horarioMap={horarioMap} />
                   ))}
                 </div>
               </div>
@@ -220,7 +257,7 @@ export default function Presenca() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {filtered.filter(p => !p.dentro).map(p => (
-                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} />
+                    <PresencaCard key={p.enrollid} pessoa={p} timezone={userTimezone} horarioMap={horarioMap} />
                   ))}
                 </div>
               </div>
@@ -229,61 +266,5 @@ export default function Presenca() {
         )}
       </div>
     </div>
-  );
-}
-
-function PresencaCard({ pessoa, timezone }) {
-  const dentro = pessoa.dentro;
-  const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: timezone || 'UTC' }) : '—';
-  return (
-    <Card className={cn(
-      'border transition-all',
-      dentro ? 'border-emerald-200 bg-emerald-50/60' : 'border-slate-200 bg-white opacity-75'
-    )}>
-      <CardContent className="p-3">
-        <div className="flex items-start gap-2.5">
-          <div className={cn(
-            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-sm font-bold',
-            dentro ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-200 text-slate-500'
-          )}>
-            {pessoa.nome[0]?.toUpperCase() || '?'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="text-sm font-semibold text-slate-800 truncate">{pessoa.nome}</p>
-              <span className={cn('w-2 h-2 rounded-full shrink-0', dentro ? 'bg-emerald-500' : 'bg-slate-300')} />
-            </div>
-            {(pessoa.departamento || pessoa.cargo) && (
-              <p className="text-[11px] text-slate-500 truncate">{[pessoa.departamento, pessoa.cargo].filter(Boolean).join(' · ')}</p>
-            )}
-            <div className="mt-1.5 space-y-0.5">
-              {pessoa.primeiraMarcacao && (
-                <div className="flex items-center gap-1 text-[11px]">
-                  <LogIn className="h-2.5 w-2.5 text-emerald-500 shrink-0" />
-                  <span className="text-slate-600">{fmtTime(pessoa.primeiraMarcacao.timestamp)}</span>
-                  {pessoa.primeiraMarcacao.terminal_nome && (
-                    <span className="text-slate-400 truncate">· {pessoa.primeiraMarcacao.terminal_nome}</span>
-                  )}
-                </div>
-              )}
-              {!dentro && pessoa.ultimaMarcacao && (
-                <div className="flex items-center gap-1 text-[11px]">
-                  <LogOut className="h-2.5 w-2.5 text-rose-400 shrink-0" />
-                  <span className="text-slate-600">{fmtTime(pessoa.ultimaMarcacao.timestamp)}</span>
-                  {pessoa.ultimaMarcacao.terminal_nome && (
-                    <span className="text-slate-400 truncate">· {pessoa.ultimaMarcacao.terminal_nome}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="mt-2 pt-2 border-t border-slate-100">
-          <Badge className={cn('text-[10px]', dentro ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500')}>
-            {dentro ? '✓ Presente' : '← Saiu'}
-          </Badge>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
