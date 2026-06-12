@@ -8,6 +8,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -218,7 +226,6 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
   const [loading, setLoading] = useState(null);
   const [results, setResults] = useState({});
   const [confirmAction, setConfirmAction] = useState(null);
-  const [confirmButtonPos, setConfirmButtonPos] = useState(null);
   const [activeForm, setActiveForm] = useState(null);
 
   // Fetch terminal users associated with this terminal
@@ -259,16 +266,10 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
     setActiveForm(null);
   };
 
-  const handleActionClick = (action, event) => {
+  const handleActionClick = (action) => {
     if (action.form) {
       setActiveForm(activeForm === action.key ? null : action.key);
     } else if (action.confirm) {
-      const rect = event.currentTarget.getBoundingClientRect();
-      setConfirmButtonPos({
-        top: rect.bottom + 8,
-        left: rect.left,
-        width: rect.width,
-      });
       setConfirmAction(action);
     } else {
       executeAction(action.key);
@@ -339,9 +340,9 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
                 const result = results[action.key];
 
                 return (
-                   <div key={action.key} className="space-y-2 relative">
+                   <div key={action.key} className="space-y-2">
                      <button
-                       onClick={(e) => handleActionClick(action, e)}
+                       onClick={() => handleActionClick(action)}
                        disabled={!!loading}
                        className={cn(
                          'w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-all',
@@ -387,50 +388,36 @@ export default function TerminalControlPanel({ terminal, open, onClose }) {
             </div>
           )}
 
-          {/* Confirm dialog — popover junto ao botão */}
-          {confirmAction && confirmButtonPos && (
-            <div 
-              className="fixed z-50 pointer-events-auto"
-              style={{
-                top: `${confirmButtonPos.top}px`,
-                left: `${Math.max(8, confirmButtonPos.left)}px`,
-                width: `${confirmButtonPos.width}px`,
-              }}
-            >
-              <div className="bg-white rounded-lg shadow-lg p-4 space-y-3 border border-slate-200">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className={cn('h-4 w-4 mt-0.5 shrink-0', confirmAction.danger ? 'text-red-600' : 'text-amber-600')} />
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm">{confirmAction.label}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{confirmAction.desc}</p>
-                  </div>
-                </div>
-                {confirmAction.danger && (
-                  <p className="text-xs text-red-600 bg-red-50 rounded p-2">⚠️ Imediata, não pode ser desfeita</p>
-                )}
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1 text-xs h-8" onClick={() => {
-                    setConfirmAction(null);
-                    setConfirmButtonPos(null);
-                  }}>
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    className={cn('flex-1 text-xs h-8', confirmAction.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700')}
-                    onClick={() => {
-                      const action = confirmAction;
-                      setConfirmAction(null);
-                      setConfirmButtonPos(null);
-                      executeAction(action.key);
-                    }}
-                  >
-                    Confirmar
-                  </Button>
+          {/* Confirm dialog using AlertDialog */}
+          <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+            <AlertDialogContent className="max-w-sm">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={cn('h-5 w-5 mt-0.5 shrink-0', confirmAction?.danger ? 'text-red-600' : 'text-amber-600')} />
+                <div className="flex-1">
+                  <AlertDialogTitle>{confirmAction?.label}</AlertDialogTitle>
+                  <AlertDialogDescription className="mt-2">
+                    {confirmAction?.desc}
+                  </AlertDialogDescription>
+                  {confirmAction?.danger && (
+                    <p className="text-xs text-red-600 bg-red-50 rounded p-2 mt-3">⚠️ Esta ação é imediata e não pode ser desfeita</p>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+              <div className="flex gap-2 mt-4">
+                <AlertDialogCancel className="flex-1">Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  className={cn('flex-1', confirmAction?.danger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700')}
+                  onClick={() => {
+                    const action = confirmAction;
+                    setConfirmAction(null);
+                    executeAction(action.key);
+                  }}
+                >
+                  Confirmar
+                </AlertDialogAction>
+              </div>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <div className="border-t border-slate-100 pt-4">
             <OperationLogsList terminalId={terminal.id} />
