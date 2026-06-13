@@ -1606,7 +1606,7 @@ export default function RH() {
       {/* ════ Dialogs ════ */}
 
       {/* Colaborador form dialog */}
-      <Dialog open={colDialog} onOpenChange={(open) => { if (!open) return; setColDialog(open); }}>
+      <Dialog open={colDialog} onOpenChange={setColDialog}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{colEditingId ? 'Editar Ficha' : 'Nova Ficha de Colaborador'}</DialogTitle></DialogHeader>
           <ColaboradorRHForm data={colFormData} onChange={setColFormData} horarios={horarios} />
