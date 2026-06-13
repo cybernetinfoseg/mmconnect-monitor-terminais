@@ -690,6 +690,61 @@ async function actionGetUserProfile(terminal, params) {
   return { success: resp.result === true, message: `Perfil do utilizador ID:${enrollid}`, data: { profile: resp.record, enrollid: resp.enrollid } };
 }
 
+/**
+ * actionSetUserPhoto — envia foto facial (base64 JPEG) para o terminal.
+ * Suportado em modelos AI com câmara: TM-AIFace11F, TM-AI07F, TM-AI08, etc.
+ * O terminal processa a imagem e cria o template facial internamente.
+ * Protocolo Timmy: cmd = "setuserphoto", enrollid, photo (base64 JPEG).
+ * Se foto_url for fornecida, faz download e converte para base64.
+ */
+async function actionSetUserPhoto(terminal, params) {
+  if (terminal.tipo_conexao !== 'websocket_cloud') {
+    return { success: false, error: 'setuserphoto apenas suportado via WebSocket Cloud (Timmy AI)' };
+  }
+  const { enrollid, photo, foto_url } = params || {};
+  if (!enrollid) return { success: false, error: 'enrollid é obrigatório' };
+
+  let photoBase64 = photo;
+
+  // Se não foi passado base64 diretamente, fazer download da foto_url
+  if (!photoBase64 && foto_url) {
+    const imgResp = await fetch(foto_url, { signal: AbortSignal.timeout(15000) })
+      .catch(e => { throw new Error(`Não foi possível fazer download da foto: ${e.message}`); });
+    if (!imgResp.ok) throw new Error(`Erro ao obter foto (HTTP ${imgResp.status})`);
+
+    const arrayBuf = await imgResp.arrayBuffer();
+    // Converter para base64
+    const bytes = new Uint8Array(arrayBuf);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    photoBase64 = btoa(binary);
+  }
+
+  if (!photoBase64) return { success: false, error: 'photo (base64) ou foto_url é obrigatório' };
+
+  // Limite de tamanho: imagens muito grandes podem causar timeout no terminal
+  // Recomendado: JPEG 300x300 a 400x400px, ~30-80KB
+  const sizeKB = Math.round((photoBase64.length * 3) / 4 / 1024);
+  console.log(`[setuserphoto] enrollid=${enrollid} tamanho estimado: ~${sizeKB}KB`);
+
+  const resp = await sendTimmyCommand(terminal, {
+    cmd: 'setuserphoto',
+    enrollid: Number(enrollid),
+    photo: photoBase64,
+  }, 2);
+
+  return {
+    success: resp.result === true,
+    message: resp.result === true
+      ? `Foto facial enviada para utilizador ID:${enrollid} (~${sizeKB}KB)`
+      : `Terminal rejeitou a foto (verifique se o modelo suporta reconhecimento facial)`,
+    data: resp,
+    size_kb: sizeKB,
+  };
+}
+
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -712,7 +767,7 @@ Deno.serve(async (req) => {
 
     const isAdmin = user.role === 'admin';
     // Ações de gestão de utilizadores (adduser/deleteuser) são permitidas a qualquer utilizador autenticado
-    const isUserManagementAction = ['adduser', 'deleteuser', 'blockuser', 'getuserlist', 'getuserinfo'].includes(action);
+    const isUserManagementAction = ['adduser', 'deleteuser', 'blockuser', 'getuserlist', 'getuserinfo', 'setuserphoto'].includes(action);
     if (!isAdmin && !isUserManagementAction && terminal.created_by !== user.email && terminal.usuario_email !== user.email) {
       return Response.json({ error: 'Sem permissão para controlar este terminal' }, { status: 403 });
     }
@@ -743,6 +798,7 @@ Deno.serve(async (req) => {
       case 'getdevcap':     result = await actionGetDevCap(terminal); break;
       case 'setuserprofile': result = await actionSetUserProfile(terminal, params); break;
       case 'getuserprofile': result = await actionGetUserProfile(terminal, params); break;
+      case 'setuserphoto':   result = await actionSetUserPhoto(terminal, params); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }

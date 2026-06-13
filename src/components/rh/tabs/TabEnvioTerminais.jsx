@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   Send, Search, Loader2, CheckCircle2, XCircle,
-  Monitor, Users, Building2, ChevronDown, ChevronUp, Trash2, RefreshCw
+  Monitor, Users, Building2, ChevronDown, ChevronUp, Trash2, RefreshCw, Camera
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 // ── Helper: envia UM colaborador para UM terminal ─────────────────────────────
-async function enviarColaborador(colaborador, terminalId) {
+async function enviarColaborador(colaborador, terminalId, comFoto = false) {
+  // 1. Enviar dados do utilizador
   const resp = await base44.functions.invoke('terminalControl', {
     terminal_id: terminalId,
     action: 'adduser',
@@ -27,7 +28,33 @@ async function enviarColaborador(colaborador, terminalId) {
       privilege: colaborador.privilege || 0,
     },
   });
-  return { success: !!resp.data?.success, message: resp.data?.message || resp.data?.error || '' };
+  const result = { success: !!resp.data?.success, message: resp.data?.message || resp.data?.error || '' };
+
+  // 2. Se pedido e tem foto, enviar foto separadamente
+  if (result.success && comFoto && colaborador.foto_url) {
+    try {
+      const fotoResp = await base44.functions.invoke('terminalControl', {
+        terminal_id: terminalId,
+        action: 'setuserphoto',
+        params: {
+          enrollid: colaborador.enrollid,
+          foto_url: colaborador.foto_url,
+        },
+      });
+      if (fotoResp.data?.success) {
+        result.message = (result.message || '') + ' + foto facial enviada';
+        result.foto_enviada = true;
+      } else {
+        result.message = (result.message || '') + ' (foto: ' + (fotoResp.data?.message || 'falhou') + ')';
+        result.foto_enviada = false;
+      }
+    } catch (e) {
+      result.message = (result.message || '') + ` (foto: ${e.message})`;
+      result.foto_enviada = false;
+    }
+  }
+
+  return result;
 }
 
 async function removerColaborador(colaborador, terminalId) {
@@ -40,10 +67,11 @@ async function removerColaborador(colaborador, terminalId) {
 }
 
 // ── Componente de linha de colaborador (envio individual) ─────────────────────
-function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, sendingId }) {
+function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, onSendPhoto, sendingId }) {
   const [expanded, setExpanded] = useState(false);
   const [selectedTerminal, setSelectedTerminal] = useState('');
   const [results, setResults] = useState({});
+  const [sendingPhoto, setSendingPhoto] = useState(false);
 
   const handleEnviar = async () => {
     if (!selectedTerminal) { toast.error('Selecione um terminal'); return; }
@@ -55,6 +83,15 @@ function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, sendingId })
     if (!selectedTerminal) { toast.error('Selecione um terminal'); return; }
     const result = await onRemoveOne(colab, selectedTerminal);
     setResults(prev => ({ ...prev, [selectedTerminal]: result }));
+  };
+
+  const handleSendPhoto = async () => {
+    if (!selectedTerminal) { toast.error('Selecione um terminal'); return; }
+    if (!colab.foto_url) { toast.error('Colaborador sem foto definida'); return; }
+    setSendingPhoto(true);
+    const result = await onSendPhoto(colab, selectedTerminal);
+    setResults(prev => ({ ...prev, [selectedTerminal]: result }));
+    setSendingPhoto(false);
   };
 
   return (
@@ -120,6 +157,18 @@ function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, sendingId })
               <Trash2 className="h-3 w-3" />
               Remover
             </Button>
+            {colab.foto_url && (
+              <Button
+                size="sm" variant="outline"
+                className="h-8 px-3 text-xs text-teal-600 border-teal-200 hover:bg-teal-50 gap-1"
+                disabled={!selectedTerminal || sendingPhoto}
+                onClick={handleSendPhoto}
+                title="Enviar apenas a foto facial para o terminal (requer modelo AI)"
+              >
+                {sendingPhoto ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
+                Foto
+              </Button>
+            )}
           </div>
 
           {/* Resultados por terminal */}
@@ -179,6 +228,7 @@ function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, sendingId })
 export default function TabEnvioTerminais({ currentUser, colaboradores }) {
   const [search, setSearch] = useState('');
   const [sendingId, setSendingId] = useState(null);
+  const [incluirFoto, setIncluirFoto] = useState(false);
 
   // Envio por departamento
   const [selectedDept, setSelectedDept] = useState('');
@@ -223,15 +273,34 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
   const handleSendOne = async (colab, terminalId) => {
     setSendingId(colab.id);
     try {
-      const result = await enviarColaborador(colab, terminalId);
+      const result = await enviarColaborador(colab, terminalId, incluirFoto);
       const term = terminals.find(t => t.id === terminalId);
       result.success
-        ? toast.success(`${colab.nome} enviado para "${term?.nome}"`)
+        ? toast.success(`${colab.nome} enviado para "${term?.nome}"${result.foto_enviada ? ' 📷' : ''}`)
         : toast.error(`Erro: ${result.message}`);
       setSendingId(null);
       return result;
     } catch (e) {
       setSendingId(null);
+      toast.error(e.message);
+      return { success: false, message: e.message };
+    }
+  };
+
+  const handleSendPhoto = async (colab, terminalId) => {
+    try {
+      const resp = await base44.functions.invoke('terminalControl', {
+        terminal_id: terminalId,
+        action: 'setuserphoto',
+        params: { enrollid: colab.enrollid, foto_url: colab.foto_url },
+      });
+      const term = terminals.find(t => t.id === terminalId);
+      const ok = !!resp.data?.success;
+      ok
+        ? toast.success(`Foto de ${colab.nome} enviada para "${term?.nome}"`)
+        : toast.error(`Erro ao enviar foto: ${resp.data?.message || 'falhou'}`);
+      return { success: ok, message: resp.data?.message || resp.data?.error || '' };
+    } catch (e) {
       toast.error(e.message);
       return { success: false, message: e.message };
     }
@@ -267,7 +336,7 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
 
     for (const colab of colabsDoDept) {
       const result = acao === 'enviar'
-        ? await enviarColaborador(colab, selectedTerminalDept).catch(e => ({ success: false, message: e.message }))
+        ? await enviarColaborador(colab, selectedTerminalDept, incluirFoto).catch(e => ({ success: false, message: e.message }))
         : await removerColaborador(colab, selectedTerminalDept).catch(e => ({ success: false, message: e.message }));
       result.success ? ok++ : fail++;
       details.push({ nome: colab.nome, enrollid: colab.enrollid, ...result });
@@ -293,7 +362,7 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
 
     for (const colab of ativos) {
       const result = acao === 'enviar'
-        ? await enviarColaborador(colab, selectedTerminalAll).catch(e => ({ success: false, message: e.message }))
+        ? await enviarColaborador(colab, selectedTerminalAll, incluirFoto).catch(e => ({ success: false, message: e.message }))
         : await removerColaborador(colab, selectedTerminalAll).catch(e => ({ success: false, message: e.message }));
       result.success ? ok++ : fail++;
       details.push({ nome: colab.nome, enrollid: colab.enrollid, ...result });
@@ -390,6 +459,27 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
         </Card>
       </div>
 
+      {/* Toggle incluir foto */}
+      <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+        <Camera className="h-4 w-4 text-teal-600 shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-700">Incluir foto facial</p>
+          <p className="text-xs text-slate-400">Apenas modelos AI com câmara (TM-AIFace, TM-AI07F, TM-AI08...)</p>
+        </div>
+        <button
+          onClick={() => setIncluirFoto(v => !v)}
+          className={cn(
+            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0',
+            incluirFoto ? 'bg-teal-600' : 'bg-slate-300'
+          )}
+        >
+          <span className={cn(
+            'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+            incluirFoto ? 'translate-x-4' : 'translate-x-0.5'
+          )} />
+        </button>
+      </div>
+
       <Tabs defaultValue="individual">
         <TabsList>
           <TabsTrigger value="individual" className="gap-1.5"><Users className="h-3.5 w-3.5" />Individual</TabsTrigger>
@@ -414,6 +504,7 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
                 terminals={terminals}
                 onSendOne={handleSendOne}
                 onRemoveOne={handleRemoveOne}
+                onSendPhoto={handleSendPhoto}
                 sendingId={sendingId}
               />
             ))}
