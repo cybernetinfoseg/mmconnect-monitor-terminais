@@ -9,6 +9,17 @@ import { Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
+// Formata timestamp UTC para hora local do browser
+const formatLocal = (ts) => {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  return d.toLocaleString('pt-PT', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false,
+  });
+};
+
 export default function RelatorioMovimentos() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filtroAutorizacao, setFiltroAutorizacao] = useState('todos');
@@ -44,8 +55,8 @@ export default function RelatorioMovimentos() {
     const csv = [
       ['Data', 'Hora', 'Enrollid', 'Nome', 'Tipo', 'Modo', 'Terminal', 'Local'],
       ...filteredMovimentos.map(m => [
-        format(new Date(m.timestamp), 'yyyy-MM-dd'),
-        format(new Date(m.timestamp), 'HH:mm:ss'),
+        new Date(m.timestamp).toLocaleDateString('pt-PT'),
+        new Date(m.timestamp).toLocaleTimeString('pt-PT'),
         m.enrollid,
         m.utilizador_nome || '-',
         m.tipo,
@@ -164,7 +175,7 @@ export default function RelatorioMovimentos() {
                   {filteredMovimentos.map((m, idx) => (
                     <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
                       <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
-                        {format(new Date(m.timestamp), 'dd/MM/yyyy HH:mm:ss', { locale: pt })}
+                        {formatLocal(m.timestamp)}
                       </td>
                       <td className="py-3 px-4 text-slate-500 font-mono text-xs">{m.enrollid}</td>
                       <td className="py-3 px-4 text-slate-700">{m.utilizador_nome || <span className="text-slate-400 italic">—</span>}</td>
