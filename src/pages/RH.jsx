@@ -13,7 +13,8 @@ import {
   CalendarOff, Fingerprint, LayoutDashboard, ExternalLink,
   Plus, Search, Pencil, Trash2, Loader2, RefreshCw, Download,
   Upload, CheckCircle2, XCircle, BarChart2, CalendarClock,
-  LayoutGrid, TableProperties, Sun, Monitor
+  LayoutGrid, TableProperties, Sun, Monitor,
+  ArrowUpDown, Send, FileSpreadsheet, FileUp, FileDown
 } from 'lucide-react';
 
 // UI
@@ -198,6 +199,7 @@ export default function RH() {
   const [colEditingId, setColEditingId] = useState(null);
   const [colFormData, setColFormData] = useState({});
   const [colDeleteId, setColDeleteId] = useState(null);
+  const [colSyncDialog, setColSyncDialog] = useState(false);
 
   const colSaveMutation = useMutation({
     mutationFn: async (data) => {
@@ -216,6 +218,72 @@ export default function RH() {
     mutationFn: (id) => base44.entities.Colaborador.delete(id),
     onSuccess: () => { queryClient.invalidateQueries(['colaboradores']); toast.success('Colaborador eliminado'); },
   });
+
+  const handleExportColabCSV = () => {
+    const headers = ['Nome', 'N\u00ba Colaborador', 'EnrollID', 'Departamento', 'Cargo', 'Email', 'Telem\u00f3vel', 'Data Admiss\u00e3o', 'Ativo'];
+    const rows = colaboradores.map(c => [
+      c.nome || '', c.numero_colaborador || '', c.enrollid || '',
+      c.departamento || '', c.cargo || '', c.email || '', c.telemovel || '',
+      c.data_admissao || '', c.ativo !== false ? 'Sim' : 'N\u00e3o',
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'colaboradores_' + new Date().toISOString().slice(0, 10) + '.csv'; a.click();
+    URL.revokeObjectURL(url);
+    toast.success('CSV exportado!');
+  };
+
+  const handleImportColabCSV = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { toast.error('CSV vazio'); return; }
+      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+      let created = 0;
+      for (let i = 1; i < lines.length; i++) {
+        try {
+          const vals = lines[i].split(',').map(v => v.replace(/"/g, '').trim());
+          const row = {};
+          headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+          if (!row['Nome']) continue;
+          await base44.entities.Colaborador.create({
+            nome: row['Nome'],
+            numero_colaborador: row['N\u00ba Colaborador'] || '',
+            enrollid: Number(row['EnrollID']) || 0,
+            departamento: row['Departamento'] || '',
+            cargo: row['Cargo'] || '',
+            email: row['Email'] || '',
+            telemovel: row['Telem\u00f3vel'] || '',
+            data_admissao: row['Data Admiss\u00e3o'] || '',
+            ativo: row['Ativo'] !== 'N\u00e3o',
+          });
+          created++;
+        } catch { }
+      }
+      queryClient.invalidateQueries(['colaboradores']);
+      toast.success(created + ' colaborador(es) importados');
+    } catch { toast.error('Erro ao ler CSV'); }
+    e.target.value = '';
+  };
+
+  const handleSendAllToTerminals = async () => {
+    const timmyTerminals = terminals.filter(t => t.tipo_conexao === 'websocket_cloud');
+    if (timmyTerminals.length === 0) { toast.error('Sem terminais Timmy'); return; }
+    let success = 0, errors = 0;
+    for (const col of colaboradores) {
+      if (!col.enrollid || col.ativo === false) continue;
+      for (const t of timmyTerminals) {
+        try {
+          await base44.functions.invoke('terminalControl', { terminal_id: t.id, action: 'adduser', params: { enrollid: col.enrollid, name: col.nome || 'Col. ' + col.enrollid, password: col.password || '', card: col.card || '', privilege: col.privilege ?? 0 } });
+          success++;
+        } catch { errors++; }
+      }
+    }
+    toast.success(success + ' envios OK' + (errors > 0 ? ' \u00b7 ' + errors + ' falhas' : ''));
+  };
 
   const departamentos = [...new Set(colaboradores.map(c => c.departamento).filter(Boolean))].sort();
   const colFiltered = colaboradores.filter(c => {
@@ -719,16 +787,43 @@ export default function RH() {
         {/* ══════════════ COLABORADORES ══════════════ */}
         {activeTab === 'colab' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <p className="text-sm text-slate-500">{colFiltered.length} de {colaboradores.length} colaborador(es)</p>
-              <Button size="sm" onClick={() => { setColEditingId(null); setColFormData({ ativo: true, num_dependentes: 0, pais: 'Portugal', nacionalidade: 'Portuguesa', genero: 'nao_especificado' }); setColDialog(true); }} className="bg-blue-600 hover:bg-blue-700 gap-1.5">
-                <Plus className="h-3.5 w-3.5" /> Novo Colaborador
-              </Button>
+
+            {/* Header bar */}
+            <div className="flex items-center justify-between flex-wrap gap-4 bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-teal-50 rounded-xl">
+                  <Users className="h-6 w-6 text-teal-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Colaboradores</h2>
+                  <p className="text-sm text-slate-500">{colaboradores.length} colaborador(es) · Sincronização com terminais biométricos</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setColSyncDialog(true)}>
+                  <ArrowUpDown className="h-3.5 w-3.5" /> Sincronizar
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => handleExportColabCSV()}>
+                  <FileDown className="h-3.5 w-3.5" /> Exportar CSV
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => document.getElementById('colab-csv-import').click()}>
+                  <FileUp className="h-3.5 w-3.5" /> Importar CSV
+                </Button>
+                <input id="colab-csv-import" type="file" accept=".csv" className="hidden" onChange={handleImportColabCSV} />
+                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleSendAllToTerminals}>
+                  <Send className="h-3.5 w-3.5" /> Enviar Todos
+                </Button>
+                <Button size="sm" onClick={() => { setColEditingId(null); setColFormData({ ativo: true, num_dependentes: 0, pais: 'Portugal', nacionalidade: 'Portuguesa', genero: 'nao_especificado' }); setColDialog(true); }} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5 text-xs">
+                  <Plus className="h-3.5 w-3.5" /> Novo
+                </Button>
+              </div>
             </div>
+
+            {/* Search & filters */}
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <Input placeholder="Pesquisar por nome, nº, cargo..." value={colSearch} onChange={e => setColSearch(e.target.value)} className="pl-10 bg-white" />
+                <Input placeholder="Pesquisar por nome, ID, departamento, crachá..." value={colSearch} onChange={e => setColSearch(e.target.value)} className="pl-10 bg-white" />
               </div>
               <Select value={colDepFilter} onValueChange={setColDepFilter}>
                 <SelectTrigger className="bg-white w-full sm:w-[200px]"><SelectValue placeholder="Todos os departamentos" /></SelectTrigger>
@@ -836,10 +931,6 @@ export default function RH() {
               </>
             )}
 
-            {/* Sincronização Bidirecional — Terminais Timmy */}
-            <div className="mt-8 pt-6 border-t border-slate-200">
-              <SyncBidirectional terminals={terminals} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
-            </div>
           </div>
         )}
 
@@ -1696,6 +1787,14 @@ export default function RH() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Sincronizacao dialog */}
+      <Dialog open={colSyncDialog} onOpenChange={setColSyncDialog}>
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Sincronizacao com Terminais Timmy</DialogTitle></DialogHeader>
+          <SyncBidirectional terminals={terminals} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!rejeitarId} onOpenChange={open => !open && setRejeitarId(null)}>
         <DialogContent className="w-[95vw] max-w-sm">
           <DialogHeader><DialogTitle>Rejeitar Pedido</DialogTitle></DialogHeader>
