@@ -13,7 +13,7 @@ import {
   CalendarOff, Fingerprint, LayoutDashboard, ExternalLink,
   Plus, Search, Pencil, Trash2, Loader2, RefreshCw, Download,
   Upload, CheckCircle2, XCircle, BarChart2, CalendarClock,
-  LayoutGrid, TableProperties, Sun
+  LayoutGrid, TableProperties, Sun, Monitor
 } from 'lucide-react';
 
 // UI
@@ -39,6 +39,7 @@ import TabBancoHoras from '@/components/rh/tabs/TabBancoHoras';
 import TabPayroll from '@/components/rh/tabs/TabPayroll';
 import TabContratos from '@/components/rh/tabs/TabContratos';
 import TabBaixasJustificacoes from '@/components/rh/tabs/TabBaixasJustificacoes';
+import TabEnvioTerminais from '@/components/rh/tabs/TabEnvioTerminais';
 
 import { calcularDia, fmtMin } from '@/lib/calculoHoras';
 import { getModeInfo, getTimmyCapabilities } from '@/lib/timmyModels';
@@ -102,6 +103,7 @@ const TABS = [
   { key: 'baixas',       label: 'Baixas & Faltas',     icon: AlertTriangle },
   { key: 'contratos',    label: 'Contratos',           icon: FileText },
   { key: 'payroll',      label: 'Payroll',             icon: Banknote },
+  { key: 'terminais',   label: 'Envio p/ Terminais',  icon: Monitor },
 ];
 
 export default function RH() {
@@ -1344,6 +1346,11 @@ export default function RH() {
         {/* ══════════════ PAYROLL ══════════════ */}
         {activeTab === 'payroll' && (
           <TabPayroll currentUser={currentUser} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+        )}
+
+        {/* ══════════════ ENVIO PARA TERMINAIS ══════════════ */}
+        {activeTab === 'terminais' && (
+          <TabEnvioTerminais currentUser={currentUser} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
         )}
 
         {/* ══════════════ FÉRIAS ══════════════ */}
