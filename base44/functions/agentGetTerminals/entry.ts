@@ -1,26 +1,40 @@
 /**
  * agentGetTerminals — devolve os terminais ao Agente Local
- *
  * Tipos geridos pelo agente: ip_local, ip_publico, dns, api
- * SEGURANÇA: autenticação EXCLUSIVAMENTE por X-Api-Key pessoal.
- * Cada utilizador vê apenas os terminais que criou (created_by).
+ * Autenticação: X-Api-Key pessoal
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import { validateApiKey, getTerminalsByOwner } from './helpers.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const AGENT_TYPES = ['ip_local', 'ip_publico', 'dns', 'api'];
 
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-        const authResult = await validateApiKey(req, base44);
-        
-        if (!authResult.valid) {
-            return Response.json({ error: authResult.error }, { status: authResult.status });
-        }
 
-        const ownerEmail = authResult.ownerEmail;
-        const terminals = await getTerminalsByOwner(base44, ownerEmail, AGENT_TYPES, false);
+        // ── Validar API Key ──────────────────────────────────────────────────
+        const apiKey = (req.headers.get('X-Api-Key') || req.headers.get('x-api-key') || '').trim();
+        if (!apiKey || apiKey.length < 16) {
+            return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
+        }
+        const allKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
+        const match = allKeys.find(k => k.key === apiKey);
+        if (!match) {
+            return Response.json({ error: 'API Key inválida' }, { status: 401 });
+        }
+        const ownerEmail = match.user_email;
+
+        // ── Carregar terminais ───────────────────────────────────────────────
+        const [byUsuario, byCreated] = await Promise.all([
+            base44.asServiceRole.entities.Terminal.filter({ ativo: true, usuario_email: ownerEmail }),
+            base44.asServiceRole.entities.Terminal.filter({ ativo: true, created_by: ownerEmail }),
+        ]);
+        const seen = new Set();
+        const allTerminals = [...byUsuario, ...byCreated].filter(t => {
+            if (seen.has(t.id)) return false;
+            seen.add(t.id);
+            return true;
+        });
+        const terminals = allTerminals.filter(t => AGENT_TYPES.includes(t.tipo_conexao));
 
         const result = terminals.map(t => ({
             id: t.id,
@@ -35,7 +49,7 @@ Deno.serve(async (req) => {
             ativo: t.ativo,
         }));
 
-        console.log(`agentGetTerminals OK: ${ownerEmail} → ${result.length} terminais (${result.map(t=>t.tipo_conexao).join(', ')})`);
+        console.log(`agentGetTerminals OK: ${ownerEmail} → ${result.length} terminais`);
         return Response.json({ success: true, terminals: result, owner: ownerEmail });
 
     } catch (error) {
