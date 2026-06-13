@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Search, Pencil, Trash2, Loader2,
-  UserCheck, UserX, ChevronRight, Building2, Phone, Mail, Calendar
+  UserCheck, UserX, ChevronRight, Building2, Phone, Mail, Calendar, ExternalLink
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import ColaboradorRHForm from '@/components/rh/ColaboradorRHForm';
 import { format, differenceInYears, parseISO } from 'date-fns';
 
 export default function FichaColaborador() {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
   const [search, setSearch] = useState('');
   const [depFilter, setDepFilter] = useState('all');
@@ -207,6 +209,9 @@ export default function FichaColaborador() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="outline" className="h-7 px-2 text-blue-600 hover:bg-blue-50 gap-1" onClick={() => navigate(`/ColaboradorPerfil?id=${c.id}`)}>
+                              <ExternalLink className="h-3 w-3" /><span className="text-xs">Perfil</span>
+                            </Button>
                             <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => handleEdit(c)}>
                               <Pencil className="h-3 w-3" />
                             </Button>
@@ -253,6 +258,9 @@ export default function FichaColaborador() {
                             : <Badge className="text-xs bg-slate-100 text-slate-500">Inativo</Badge>
                           }
                           {c.email && <Badge variant="outline" className="text-xs">{c.email}</Badge>}
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-blue-600 hover:bg-blue-50 gap-1 text-xs" onClick={() => navigate(`/ColaboradorPerfil?id=${c.id}`)}>
+                            <ExternalLink className="h-3 w-3" />Perfil 360°
+                          </Button>
                         </div>
                       </div>
                     </div>

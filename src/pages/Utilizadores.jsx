@@ -2,10 +2,11 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   Users, Plus, Pencil, Trash2, Search, Upload, Download,
   CheckCircle2, XCircle, Loader2, Send, ChevronDown, ChevronUp,
-  FileDown, FileUp, Zap, UserCheck, UserX, ArrowDownUp
+  FileDown, FileUp, Zap, UserCheck, UserX, ArrowDownUp, ExternalLink
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ import SyncPanel from '@/components/colaboradores/SyncPanel';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
 
 export default function Utilizadores() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -628,6 +630,9 @@ export default function Utilizadores() {
                               <Button size="sm" variant="outline" className="h-7 px-2 text-teal-600 hover:bg-teal-50" onClick={() => setExpandedUser(isExpanded ? null : u.id)}>
                                 <Send className="h-3 w-3 mr-1" />{isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                               </Button>
+                              <Button size="sm" variant="outline" className="h-7 px-1.5 text-blue-600 hover:bg-blue-50 gap-1" onClick={() => navigate(`/ColaboradorPerfil?enrollid=${u.enrollid}`)}>
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
                               <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => handleEdit(u)}><Pencil className="h-3 w-3" /></Button>
                               <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-500 hover:bg-red-50" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3 w-3" /></Button>
                             </div>
@@ -676,6 +681,9 @@ export default function Utilizadores() {
                             <div className="flex gap-1.5 shrink-0">
                               <Button size="sm" variant="outline" className="h-8 px-2 text-teal-600" onClick={() => setExpandedUser(isExpanded ? null : u.id)}>
                                 <Send className="h-3 w-3" />{isExpanded ? <ChevronUp className="h-3 w-3 ml-0.5" /> : <ChevronDown className="h-3 w-3 ml-0.5" />}
+                              </Button>
+                              <Button size="sm" variant="outline" className="h-8 w-8 p-0 text-blue-600 hover:bg-blue-50" onClick={() => navigate(`/ColaboradorPerfil?enrollid=${u.enrollid}`)}>
+                                <ExternalLink className="h-3 w-3" />
                               </Button>
                               <Button size="sm" variant="outline" className="h-8 w-8 p-0" onClick={() => handleEdit(u)}><Pencil className="h-3 w-3" /></Button>
                               <Button size="sm" variant="outline" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50" onClick={() => setDeleteId(u.id)}><Trash2 className="h-3 w-3" /></Button>

@@ -134,6 +134,17 @@ export default function RH() {
       badge: null,
       badgeColor: '',
     },
+    {
+      title: 'Fichas de Colaborador (RH)',
+      desc: 'Perfil 360° por colaborador: marcações, férias, contratos, salários',
+      icon: Users,
+      color: 'bg-blue-50 border-blue-200',
+      iconColor: 'text-blue-600',
+      link: '/FichaColaborador',
+      stats: `${ativos.length} colaboradores`,
+      badge: null,
+      badgeColor: '',
+    },
   ];
 
   const alertas = [];
