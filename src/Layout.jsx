@@ -56,7 +56,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
 
   { name: 'Mapa', page: 'Mapa', icon: MapPin },
-  { name: 'Colaboradores', page: 'Utilizadores', icon: Users },
+  { name: 'Utilizadores Biométricos', page: 'Utilizadores', icon: Users },
   { name: 'Controlo Acesso', page: 'ControloAcesso', icon: Shield },
   { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
 
