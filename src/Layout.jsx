@@ -60,13 +60,8 @@ const ALL_NAV_ITEMS = [
   { name: 'Marcações', page: 'Marcacoes', icon: Fingerprint },
   { name: 'Presença', page: 'Presenca', icon: Building2 },
   { name: 'Controlo Acesso', page: 'ControloAcesso', icon: Shield },
-  { name: 'Horários', page: 'GestaoHorarios', icon: Clock },
-  { name: 'Ausências', page: 'GestaoAusencias', icon: CalendarOff },
-  { name: 'Ponto Diário', page: 'RelatorioPresencaDiaria', icon: FileBarChart2 },
   { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
-  { name: 'Fichas RH', page: 'FichaColaborador', icon: Users },
   { name: 'Contratos', page: 'GestaoContratos', icon: FileSignature },
-  { name: 'Férias RH', page: 'GestaoFeriasRH', icon: Palmtree },
   { name: 'Justificação Faltas', page: 'JustificacaoFaltas', icon: FileSignature },
   { name: 'Gestão de Baixas', page: 'GestAoBaixas', icon: AlertTriangle },
   { name: 'Desempenho', page: 'GestaoDesempenho', icon: TrendingUp },
@@ -81,6 +76,7 @@ const ALL_NAV_ITEMS = [
   { name: 'Mapa Assiduidade', page: 'MapaAssiduidade', icon: LayoutGrid },
   { name: 'Payroll', page: 'Payroll', icon: Banknote },
   { name: 'Recibos', page: 'Recibos', icon: FileText },
+
   
   { name: 'Zonas de Acesso', page: 'ZonasAcesso', icon: DoorOpen },
   { name: 'Visitantes', page: 'Visitantes', icon: UserCheck },
