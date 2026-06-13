@@ -598,6 +598,12 @@ export default function RH() {
     catch { toast.error('Erro ao atribuir horário'); }
     finally { setAssigningId(null); }
   };
+  const handleAssignColab = async (colaboradorId, horarioId) => {
+    setAssigningId(colaboradorId);
+    try { await base44.entities.Colaborador.update(colaboradorId, { horario_id: horarioId || '' }); queryClient.invalidateQueries(['colaboradores']); toast.success(horarioId ? 'Horário atribuído' : 'Horário removido'); }
+    catch { toast.error('Erro ao atribuir horário'); }
+    finally { setAssigningId(null); }
+  };
   const toggleDia = (dia) => {
     const dias = parseDias(horForm.dias_semana);
     const novo = dias.includes(dia) ? dias.filter(d => d !== dia) : [...dias, dia].sort();
@@ -1352,17 +1358,38 @@ export default function RH() {
             )}
 
             {horTab === 'escala' && (
-              <Card className="bg-white border-slate-200">
-                <CardContent className="p-4">
-                  {terminalUsers.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400"><p>Sem colaboradores</p></div>
-                  ) : horarios.length === 0 ? (
-                    <div className="text-center py-12 text-slate-400"><p>Sem turnos criados</p></div>
-                  ) : (
-                    <EscalaTrabalho colaboradores={terminalUsers} horarios={horarios} onAssign={handleAssign} assigningId={assigningId} ownerEmail={currentUser?.email} />
-                  )}
-                </CardContent>
-              </Card>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <p className="text-xs text-slate-500">
+                    {ativos.length > 0 ? `${ativos.length} colaborador(es) ativo(s) · Clique no ✏️ para editar a escala de cada um` : 'Crie colaboradores primeiro'}
+                  </p>
+                </div>
+                {ativos.length === 0 ? (
+                  <Card className="bg-white border-slate-200">
+                    <CardContent className="py-16 text-center text-slate-400">
+                      <CalendarClock className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p className="font-medium mb-2">Nenhum colaborador ativo</p>
+                      <p className="text-sm mb-4">Crie colaboradores no separador "Colaboradores" para gerir escalas.</p>
+                      <Button onClick={() => setActiveTab('colab')} className="bg-blue-600 hover:bg-blue-700 text-xs gap-1.5">
+                        <Users className="h-3.5 w-3.5" /> Ir para Colaboradores
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : horarios.length === 0 ? (
+                  <Card className="bg-white border-slate-200">
+                    <CardContent className="py-16 text-center text-slate-400">
+                      <CalendarClock className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p className="font-medium mb-2">Nenhum horário/turno criado</p>
+                      <p className="text-sm mb-4">Crie horários no separador "Turnos" para depois atribuir na escala.</p>
+                      <Button onClick={() => setHorTab('turnos')} className="bg-violet-600 hover:bg-violet-700 text-xs gap-1.5">
+                        <Plus className="h-3.5 w-3.5" /> Criar turnos
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <EscalaTrabalho colaboradores={ativos} horarios={horarios} onAssign={handleAssignColab} assigningId={assigningId} ownerEmail={currentUser?.email} />
+                )}
+              </div>
             )}
           </div>
         )}
