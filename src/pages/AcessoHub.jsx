@@ -21,18 +21,18 @@ export default function AcessoHub() {
   const [activeTab, setActiveTab] = useState('controlo');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 w-full">
+    <div className="min-h-screen bg-slate-50 w-full">
       {/* Header */}
-      <div className="border-b border-slate-700/60 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-slate-200 bg-white sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-3 sm:px-6">
           {/* Título */}
           <div className="flex items-center gap-3 pt-4 pb-2">
-            <div className="p-2 bg-blue-900/60 border border-blue-700/50 rounded-xl shrink-0">
-              <Monitor className="h-5 w-5 text-blue-400" />
+            <div className="p-2 bg-slate-900 rounded-xl shrink-0">
+              <Monitor className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Controlo de Acesso</h1>
-              <p className="text-xs text-slate-400">Gestão centralizada de acessos, zonas, visitantes e planta</p>
+              <h1 className="text-lg font-bold text-slate-900">Controlo de Acesso</h1>
+              <p className="text-xs text-slate-500">Gestão centralizada de acessos, zonas, visitantes e planta</p>
             </div>
           </div>
 
@@ -48,8 +48,8 @@ export default function AcessoHub() {
                   className={cn(
                     'flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-all shrink-0',
                     active
-                      ? 'border-blue-400 text-blue-300'
-                      : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'
+                      ? 'border-slate-900 text-slate-900'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                   )}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -85,33 +85,17 @@ function ControloAcessoInner() {
 }
 
 function UtilizadoresWrapper() {
-  return (
-    <div className="bg-slate-50 min-h-screen">
-      <Utilizadores />
-    </div>
-  );
+  return <Utilizadores />;
 }
 
 function ZonasWrapper() {
-  return (
-    <div className="bg-slate-50 min-h-screen">
-      <ZonasAcesso />
-    </div>
-  );
+  return <ZonasAcesso />;
 }
 
 function VisitantesWrapper() {
-  return (
-    <div className="bg-slate-50 min-h-screen">
-      <Visitantes />
-    </div>
-  );
+  return <Visitantes />;
 }
 
 function MapaWrapper() {
-  return (
-    <div className="bg-slate-50 min-h-screen">
-      <Mapa />
-    </div>
-  );
+  return <Mapa />;
 }
