@@ -273,14 +273,14 @@ export default function FichaColaborador() {
       </div>
 
       {/* Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) return; setDialogOpen(open); }}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Editar Ficha' : 'Nova Ficha de Colaborador'}</DialogTitle>
           </DialogHeader>
           <ColaboradorRHForm data={formData} onChange={setFormData} horarios={horarios} />
           <div className="flex gap-2 pt-3 border-t border-slate-100 mt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" className="flex-1" onClick={() => { setDialogOpen(false); setEditingId(null); setFormData({}); }}>Cancelar</Button>
             <Button
               className="flex-1 bg-blue-600 hover:bg-blue-700"
               disabled={saveMutation.isPending || !formData.nome}
