@@ -167,7 +167,7 @@
     },
     "foto_url": {
       "type": "string",
-      "description": "URL da foto do colaborador"
+      "description": "URL da foto do colaborador (usada para reconhecimento facial no terminal)"
     },
     "horario_id": {
       "type": "string",
@@ -180,6 +180,23 @@
     "gestor_nome": {
       "type": "string",
       "description": "Nome do gestor (cache)"
+    },
+    "password": {
+      "type": "string",
+      "description": "PIN/Palavra-passe para o terminal biom\u00e9trico"
+    },
+    "card": {
+      "type": "string",
+      "description": "N\u00famero do cart\u00e3o RFID para o terminal"
+    },
+    "privilege": {
+      "type": "number",
+      "default": 0,
+      "description": "Privil\u00e9gio no terminal (0=normal, 14=admin)"
+    },
+    "grupo_acesso": {
+      "type": "string",
+      "description": "Grupo de acesso no terminal"
     },
     "observacoes": {
       "type": "string",

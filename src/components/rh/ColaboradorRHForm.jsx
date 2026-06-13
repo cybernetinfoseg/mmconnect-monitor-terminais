@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import { base44 } from '@/api/base44Client';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Upload, Loader2, Camera } from 'lucide-react';
 
 function Field({ label, children, required }) {
   return (
@@ -19,6 +22,17 @@ function Field({ label, children, required }) {
 
 export default function ColaboradorRHForm({ data, onChange, horarios = [] }) {
   const set = (field, value) => onChange({ ...data, [field]: value });
+  const fotoRef = useRef();
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+
+  const handleFotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFoto(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    onChange({ ...data, foto_url: file_url });
+    setUploadingFoto(false);
+  };
 
   return (
     <Tabs defaultValue="pessoal" className="w-full">
@@ -140,6 +154,63 @@ export default function ColaboradorRHForm({ data, onChange, horarios = [] }) {
             <Input type="number" value={data.enrollid || ''} onChange={e => set('enrollid', Number(e.target.value))} placeholder="Nº no terminal" />
           </Field>
         </div>
+
+        {/* Secção Terminal Biométrico */}
+        <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-4 space-y-4">
+          <p className="text-xs font-semibold text-teal-700 flex items-center gap-1.5">
+            <Camera className="h-3.5 w-3.5" /> Dados para Terminal Biométrico
+          </p>
+
+          {/* Foto */}
+          <div className="flex items-center gap-4">
+            <div
+              className="w-20 h-20 rounded-xl border-2 border-dashed border-teal-300 bg-white flex items-center justify-center overflow-hidden cursor-pointer hover:border-teal-500 transition-colors shrink-0"
+              onClick={() => fotoRef.current?.click()}
+            >
+              {data.foto_url
+                ? <img src={data.foto_url} alt="foto" className="w-full h-full object-cover" />
+                : uploadingFoto
+                  ? <Loader2 className="h-5 w-5 animate-spin text-teal-400" />
+                  : <Camera className="h-6 w-6 text-teal-300" />
+              }
+            </div>
+            <div className="flex-1 space-y-1">
+              <p className="text-xs font-medium text-slate-600">Foto do Colaborador</p>
+              <p className="text-xs text-slate-400">Usada para reconhecimento facial no terminal. Recomendado: rosto centrado, boa iluminação.</p>
+              <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1.5 mt-1" onClick={() => fotoRef.current?.click()} disabled={uploadingFoto}>
+                {uploadingFoto ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                {data.foto_url ? 'Alterar Foto' : 'Carregar Foto'}
+              </Button>
+              <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={handleFotoUpload} />
+              {data.foto_url && (
+                <button type="button" className="text-xs text-red-400 hover:text-red-600 block mt-0.5" onClick={() => set('foto_url', '')}>Remover foto</button>
+              )}
+            </div>
+          </div>
+
+          {/* Campos terminal */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Palavra-passe (PIN terminal)">
+              <Input value={data.password || ''} onChange={e => set('password', e.target.value)} placeholder="Opcional" />
+            </Field>
+            <Field label="Nº Cartão (RFID)">
+              <Input value={data.card || ''} onChange={e => set('card', e.target.value)} placeholder="Opcional" />
+            </Field>
+            <Field label="Privilégio no Terminal">
+              <Select value={String(data.privilege ?? 0)} onValueChange={v => set('privilege', Number(v))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">Utilizador normal</SelectItem>
+                  <SelectItem value="14">Administrador</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Grupo de Acesso">
+              <Input value={data.grupo_acesso || ''} onChange={e => set('grupo_acesso', e.target.value)} placeholder="ex: 1" />
+            </Field>
+          </div>
+        </div>
+
         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
           <Switch checked={data.ativo !== false} onCheckedChange={v => set('ativo', v)} />
           <span className="text-sm text-slate-700">Colaborador ativo</span>
