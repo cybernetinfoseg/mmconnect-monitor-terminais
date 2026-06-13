@@ -55,7 +55,6 @@ const ALL_NAV_ITEMS = [
   { name: 'Modo TV', page: 'TVMode', icon: Tv },
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
 
-  { name: 'Mapa', page: 'Mapa', icon: MapPin },
   { name: 'Controlo de Acesso', page: 'AcessoHub', icon: Shield },
   { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
 
