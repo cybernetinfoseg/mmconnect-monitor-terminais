@@ -40,6 +40,7 @@ import TabPayroll from '@/components/rh/tabs/TabPayroll';
 import TabContratos from '@/components/rh/tabs/TabContratos';
 import TabBaixasJustificacoes from '@/components/rh/tabs/TabBaixasJustificacoes';
 import TabEnvioTerminais from '@/components/rh/tabs/TabEnvioTerminais';
+import SyncBidirectional from '@/components/rh/SyncBidirectional';
 
 import { calcularDia, fmtMin } from '@/lib/calculoHoras';
 import { getModeInfo, getTimmyCapabilities } from '@/lib/timmyModels';
@@ -834,6 +835,11 @@ export default function RH() {
                 </div>
               </>
             )}
+
+            {/* Sincronização Bidirecional — Terminais Timmy */}
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <SyncBidirectional terminals={terminals} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+            </div>
           </div>
         )}
 
