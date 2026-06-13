@@ -313,6 +313,30 @@ export default function RH() {
   const [pontoFiltroStatus, setPontoFiltroStatus] = useState('todos');
   const [pontoSearch, setPontoSearch] = useState('');
 
+  // Marcação edit dialog state
+  const [marcEditDialog, setMarcEditDialog] = useState(false);
+  const [marcEditData, setMarcEditData] = useState(null);
+  const [marcDeleteId, setMarcDeleteId] = useState(null);
+
+  const marcEditMutation = useMutation({
+    mutationFn: (data) => base44.entities.Marcacao.update(marcEditData?.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['marcacoes-rh']);
+      setMarcEditDialog(false); setMarcEditData(null);
+      toast.success('Marcação atualizada');
+    },
+    onError: e => toast.error(`Erro: ${e.message}`),
+  });
+  const marcDeleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Marcacao.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['marcacoes-rh']);
+      queryClient.invalidateQueries(['movimentos_acesso']);
+      setMarcDeleteId(null);
+      toast.success('Marcação eliminada');
+    },
+  });
+
   const { data: marcacoes = [], isLoading: loadingMarc, refetch: refetchMarc, dataUpdatedAt: marcUpdatedAt } = useQuery({
     queryKey: ['marcacoes-rh'],
     queryFn: () => base44.entities.Marcacao.list('-timestamp', 2000),
@@ -721,6 +745,33 @@ export default function RH() {
               ))}
             </div>
 
+            {/* Estado dos Terminais */}
+            {terminals.length > 0 && (
+              <Card className="bg-white border-slate-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Monitor className="h-4 w-4 text-teal-600" />
+                    <h2 className="text-sm font-semibold text-slate-700">Terminais Conectados</h2>
+                    <Badge className={cn('text-xs', terminals.filter(t => t.status === 'online').length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}>
+                      {terminals.filter(t => t.status === 'online').length}/{terminals.length} online
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {terminals.map(t => {
+                      const lastReport = t.ultimo_ping ? new Date(t.ultimo_ping).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit' }) : null;
+                      return (
+                        <div key={t.id} className={cn('flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs', t.status === 'online' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500')}>
+                          <span className={cn('w-1.5 h-1.5 rounded-full', t.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300')} />
+                          <span className="font-medium">{t.nome}</span>
+                          {lastReport && <span className="text-[10px] opacity-60">{lastReport}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Alertas */}
             {(contratosAExpirar.length > 0 || feriasPendentes.length > 0) && (
               <div className="space-y-2">
@@ -1125,6 +1176,7 @@ export default function RH() {
                             <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">ID</th>
                             <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Utilizador</th>
                             <th className="text-left px-4 py-3 text-xs font-semibold text-slate-600 uppercase">Tipo</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-slate-600 uppercase w-16">Ações</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1132,12 +1184,24 @@ export default function RH() {
                             const nome = m.utilizador_nome || userMap[m.enrollid]?.nome || `ID:${m.enrollid}`;
                             const modeInfo = getModeInfo(m.modo, m.raw_mode);
                             return (
-                              <tr key={m.id || i} className="hover:bg-slate-50">
+                              <tr key={m.id || i} className="hover:bg-slate-50 group">
                                 <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</td>
                                 <td className="px-4 py-2.5 text-xs font-medium text-slate-800">{m.terminal_nome || '—'}</td>
                                 <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{m.enrollid}</td>
                                 <td className="px-4 py-2.5 text-xs font-medium text-slate-700">{nome}</td>
                                 <td className="px-4 py-2.5"><Badge className={cn('text-xs', TIPO_MARCACAO_COLORS[m.tipo] || TIPO_MARCACAO_COLORS.desconhecido)}>{m.tipo || 'desconhecido'}</Badge></td>
+                                <td className="px-4 py-2.5 text-right">
+                                  <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Editar" onClick={() => { setMarcEditData({ ...m }); setMarcEditDialog(true); }}>
+                                      <Pencil className="h-3 w-3 text-slate-400 hover:text-blue-600" />
+                                    </Button>
+                                    {isAdmin && (
+                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Eliminar" onClick={() => setMarcDeleteId(m.id)}>
+                                        <Trash2 className="h-3 w-3 text-slate-400 hover:text-red-600" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}
@@ -1833,6 +1897,82 @@ export default function RH() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Marcação edit dialog */}
+      <Dialog open={marcEditDialog} onOpenChange={open => { setMarcEditDialog(open); if (!open) setMarcEditData(null); }}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader><DialogTitle>Editar Marcação</DialogTitle></DialogHeader>
+          {marcEditData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Data/Hora</Label>
+                  <Input
+                    type="datetime-local"
+                    value={marcEditData.timestamp ? new Date(marcEditData.timestamp).toISOString().slice(0, 16) : ''}
+                    onChange={e => setMarcEditData(f => ({ ...f, timestamp: new Date(e.target.value).toISOString() }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Tipo</Label>
+                  <Select value={marcEditData.tipo || 'desconhecido'} onValueChange={v => setMarcEditData(f => ({ ...f, tipo: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="entrada">Entrada</SelectItem>
+                      <SelectItem value="saida">Saída</SelectItem>
+                      <SelectItem value="desconhecido">Desconhecido</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">ID (EnrollID)</Label>
+                  <Input type="number" value={marcEditData.enrollid || ''} onChange={e => setMarcEditData(f => ({ ...f, enrollid: Number(e.target.value) }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Modo</Label>
+                  <Input value={marcEditData.modo || ''} onChange={e => setMarcEditData(f => ({ ...f, modo: e.target.value }))} placeholder="fp, face, card, pw..." />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600">Nome do Utilizador</Label>
+                <Input value={marcEditData.utilizador_nome || ''} onChange={e => setMarcEditData(f => ({ ...f, utilizador_nome: e.target.value }))} placeholder="Nome no terminal..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-600">Terminal</Label>
+                <Input value={marcEditData.terminal_nome || ''} disabled className="bg-slate-50" />
+              </div>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-700 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" />A edição corrige divergências nos dados vindos do terminal. Use com cuidado.</p>
+              </div>
+              <div className="flex gap-2 pt-2 border-t border-slate-100">
+                <Button variant="outline" className="flex-1" onClick={() => { setMarcEditDialog(false); setMarcEditData(null); }}>Cancelar</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={marcEditMutation.isPending} onClick={() => marcEditMutation.mutate({
+                  timestamp: marcEditData.timestamp,
+                  tipo: marcEditData.tipo,
+                  enrollid: marcEditData.enrollid,
+                  modo: marcEditData.modo,
+                  utilizador_nome: marcEditData.utilizador_nome,
+                })}>
+                  {marcEditMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Guardar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Marcação delete dialog */}
+      <AlertDialog open={!!marcDeleteId} onOpenChange={open => !open && setMarcDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Eliminar Marcação?</AlertDialogTitle><AlertDialogDescription>Esta ação é permanente. A marcação será removida do sistema.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => marcDeleteMutation.mutate(marcDeleteId)}>Eliminar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
