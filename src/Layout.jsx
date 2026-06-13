@@ -57,8 +57,6 @@ const ALL_NAV_ITEMS = [
 
   { name: 'Mapa', page: 'Mapa', icon: MapPin },
   { name: 'Colaboradores', page: 'Utilizadores', icon: Users },
-  { name: 'Marcações', page: 'Marcacoes', icon: Fingerprint },
-  { name: 'Presença', page: 'Presenca', icon: Building2 },
   { name: 'Controlo Acesso', page: 'ControloAcesso', icon: Shield },
   { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
 

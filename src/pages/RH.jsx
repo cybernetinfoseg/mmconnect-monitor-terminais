@@ -34,6 +34,11 @@ import ColaboradorRHForm from '@/components/rh/ColaboradorRHForm';
 import PresencaCard from '@/components/presenca/PresencaCard';
 import EscalaTrabalho from '@/components/horarios/EscalaTrabalho';
 import RelatorioPorColaborador from '@/components/marcacoes/RelatorioPorColaborador';
+import TabHorasExtra from '@/components/rh/tabs/TabHorasExtra';
+import TabBancoHoras from '@/components/rh/tabs/TabBancoHoras';
+import TabPayroll from '@/components/rh/tabs/TabPayroll';
+import TabContratos from '@/components/rh/tabs/TabContratos';
+import TabBaixasJustificacoes from '@/components/rh/tabs/TabBaixasJustificacoes';
 
 import { calcularDia, fmtMin } from '@/lib/calculoHoras';
 import { getModeInfo, getTimmyCapabilities } from '@/lib/timmyModels';
@@ -86,12 +91,17 @@ function calcDiasUteis(inicio, fim) {
 // Main
 // ─────────────────────────────────────────────
 const TABS = [
-  { key: 'overview',   label: 'Visão Geral',       icon: LayoutDashboard },
-  { key: 'colab',      label: 'Colaboradores',      icon: Users },
-  { key: 'ponto',      label: 'Ponto & Presença',   icon: Fingerprint },
-  { key: 'horarios',   label: 'Horários & Turnos',  icon: CalendarClock },
-  { key: 'ausencias',  label: 'Ausências',          icon: CalendarOff },
-  { key: 'ferias',     label: 'Férias',             icon: CalendarDays },
+  { key: 'overview',     label: 'Visão Geral',        icon: LayoutDashboard },
+  { key: 'colab',        label: 'Colaboradores',       icon: Users },
+  { key: 'ponto',        label: 'Ponto & Presença',    icon: Fingerprint },
+  { key: 'horarios',     label: 'Horários & Turnos',   icon: CalendarClock },
+  { key: 'ausencias',    label: 'Ausências',           icon: CalendarOff },
+  { key: 'ferias',       label: 'Férias',              icon: CalendarDays },
+  { key: 'horas_extra',  label: 'Horas Extra',         icon: TrendingUp },
+  { key: 'banco_horas',  label: 'Banco de Horas',      icon: Archive },
+  { key: 'baixas',       label: 'Baixas & Faltas',     icon: AlertTriangle },
+  { key: 'contratos',    label: 'Contratos',           icon: FileText },
+  { key: 'payroll',      label: 'Payroll',             icon: Banknote },
 ];
 
 export default function RH() {
@@ -1309,6 +1319,31 @@ export default function RH() {
               <Card className="bg-white border-slate-200"><CardContent className="py-16 text-center text-slate-400"><CalendarOff className="h-12 w-12 mx-auto mb-3 opacity-30" /><p>Nenhuma ausência registada</p></CardContent></Card>
             )}
           </div>
+        )}
+
+        {/* ══════════════ HORAS EXTRA ══════════════ */}
+        {activeTab === 'horas_extra' && (
+          <TabHorasExtra currentUser={currentUser} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+        )}
+
+        {/* ══════════════ BANCO DE HORAS ══════════════ */}
+        {activeTab === 'banco_horas' && (
+          <TabBancoHoras currentUser={currentUser} />
+        )}
+
+        {/* ══════════════ BAIXAS & JUSTIFICAÇÕES ══════════════ */}
+        {activeTab === 'baixas' && (
+          <TabBaixasJustificacoes currentUser={currentUser} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+        )}
+
+        {/* ══════════════ CONTRATOS ══════════════ */}
+        {activeTab === 'contratos' && (
+          <TabContratos currentUser={currentUser} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+        )}
+
+        {/* ══════════════ PAYROLL ══════════════ */}
+        {activeTab === 'payroll' && (
+          <TabPayroll currentUser={currentUser} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
         )}
 
         {/* ══════════════ FÉRIAS ══════════════ */}
