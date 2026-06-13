@@ -25,9 +25,10 @@ export default function RelatorioMovimentos() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const { data: movimentos = [], isLoading } = useQuery({
+  const { data: movimentos = [], isLoading, dataUpdatedAt } = useQuery({
     queryKey: ['movimentos_acesso'],
-    queryFn: () => base44.entities.Marcacao.list('-timestamp', 1000)
+    queryFn: () => base44.entities.Marcacao.list('-timestamp', 1000),
+    refetchInterval: 30000,
   });
 
   const filteredMovimentos = movimentos.filter(m => {
@@ -79,7 +80,10 @@ export default function RelatorioMovimentos() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Relatório de Movimentos</h1>
-          <p className="text-slate-600">Trilho completo de acessos por pessoa ou terminal</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <p className="text-slate-600">Trilho completo de acessos por pessoa ou terminal</p>
+            {dataUpdatedAt && <p className="text-xs text-slate-400">· Atualizado {format(new Date(dataUpdatedAt), 'HH:mm:ss', { locale: pt })} · auto-refresh 30s</p>}
+          </div>
         </div>
 
         {/* Stats */}

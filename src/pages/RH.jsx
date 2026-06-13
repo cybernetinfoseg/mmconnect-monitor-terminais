@@ -201,16 +201,37 @@ export default function RH() {
   const [colDeleteId, setColDeleteId] = useState(null);
   const [colSyncDialog, setColSyncDialog] = useState(false);
 
+  const syncColabToTerminal = async (colData) => {
+    const enrollid = Number(colData.enrollid);
+    if (!enrollid) return;
+    const timmyTerminals = terminals.filter(t => t.marca?.toLowerCase().includes('timmy') && t.status === 'online');
+    if (timmyTerminals.length === 0) return;
+    for (const t of timmyTerminals) {
+      try {
+        await base44.functions.invoke('terminalControl', {
+          terminal_id: t.id,
+          action: 'setuser',
+          enrollid,
+          nome: colData.nome,
+          card: colData.card || '',
+          password: colData.password || '',
+          privilege: colData.privilege ?? 0,
+        });
+      } catch {}
+    }
+  };
+
   const colSaveMutation = useMutation({
     mutationFn: async (data) => {
       const payload = { ...data, owner_email: data.owner_email || currentUser?.email };
       if (colEditingId) return base44.entities.Colaborador.update(colEditingId, payload);
       return base44.entities.Colaborador.create(payload);
     },
-    onSuccess: () => {
+    onSuccess: async (result) => {
       queryClient.invalidateQueries(['colaboradores']);
       setColDialog(false); setColEditingId(null); setColFormData({});
       toast.success(colEditingId ? 'Ficha atualizada' : 'Colaborador criado');
+      await syncColabToTerminal(colFormData);
     },
     onError: e => toast.error(`Erro: ${e.message}`),
   });
@@ -941,7 +962,21 @@ export default function RH() {
             {pontoTab === 'presenca' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-3">
-                  <p className="text-xs text-slate-500">Atualizado {marcUpdatedAt ? new Date(marcUpdatedAt).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'} · auto-refresh 30s</p>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-xs text-slate-500">Atualizado {marcUpdatedAt ? new Date(marcUpdatedAt).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'} · auto-refresh 30s</p>
+                    {terminals.filter(t => t.ultimo_ping).length > 0 && (
+                      <p className="text-[10px] text-slate-400 flex items-center gap-1 flex-wrap">
+                        <span>Terminais:</span>
+                        {terminals.filter(t => t.ultimo_ping).slice(0, 4).map(t => (
+                          <span key={t.id} className={cn('inline-flex items-center gap-0.5', t.status === 'online' ? 'text-emerald-500' : 'text-slate-400')}>
+                            <span className={cn('w-1.5 h-1.5 rounded-full', t.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300')} />
+                            {t.nome}
+                          </span>
+                        ))}
+                        {terminals.filter(t => t.ultimo_ping).length > 4 && <span>+{terminals.filter(t => t.ultimo_ping).length - 4}</span>}
+                      </p>
+                    )}
+                  </div>
                   <Button variant="outline" size="sm" onClick={() => refetchMarc()} className="gap-1.5 text-xs"><RefreshCw className="h-3.5 w-3.5" /> Atualizar</Button>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -1012,12 +1047,19 @@ export default function RH() {
                     {isAdmin && <Button variant="outline" size="sm" onClick={handleExportMarcacoesCSV} disabled={marcacoesFiltered.length === 0} className="gap-1.5 text-xs"><Download className="h-3.5 w-3.5" />CSV</Button>}
                   </div>
                 </div>
-                {/* Recolher terminais */}
+                {/* Recolher terminais (avançado — expandir manualmente) */}
                 {terminals.length > 0 && (
-                  <Card className="bg-white border-slate-200">
-                    <CardContent className="p-4 space-y-3">
+                  <details className="bg-white border border-slate-200 rounded-xl group">
+                    <summary className="cursor-pointer select-none list-none">
+                      <div className="flex items-center justify-between gap-2 p-4">
+                        <p className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Download className="h-4 w-4 text-teal-600" />Recolher Marcações (Avançado)</p>
+                        <span className="text-xs text-slate-400 group-open:hidden">Expandir ▼</span>
+                        <span className="text-xs text-slate-400 hidden group-open:inline">Recolher ▲</span>
+                      </div>
+                    </summary>
+                    <div className="px-4 pb-4 space-y-3">
+                      <p className="text-xs text-slate-500 italic">As marcações chegam automaticamente via WebSocket/ADMS. Use esta opção apenas para recuperação ou terminais offline.</p>
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Upload className="h-4 w-4 text-teal-600" />Recolher Marcações</p>
                         <Button size="sm" className="bg-teal-600 hover:bg-teal-700 gap-1.5 text-xs" onClick={async () => {
                           setCollecting('all'); let total = 0, errors = 0;
                           for (const t of terminals) { try { total += await collectFromTerminal(t); } catch { errors++; } }
@@ -1036,8 +1078,8 @@ export default function RH() {
                           </Button>
                         ))}
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </details>
                 )}
                 {/* Stats */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
