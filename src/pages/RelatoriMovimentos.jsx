@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Download, AlertCircle } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -17,38 +17,41 @@ export default function RelatorioMovimentos() {
 
   const { data: movimentos = [], isLoading } = useQuery({
     queryKey: ['movimentos_acesso'],
-    queryFn: () => base44.entities.MovimentoAcesso.list('-timestamp', 1000)
+    queryFn: () => base44.entities.Marcacao.list('-timestamp', 1000)
   });
 
   const filteredMovimentos = movimentos.filter(m => {
-    const matchSearch = m.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       m.zona_nome?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchAuth = filtroAutorizacao === 'todos' ? true : 
-                     (filtroAutorizacao === 'autorizado' ? m.autorizado : !m.autorizado);
-    
+    const matchSearch = !searchTerm ||
+      m.utilizador_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.terminal_nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      m.local?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(m.enrollid)?.includes(searchTerm);
+    const matchAuth = filtroAutorizacao === 'todos' ? true :
+      (filtroAutorizacao === 'autorizado' ? m.tipo === 'entrada' : m.tipo === 'saida');
+
     const dataMovimento = new Date(m.timestamp);
     const matchDate = (!dateFrom || dataMovimento >= new Date(dateFrom)) &&
-                     (!dateTo || dataMovimento <= new Date(dateTo));
-    
+                     (!dateTo || dataMovimento <= new Date(dateTo + 'T23:59:59'));
+
     return matchSearch && matchAuth && matchDate;
   });
 
   const totalAcessos = filteredMovimentos.length;
-  const acessosDenegados = filteredMovimentos.filter(m => !m.autorizado).length;
-  const taxaDenegacao = totalAcessos > 0 ? ((acessosDenegados / totalAcessos) * 100).toFixed(1) : 0;
+  const entradas = filteredMovimentos.filter(m => m.tipo === 'entrada').length;
+  const saidas = filteredMovimentos.filter(m => m.tipo === 'saida').length;
 
   const exportarCSV = () => {
     const csv = [
-      ['Data', 'Hora', 'Pessoa', 'Tipo', 'Zona', 'Terminal', 'Autorizado', 'Motivo'],
+      ['Data', 'Hora', 'Enrollid', 'Nome', 'Tipo', 'Modo', 'Terminal', 'Local'],
       ...filteredMovimentos.map(m => [
         format(new Date(m.timestamp), 'yyyy-MM-dd'),
         format(new Date(m.timestamp), 'HH:mm:ss'),
-        m.nome,
-        m.tipo_acesso,
-        m.zona_nome || '-',
+        m.enrollid,
+        m.utilizador_nome || '-',
+        m.tipo,
+        m.modo || '-',
         m.terminal_nome || '-',
-        m.autorizado ? 'Sim' : 'Não',
-        m.motivo_negacao || '-'
+        m.local || '-',
       ])
     ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
 
@@ -74,19 +77,19 @@ export default function RelatorioMovimentos() {
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="pt-6">
               <div className="text-3xl font-bold text-blue-600">{totalAcessos}</div>
-              <p className="text-sm text-slate-600 mt-1">Total de Acessos</p>
+              <p className="text-sm text-slate-600 mt-1">Total de Marcações</p>
             </CardContent>
           </Card>
-          <Card className="bg-red-50 border-red-200">
+          <Card className="bg-green-50 border-green-200">
             <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-red-600">{acessosDenegados}</div>
-              <p className="text-sm text-slate-600 mt-1">Acessos Denegados</p>
+              <div className="text-3xl font-bold text-green-600">{entradas}</div>
+              <p className="text-sm text-slate-600 mt-1">Entradas</p>
             </CardContent>
           </Card>
           <Card className="bg-amber-50 border-amber-200">
             <CardContent className="pt-6">
-              <div className="text-3xl font-bold text-amber-600">{taxaDenegacao}%</div>
-              <p className="text-sm text-slate-600 mt-1">Taxa de Denegação</p>
+              <div className="text-3xl font-bold text-amber-600">{saidas}</div>
+              <p className="text-sm text-slate-600 mt-1">Saídas</p>
             </CardContent>
           </Card>
         </div>
@@ -112,9 +115,9 @@ export default function RelatorioMovimentos() {
                 onChange={(e) => setFiltroAutorizacao(e.target.value)}
                 className="px-3 py-2 rounded-md border border-slate-300 bg-white text-sm"
               >
-                <option value="todos">Todos os Acessos</option>
-                <option value="autorizado">Autorizados</option>
-                <option value="denegado">Denegados</option>
+                <option value="todos">Todas as Marcações</option>
+                <option value="autorizado">Entradas</option>
+                <option value="denegado">Saídas</option>
               </select>
               <div className="flex gap-2">
                 <input
@@ -149,11 +152,12 @@ export default function RelatorioMovimentos() {
                 <thead>
                   <tr className="border-b border-slate-200">
                     <th className="text-left py-3 px-4 font-semibold text-slate-700">Data/Hora</th>
-                    <th className="text-left py-3 px-4 font-semibold text-slate-700">Pessoa</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700">Enrollid</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700">Nome</th>
                     <th className="text-left py-3 px-4 font-semibold text-slate-700">Tipo</th>
-                    <th className="text-left py-3 px-4 font-semibold text-slate-700">Zona</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700">Modo</th>
                     <th className="text-left py-3 px-4 font-semibold text-slate-700">Terminal</th>
-                    <th className="text-center py-3 px-4 font-semibold text-slate-700">Status</th>
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700">Local</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -162,23 +166,16 @@ export default function RelatorioMovimentos() {
                       <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
                         {format(new Date(m.timestamp), 'dd/MM/yyyy HH:mm:ss', { locale: pt })}
                       </td>
-                      <td className="py-3 px-4 text-slate-700">{m.nome}</td>
+                      <td className="py-3 px-4 text-slate-500 font-mono text-xs">{m.enrollid}</td>
+                      <td className="py-3 px-4 text-slate-700">{m.utilizador_nome || <span className="text-slate-400 italic">—</span>}</td>
                       <td className="py-3 px-4">
-                        <Badge className={m.tipo_acesso === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
-                          {m.tipo_acesso === 'entrada' ? '↓ Entrada' : '↑ Saída'}
+                        <Badge className={m.tipo === 'entrada' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}>
+                          {m.tipo === 'entrada' ? '↓ Entrada' : '↑ Saída'}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-slate-600">{m.zona_nome || '-'}</td>
+                      <td className="py-3 px-4 text-slate-500 text-xs">{m.modo || '-'}</td>
                       <td className="py-3 px-4 text-slate-600">{m.terminal_nome || '-'}</td>
-                      <td className="py-3 px-4 text-center">
-                        {m.autorizado ? (
-                          <Badge className="bg-green-100 text-green-700">✓ Autorizado</Badge>
-                        ) : (
-                          <Badge className="bg-red-100 text-red-700 flex items-center justify-center gap-1 w-fit mx-auto">
-                            <AlertCircle className="h-3 w-3" /> Denegado
-                          </Badge>
-                        )}
-                      </td>
+                      <td className="py-3 px-4 text-slate-500 text-xs">{m.local || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
