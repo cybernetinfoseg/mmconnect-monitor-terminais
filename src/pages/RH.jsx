@@ -14,7 +14,7 @@ import {
   Plus, Search, Pencil, Trash2, Loader2, RefreshCw, Download,
   Upload, CheckCircle2, XCircle, BarChart2, CalendarClock,
   LayoutGrid, TableProperties, Sun, Monitor,
-  ArrowUpDown, Send, FileSpreadsheet, FileUp, FileDown
+  ArrowUpDown, FileSpreadsheet, FileUp, FileDown
 } from 'lucide-react';
 
 // UI
@@ -267,22 +267,6 @@ export default function RH() {
       toast.success(created + ' colaborador(es) importados');
     } catch { toast.error('Erro ao ler CSV'); }
     e.target.value = '';
-  };
-
-  const handleSendAllToTerminals = async () => {
-    const timmyTerminals = terminals.filter(t => t.tipo_conexao === 'websocket_cloud');
-    if (timmyTerminals.length === 0) { toast.error('Sem terminais Timmy'); return; }
-    let success = 0, errors = 0;
-    for (const col of colaboradores) {
-      if (!col.enrollid || col.ativo === false) continue;
-      for (const t of timmyTerminals) {
-        try {
-          await base44.functions.invoke('terminalControl', { terminal_id: t.id, action: 'adduser', params: { enrollid: col.enrollid, name: col.nome || 'Col. ' + col.enrollid, password: col.password || '', card: col.card || '', privilege: col.privilege ?? 0 } });
-          success++;
-        } catch { errors++; }
-      }
-    }
-    toast.success(success + ' envios OK' + (errors > 0 ? ' \u00b7 ' + errors + ' falhas' : ''));
   };
 
   const departamentos = [...new Set(colaboradores.map(c => c.departamento).filter(Boolean))].sort();
@@ -810,9 +794,6 @@ export default function RH() {
                   <FileUp className="h-3.5 w-3.5" /> Importar CSV
                 </Button>
                 <input id="colab-csv-import" type="file" accept=".csv" className="hidden" onChange={handleImportColabCSV} />
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleSendAllToTerminals}>
-                  <Send className="h-3.5 w-3.5" /> Enviar Todos
-                </Button>
                 <Button size="sm" onClick={() => { setColEditingId(null); setColFormData({ ativo: true, num_dependentes: 0, pais: 'Portugal', nacionalidade: 'Portuguesa', genero: 'nao_especificado' }); setColDialog(true); }} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5 text-xs">
                   <Plus className="h-3.5 w-3.5" /> Novo
                 </Button>
@@ -1788,10 +1769,13 @@ export default function RH() {
         </DialogContent>
       </Dialog>
       {/* Sincronizacao dialog */}
-      <Dialog open={colSyncDialog} onOpenChange={setColSyncDialog}>
+      <Dialog open={colSyncDialog} onOpenChange={(open) => setColSyncDialog(open)}>
         <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Sincronizacao com Terminais Timmy</DialogTitle></DialogHeader>
           <SyncBidirectional terminals={terminals} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+          <div className="flex justify-end pt-3 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setColSyncDialog(false)}>Fechar</Button>
+          </div>
         </DialogContent>
       </Dialog>
 
