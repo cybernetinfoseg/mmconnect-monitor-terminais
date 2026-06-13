@@ -42,6 +42,7 @@ import CustosDepartamentos from './pages/CustosDepartamentos.jsx';
 import Adiantamentos from './pages/Adiantamentos.jsx';
 import Organigrama from './pages/Organigrama.jsx';
 import ColaboradorPerfil from './pages/ColaboradorPerfil.jsx';
+import AcessoHub from './pages/AcessoHub.jsx';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -134,6 +135,7 @@ const AuthenticatedApp = () => {
       <Route path="/Adiantamentos" element={<LayoutWrapper currentPageName="Adiantamentos"><Adiantamentos /></LayoutWrapper>} />
       <Route path="/Organigrama" element={<LayoutWrapper currentPageName="Organigrama"><Organigrama /></LayoutWrapper>} />
       <Route path="/ColaboradorPerfil" element={<LayoutWrapper currentPageName="ColaboradorPerfil"><ColaboradorPerfil /></LayoutWrapper>} />
+      <Route path="/AcessoHub" element={<LayoutWrapper currentPageName="AcessoHub"><AcessoHub /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

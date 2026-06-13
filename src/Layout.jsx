@@ -56,13 +56,9 @@ const ALL_NAV_ITEMS = [
   { name: 'Terminais', page: 'Terminais', icon: Monitor },
 
   { name: 'Mapa', page: 'Mapa', icon: MapPin },
-  { name: 'Utilizadores Biométricos', page: 'Utilizadores', icon: Users },
-  { name: 'Controlo Acesso', page: 'ControloAcesso', icon: Shield },
+  { name: 'Controlo de Acesso', page: 'AcessoHub', icon: Shield },
   { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
 
-  
-  { name: 'Zonas de Acesso', page: 'ZonasAcesso', icon: DoorOpen },
-  { name: 'Visitantes', page: 'Visitantes', icon: UserCheck },
   { name: 'Relatório Movimentos', page: 'RelatorioMovimentos', icon: BarChart3 },
   
   

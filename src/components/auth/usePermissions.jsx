@@ -19,6 +19,11 @@ const ALL_PAGES = [
   'RH', 'FichaColaborador', 'GestaoContratos', 'GestaoFeriasRH',
   'HorasExtra', 'BancoHoras', 'MapaAssiduidade',
   'Payroll', 'Recibos',
+  'ZonasAcesso', 'Visitantes', 'ControloAcesso', 'Utilizadores', 'AcessoHub',
+  'RelatorioMovimentos', 'AlertasCompliance', 'JustificacaoFaltas',
+  'GestAoBaixas', 'GestaoDesempenho', 'GestaoFormacao', 'DocumentosColaborador',
+  'FichaSalarial', 'CustosDepartamentos', 'Adiantamentos', 'Organigrama',
+  'ColaboradorPerfil', 'DashboardRHExecutivo', 'RelatorioAbsentismo',
 ];
 
 const ADMIN_ONLY_PAGES = ['Administracao', 'Configuracoes', 'ExportacaoMarcacoes'];
