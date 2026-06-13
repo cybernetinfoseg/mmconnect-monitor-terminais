@@ -3,31 +3,50 @@
  * Tipos suportados: heartbeat, adms_push, sdk_tcp, websocket_cloud
  * Autenticação: X-Api-Key pessoal (no header)
  */
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
-import { validateApiKey, getTerminalsByOwner, isUserAdmin } from './helpers.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 Deno.serve(async (req) => {
     try {
         const base44 = createClientFromRequest(req);
-        const authResult = await validateApiKey(req, base44);
-        
-        if (!authResult.valid) {
-            return Response.json({ error: authResult.error }, { status: authResult.status });
-        }
 
-        const ownerEmail = authResult.ownerEmail;
+        // ── Validar API Key ──────────────────────────────────────────────────
+        const apiKey = (req.headers.get('X-Api-Key') || req.headers.get('x-api-key') || '').trim();
+        if (!apiKey || apiKey.length < 16) {
+            return Response.json({ error: 'API Key ausente ou inválida' }, { status: 401 });
+        }
+        const allKeys = await base44.asServiceRole.entities.ApiKey.filter({ ativo: true });
+        const match = allKeys.find(k => k.key === apiKey);
+        if (!match) {
+            return Response.json({ error: 'API Key inválida' }, { status: 401 });
+        }
+        const ownerEmail = match.user_email;
         console.log(`nocServerGetTerminals: autenticado como ${ownerEmail}`);
 
-        // Verificar se o utilizador é admin
-        const isAdmin = await isUserAdmin(base44, ownerEmail);
-        
+        // ── Verificar se admin ───────────────────────────────────────────────
+        const users = await base44.asServiceRole.entities.User.filter({ email: ownerEmail }).catch(() => []);
+        const ownerUser = users[0];
+        const isAdmin = ownerUser?.role === 'admin';
+
+        // ── Carregar terminais ───────────────────────────────────────────────
         const supported = ['heartbeat', 'adms_push', 'sdk_tcp', 'websocket_cloud'];
-        const terminals = await getTerminalsByOwner(base44, ownerEmail, supported, isAdmin);
-        
+        let allTerminals = [];
         if (isAdmin) {
-            console.log(`nocServerGetTerminals: ADMIN ${ownerEmail} → todos os terminais (${terminals.length})`);
+            allTerminals = await base44.asServiceRole.entities.Terminal.filter({ ativo: true });
+        } else {
+            const [byUsuario, byCreated] = await Promise.all([
+                base44.asServiceRole.entities.Terminal.filter({ ativo: true, usuario_email: ownerEmail }),
+                base44.asServiceRole.entities.Terminal.filter({ ativo: true, created_by: ownerEmail }),
+            ]);
+            const seen = new Set();
+            allTerminals = [...byUsuario, ...byCreated].filter(t => {
+                if (seen.has(t.id)) return false;
+                seen.add(t.id);
+                return true;
+            });
         }
-        console.log(`nocServerGetTerminals: ${ownerEmail} tem ${terminals.length} terminais ativos total`);
+        const terminals = allTerminals.filter(t => supported.includes(t.tipo_conexao));
+
+        console.log(`nocServerGetTerminals: ${ownerEmail} → ${terminals.length} terminais`);
 
         const result = terminals.map(t => ({
             id: t.id,
@@ -45,9 +64,6 @@ Deno.serve(async (req) => {
             ativo: t.ativo,
         }));
 
-        // Buscar timezone do utilizador para sincronização com o servidor Timmy
-        const users = await base44.asServiceRole.entities.User.filter({ email: ownerEmail }).catch(() => []);
-        const ownerUser = users[0];
         const user_timezone = ownerUser?.timezone || 'Europe/Lisbon';
 
         console.log(`nocServerGetTerminals OK: ${ownerEmail} → ${result.length} terminais | timezone=${user_timezone}`);
