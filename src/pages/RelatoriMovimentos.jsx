@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, Pencil, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 // O timestamp vem do terminal já em hora local — mostrar diretamente sem conversão de timezone
 const formatLocal = (ts) => {
@@ -25,10 +30,26 @@ export default function RelatorioMovimentos() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
+  // Edit/Delete state
+  const [editDialog, setEditDialog] = useState(false);
+  const [editData, setEditData] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+  const queryClient = useQueryClient();
+
   const { data: movimentos = [], isLoading, dataUpdatedAt } = useQuery({
     queryKey: ['movimentos_acesso'],
     queryFn: () => base44.entities.Marcacao.list('-timestamp', 1000),
     refetchInterval: 30000,
+  });
+
+  const editMutation = useMutation({
+    mutationFn: (data) => base44.entities.Marcacao.update(editData?.id, data),
+    onSuccess: () => { queryClient.invalidateQueries(['movimentos_acesso']); setEditDialog(false); setEditData(null); toast.success('Registo atualizado'); },
+    onError: e => toast.error(`Erro: ${e.message}`),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.Marcacao.delete(id),
+    onSuccess: () => { queryClient.invalidateQueries(['movimentos_acesso']); setDeleteId(null); toast.success('Registo eliminado'); },
   });
 
   const filteredMovimentos = movimentos.filter(m => {
@@ -172,11 +193,12 @@ export default function RelatorioMovimentos() {
                     <th className="text-left py-3 px-4 font-semibold text-slate-700">Modo</th>
                     <th className="text-left py-3 px-4 font-semibold text-slate-700">Terminal</th>
                     <th className="text-left py-3 px-4 font-semibold text-slate-700">Local</th>
+                    <th className="text-right py-3 px-4 font-semibold text-slate-700 w-16">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMovimentos.map((m, idx) => (
-                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
+                    <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 group">
                       <td className="py-3 px-4 text-slate-700 whitespace-nowrap">
                         {formatLocal(m.timestamp)}
                       </td>
@@ -190,6 +212,16 @@ export default function RelatorioMovimentos() {
                       <td className="py-3 px-4 text-slate-500 text-xs">{m.modo || '-'}</td>
                       <td className="py-3 px-4 text-slate-600">{m.terminal_nome || '-'}</td>
                       <td className="py-3 px-4 text-slate-500 text-xs">{m.local || '-'}</td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Editar" onClick={() => { setEditData({ ...m }); setEditDialog(true); }}>
+                            <Pencil className="h-3 w-3 text-slate-400 hover:text-blue-600" />
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" title="Eliminar" onClick={() => setDeleteId(m.id)}>
+                            <Trash2 className="h-3 w-3 text-slate-400 hover:text-red-600" />
+                          </Button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -202,6 +234,76 @@ export default function RelatorioMovimentos() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={editDialog} onOpenChange={open => { setEditDialog(open); if (!open) setEditData(null); }}>
+          <DialogContent className="w-[95vw] max-w-md">
+            <DialogHeader><DialogTitle>Editar Registo</DialogTitle></DialogHeader>
+            {editData && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-slate-600">Data/Hora</Label>
+                    <Input type="datetime-local" value={editData.timestamp ? new Date(editData.timestamp).toISOString().slice(0, 16) : ''}
+                      onChange={e => setEditData(f => ({ ...f, timestamp: new Date(e.target.value).toISOString() }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-slate-600">Tipo</Label>
+                    <Select value={editData.tipo || 'desconhecido'} onValueChange={v => setEditData(f => ({ ...f, tipo: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entrada">Entrada</SelectItem>
+                        <SelectItem value="saida">Saída</SelectItem>
+                        <SelectItem value="desconhecido">Desconhecido</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-slate-600">EnrollID</Label>
+                    <Input type="number" value={editData.enrollid || ''} onChange={e => setEditData(f => ({ ...f, enrollid: Number(e.target.value) }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium text-slate-600">Modo</Label>
+                    <Input value={editData.modo || ''} onChange={e => setEditData(f => ({ ...f, modo: e.target.value }))} placeholder="fp, face, card..." />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Nome</Label>
+                  <Input value={editData.utilizador_nome || ''} onChange={e => setEditData(f => ({ ...f, utilizador_nome: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-600">Terminal</Label>
+                  <Input value={editData.terminal_nome || ''} disabled className="bg-slate-50" />
+                </div>
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-xs text-amber-700 flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5" />Editar apenas quando necessário. Dados originais vêm do terminal.</p>
+                </div>
+                <div className="flex gap-2 pt-2 border-t border-slate-100">
+                  <Button variant="outline" className="flex-1" onClick={() => { setEditDialog(false); setEditData(null); }}>Cancelar</Button>
+                  <Button className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={editMutation.isPending} onClick={() => editMutation.mutate({
+                    timestamp: editData.timestamp, tipo: editData.tipo, enrollid: editData.enrollid,
+                    modo: editData.modo, utilizador_nome: editData.utilizador_nome,
+                  })}>
+                    {editMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Guardar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Dialog */}
+        <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>Eliminar Registo?</AlertDialogTitle><AlertDialogDescription>Esta ação é permanente.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => deleteMutation.mutate(deleteId)}>Eliminar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

@@ -652,17 +652,27 @@ export default function RH() {
   const [ferEstado, setFerEstado] = useState('all');
   const [ferDialog, setFerDialog] = useState(false);
   const [ferFormData, setFerFormData] = useState({});
+  const [ferEditingIdFerias, setFerEditingIdFerias] = useState(null);
+  const [ferDeleteId, setFerDeleteId] = useState(null);
+  const [saldoEditing, setSaldoEditing] = useState(null);
+  const [saldoForm, setSaldoForm] = useState({});
   const [aprovacaoId, setAprovacaoId] = useState(null);
   const [rejeitarId, setRejeitarId] = useState(null);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
   const [mapaMonth, setMapaMonth] = useState(hoje_date);
 
-  const ferCreateMutation = useMutation({
+  const ferSaveMutation = useMutation({
     mutationFn: async (data) => {
       const diasUteis = calcDiasUteis(data.data_inicio, data.data_fim);
-      return base44.entities.PedidoFerias.create({ ...data, dias_uteis: diasUteis, ano: data.data_inicio ? parseISO(data.data_inicio).getFullYear() : anoAtual, estado: 'pendente', owner_email: currentUser?.email });
+      const payload = { ...data, dias_uteis: diasUteis, ano: data.data_inicio ? parseISO(data.data_inicio).getFullYear() : anoAtual };
+      if (ferEditingIdFerias) return base44.entities.PedidoFerias.update(ferEditingIdFerias, payload);
+      return base44.entities.PedidoFerias.create({ ...payload, estado: 'pendente', owner_email: currentUser?.email });
     },
-    onSuccess: () => { queryClient.invalidateQueries(['pedidos-ferias']); setFerDialog(false); setFerFormData({}); toast.success('Pedido registado'); },
+    onSuccess: () => { queryClient.invalidateQueries(['pedidos-ferias']); setFerDialog(false); setFerFormData({}); setFerEditingIdFerias(null); toast.success(ferEditingIdFerias ? 'Pedido atualizado' : 'Pedido registado'); },
+  });
+  const ferDeleteMutation = useMutation({
+    mutationFn: (id) => base44.entities.PedidoFerias.delete(id),
+    onSuccess: () => { queryClient.invalidateQueries(['pedidos-ferias']); setFerDeleteId(null); toast.success('Pedido eliminado'); },
   });
   const ferAprovarMutation = useMutation({
     mutationFn: (id) => base44.entities.PedidoFerias.update(id, { estado: 'aprovado', aprovado_por: currentUser?.email, aprovado_em: new Date().toISOString() }),
@@ -1556,7 +1566,7 @@ export default function RH() {
                   </Card>
                 ))}
               </div>
-              <Button size="sm" onClick={() => { setFerFormData({}); setFerDialog(true); }} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5 self-start">
+              <Button size="sm" onClick={() => { setFerEditingIdFerias(null); setFerFormData({}); setFerDialog(true); }} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5 self-start">
                 <Plus className="h-3.5 w-3.5" /> Registar Pedido
               </Button>
             </div>
@@ -1602,12 +1612,18 @@ export default function RH() {
                               <td className="px-4 py-3"><span className="text-sm font-semibold text-slate-700">{p.dias_uteis || calcDiasUteis(p.data_inicio, p.data_fim)}</span><span className="text-xs text-slate-400 ml-1">dias</span></td>
                               <td className="px-4 py-3"><Badge className={cn('text-xs', cfg.cls)}>{cfg.label}</Badge>{p.motivo_rejeicao && <p className="text-[10px] text-red-500 mt-0.5">{p.motivo_rejeicao}</p>}</td>
                               <td className="px-4 py-3 text-right">
-                                {p.estado === 'pendente' && isAdmin && (
-                                  <div className="flex justify-end gap-1">
-                                    <Button size="sm" className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-xs gap-1" onClick={() => setAprovacaoId(p.id)}><CheckCircle2 className="h-3 w-3" />Aprovar</Button>
-                                    <Button size="sm" variant="outline" className="h-7 px-2 text-red-600 border-red-300 hover:bg-red-50 text-xs gap-1" onClick={() => setRejeitarId(p.id)}><XCircle className="h-3 w-3" />Rejeitar</Button>
-                                  </div>
-                                )}
+                                <div className="flex justify-end gap-1">
+                                  <Button size="sm" variant="outline" className="h-7 w-7 p-0" title="Editar" onClick={() => { setFerEditingIdFerias(p.id); setFerFormData({ colaborador_id: p.colaborador_id, colaborador_nome: p.colaborador_nome, enrollid: p.enrollid, data_inicio: p.data_inicio, data_fim: p.data_fim, observacoes: p.observacoes }); setFerDialog(true); }}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  {isAdmin && p.estado === 'pendente' && (
+                                    <>
+                                      <Button size="sm" className="h-7 w-7 p-0 bg-emerald-600 hover:bg-emerald-700" title="Aprovar" onClick={() => setAprovacaoId(p.id)}><CheckCircle2 className="h-3 w-3" /></Button>
+                                      <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-600 border-red-300 hover:bg-red-50" title="Rejeitar" onClick={() => setRejeitarId(p.id)}><XCircle className="h-3 w-3" /></Button>
+                                    </>
+                                  )}
+                                  {isAdmin && <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-500 hover:bg-red-50" title="Eliminar" onClick={() => setFerDeleteId(p.id)}><Trash2 className="h-3 w-3" /></Button>}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1831,7 +1847,7 @@ export default function RH() {
       {/* Férias dialogs */}
       <Dialog open={ferDialog} onOpenChange={setFerDialog}>
         <DialogContent className="w-[95vw] max-w-md">
-          <DialogHeader><DialogTitle>Registar Pedido de Férias</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{ferEditingIdFerias ? 'Editar Pedido de Férias' : 'Registar Pedido de Férias'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-slate-600">Colaborador *</Label>
@@ -1856,8 +1872,8 @@ export default function RH() {
           </div>
           <div className="flex gap-2 pt-3 border-t border-slate-100">
             <Button variant="outline" className="flex-1" onClick={() => setFerDialog(false)}>Cancelar</Button>
-            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={ferCreateMutation.isPending || !ferFormData.colaborador_id || !ferFormData.data_inicio || !ferFormData.data_fim} onClick={() => ferCreateMutation.mutate(ferFormData)}>
-              {ferCreateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}Registar
+            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={ferSaveMutation.isPending || !ferFormData.colaborador_id || !ferFormData.data_inicio || !ferFormData.data_fim} onClick={() => ferSaveMutation.mutate(ferFormData)}>
+              {ferSaveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}{ferEditingIdFerias ? 'Guardar' : 'Registar'}
             </Button>
           </div>
         </DialogContent>
@@ -1874,6 +1890,11 @@ export default function RH() {
           </div>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={!!ferDeleteId} onOpenChange={open => !open && setFerDeleteId(null)}>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar Pedido?</AlertDialogTitle><AlertDialogDescription>Esta ação é permanente.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => ferDeleteMutation.mutate(ferDeleteId)}>Eliminar</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* Sincronizacao dialog */}
       <Dialog open={colSyncDialog} onOpenChange={(open) => setColSyncDialog(open)}>
         <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
