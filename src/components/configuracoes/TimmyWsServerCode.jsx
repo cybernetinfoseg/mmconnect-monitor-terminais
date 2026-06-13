@@ -621,7 +621,8 @@ def ciclo_reporte_ws(intervalo=30, stop_event=None):
 # ──────────────────────────────────────────────────────────────
 def ciclo_reload_terminais(stop_event=None):
     """Sincroniza terminais e timezone da nuvem a cada 60 segundos."""
-    global sn_to_terminal, sn_to_nome
+    global sn_to_terminal, sn_to_nome, USER_TIMEZONE
+    last_timezone = USER_TIMEZONE
     while not (stop_event and stop_event.is_set()):
         time.sleep(60)
         try:
@@ -637,6 +638,32 @@ def ciclo_reload_terminais(stop_event=None):
                             ws_state[sn]["local"] = t.get("local", "")
             sn_to_terminal = new_map
             sn_to_nome     = new_nomes
+
+            if USER_TIMEZONE != last_timezone:
+                logger.info(f"[RELOAD] Timezone alterado: {last_timezone} -> {USER_TIMEZONE}")
+                last_timezone = USER_TIMEZONE
+
+                with ws_conn_lock:
+                    sns_conectados = list(ws_connections.keys())
+
+                for sn in sns_conectados:
+                    try:
+                        ws, loop = ws_connections.get(sn, (None, None))
+                        if ws:
+                            cmd = {
+                                "cmd": "settime",
+                                "sn": sn,
+                                "cloudtime": obter_hora_sincronizada()
+                            }
+                            asyncio.run_coroutine_threadsafe(
+                                ws.send(json.dumps(cmd)),
+                                loop
+                            )
+                            nome = sn_to_nome.get(sn, sn)
+                            logger.info(f"[RELOAD-SYNC] settime para '{nome}' (SN={sn}) tz={USER_TIMEZONE}")
+                    except Exception as e:
+                        logger.error(f"[RELOAD-SYNC] Erro SN={sn}: {e}")
+
             # Garantir que terminais offline sem disconnected_at o tenham definido agora
             # (evita seg_offline inflado após restart do servidor)
             now = time.time()
