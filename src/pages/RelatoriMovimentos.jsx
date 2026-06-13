@@ -9,15 +9,14 @@ import { Search, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
-// Formata timestamp UTC para hora local do browser
+// O timestamp vem do terminal já em hora local — mostrar diretamente sem conversão de timezone
 const formatLocal = (ts) => {
   if (!ts) return '-';
-  const d = new Date(ts);
-  return d.toLocaleString('pt-PT', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false,
-  });
+  // Remover sufixo Z ou offset para evitar que o browser converta para local
+  const raw = ts.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return ts;
+  return format(d, 'dd/MM/yyyy HH:mm:ss');
 };
 
 export default function RelatorioMovimentos() {
@@ -55,8 +54,8 @@ export default function RelatorioMovimentos() {
     const csv = [
       ['Data', 'Hora', 'Enrollid', 'Nome', 'Tipo', 'Modo', 'Terminal', 'Local'],
       ...filteredMovimentos.map(m => [
-        new Date(m.timestamp).toLocaleDateString('pt-PT'),
-        new Date(m.timestamp).toLocaleTimeString('pt-PT'),
+        formatLocal(m.timestamp).split(' ')[0],
+        formatLocal(m.timestamp).split(' ')[1],
         m.enrollid,
         m.utilizador_nome || '-',
         m.tipo,

@@ -129,7 +129,9 @@ Deno.serve(async (req) => {
                     let tipo = rec.tipo || 'desconhecido';
                     if (tipo === 'desconhecido' && rec.timestamp) {
                         try {
-                            const hora = new Date(rec.timestamp).getHours();
+                            // Usar hora local do terminal (remover Z/offset para não converter)
+                            const raw = String(rec.timestamp).replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+                            const hora = new Date(raw).getHours();
                             if (hora >= 7 && hora <= 12) tipo = 'entrada';
                             else if (hora >= 16 && hora <= 19) tipo = 'saida';
                         } catch (e) {}
