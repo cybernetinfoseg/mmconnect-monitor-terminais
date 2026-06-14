@@ -452,20 +452,21 @@ export default function RH() {
       const dedupSet = new Set();
       existentes.forEach(m => { if (m.timestamp) { const b = Math.floor(new Date(m.timestamp).getTime() / DEDUP_MS); dedupSet.add(`${m.enrollid}|${b}`); } });
       const toSave = data.records.map(r => {
-        const rawMode = r.mode ?? r.Mode ?? r.verifyType ?? r.verifytype;
-        let modo = String(rawMode ?? '');
-        if (rawMode >= 1 && rawMode <= 9) modo = 'fp'; else if (rawMode === 10) modo = 'pw'; else if (rawMode === 11) modo = 'card'; else if (rawMode === 15 || rawMode === 20) modo = 'face';
-        const rawTs = r.time ?? r.Time ?? r.timestamp ?? '';
-        let ts = rawTs;
-        if (rawTs && rawTs.includes(' ') && rawTs.includes('-')) ts = rawTs.replace(' ', 'T');
-        const enrollid = r.enrollid ?? r.EnrollNumber ?? r.id;
-        let tipo = 'desconhecido';
-        const inoutVal = r.inout ?? r.InOutStatus;
-        if (inoutVal === 0 || inoutVal === 'entrada') tipo = 'entrada';
-        else if (inoutVal === 1 || inoutVal === 'saida') tipo = 'saida';
-        else if (ts) { try { const dt = new Date(ts.includes('T') ? ts : ts + 'T00:00:00'); const hora = dt.getHours(); if (hora >= 7 && hora <= 12) tipo = 'entrada'; else if (hora >= 16 && hora <= 19) tipo = 'saida'; } catch { } }
-        return { terminal_id: terminal.id, terminal_nome: terminal.nome, enrollid: Number(enrollid) || 0, utilizador_nome: userMap[enrollid] || '', timestamp: ts || new Date().toISOString(), modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo, local: terminal.local || '', exportado: false };
-      });
+         const rawMode = r.mode ?? r.Mode ?? r.verifyType ?? r.verifytype;
+         let modo = String(rawMode ?? '');
+         if (rawMode >= 1 && rawMode <= 9) modo = 'fp'; else if (rawMode === 10) modo = 'pw'; else if (rawMode === 11) modo = 'card'; else if (rawMode === 15 || rawMode === 20) modo = 'face';
+         const rawTs = r.time ?? r.Time ?? r.timestamp ?? '';
+         let ts = rawTs;
+         if (rawTs && rawTs.includes(' ') && rawTs.includes('-')) ts = rawTs.replace(' ', 'T');
+         if (!ts) return null;
+         const enrollid = r.enrollid ?? r.EnrollNumber ?? r.id;
+         let tipo = 'desconhecido';
+         const inoutVal = r.inout ?? r.InOutStatus;
+         if (inoutVal === 0 || inoutVal === 'entrada') tipo = 'entrada';
+         else if (inoutVal === 1 || inoutVal === 'saida') tipo = 'saida';
+         else if (ts) { try { const dt = new Date(ts.includes('T') ? ts : ts + 'T00:00:00'); const hora = dt.getHours(); if (hora >= 7 && hora <= 12) tipo = 'entrada'; else if (hora >= 16 && hora <= 19) tipo = 'saida'; } catch { } }
+         return { terminal_id: terminal.id, terminal_nome: terminal.nome, enrollid: Number(enrollid) || 0, utilizador_nome: userMap[enrollid] || '', timestamp: ts, modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo, local: terminal.local || '', exportado: false };
+       }).filter(Boolean);
       const novas = toSave.filter(r => { if (!r.timestamp) return false; const b = Math.floor(new Date(r.timestamp).getTime() / DEDUP_MS); const k = `${r.enrollid}|${b}`; if (dedupSet.has(k)) return false; dedupSet.add(k); return true; });
       if (novas.length > 0) await base44.entities.Marcacao.bulkCreate(novas);
       return novas.length;

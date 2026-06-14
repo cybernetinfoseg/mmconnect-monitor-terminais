@@ -152,7 +152,7 @@ def parse_log_record(rec, terminal_id, terminal_nome, terminal_local):
     ts_str = rec.get("time", "")
     try:
         dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-        timestamp = dt.isoformat() + "Z"
+        timestamp = dt.strftime("%Y-%m-%dT%H:%M:%S")
     except Exception:
         timestamp = ts_str
 

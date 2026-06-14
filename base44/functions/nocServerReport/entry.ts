@@ -96,7 +96,8 @@ async function processMarcacoes(base44, terminalId, terminal, marcacoes, enrollM
     let saved = 0;
     for (const m of marcacoes) {
         try {
-            const tsStr = m.timestamp || new Date().toISOString();
+            const tsStr = m.timestamp || '';
+            if (!tsStr) continue;
             const tsMs = new Date(tsStr).getTime();
             if (isNaN(tsMs)) continue;
             const enrollid = Number(m.enrollid) || 0;
