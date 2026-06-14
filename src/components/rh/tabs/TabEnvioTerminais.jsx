@@ -3,7 +3,7 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   Send, Search, Loader2, CheckCircle2, XCircle,
-  Monitor, Users, Building2, ChevronDown, ChevronUp, Trash2, RefreshCw, Camera, ArrowUpDown
+  Monitor, Users, Building2, ChevronDown, ChevronUp, Trash2, Camera, ArrowUpDown
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import SyncBidirectional from '@/components/rh/SyncBidirectional';
@@ -16,9 +16,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+// ── Helper: Converte URL de imagem externa para uma string Base64 limpa ──────
+async function converterUrlParaBase64(url) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result;
+      // Extrai apenas o hash limpando o cabeçalho "data:image/...;base64,"
+      const cleanBase64 = base64String.split(',')[1];
+      resolve(cleanBase64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 // ── Helper: envia UM colaborador para UM terminal ─────────────────────────────
 async function enviarColaborador(colaborador, terminalId, comFoto = false) {
-  // 1. Enviar dados do utilizador
+  // 1. Enviar dados do utilizador base textuais
   const resp = await base44.functions.invoke('terminalControl', {
     terminal_id: terminalId,
     action: 'adduser',
@@ -30,28 +47,34 @@ async function enviarColaborador(colaborador, terminalId, comFoto = false) {
       privilege: colaborador.privilege || 0,
     },
   });
+  
   const result = { success: !!resp.data?.success, message: resp.data?.message || resp.data?.error || '' };
 
-  // 2. Se pedido e tem foto, enviar foto separadamente
+  // 2. Se a flag comFoto estiver ativa e existir foto_url, envia via protocolo setuserface (Base64)
   if (result.success && comFoto && colaborador.foto_url) {
     try {
+      const base64Face = await converterUrlParaBase64(colaborador.foto_url);
+      
       const fotoResp = await base44.functions.invoke('terminalControl', {
         terminal_id: terminalId,
-        action: 'setuserphoto',
+        action: 'setuserface',
         params: {
           enrollid: colaborador.enrollid,
-          foto_url: colaborador.foto_url,
+          name: colaborador.nome,
+          faceid: 1,
+          face: base64Face,
         },
       });
-      if (fotoResp.data?.success) {
-        result.message = (result.message || '') + ' + foto facial enviada';
+
+      if (fotoResp.data?.success || fotoResp.data?.result?.result === true) {
+        result.message = (result.message || '') + ' + template facial processado';
         result.foto_enviada = true;
       } else {
-        result.message = (result.message || '') + ' (foto: ' + (fotoResp.data?.message || 'falhou') + ')';
+        result.message = (result.message || '') + ' (foto: algoritmo rejeitou a imagem)';
         result.foto_enviada = false;
       }
     } catch (e) {
-      result.message = (result.message || '') + ` (foto: ${e.message})`;
+      result.message = (result.message || '') + ` (erro conversão foto: ${e.message})`;
       result.foto_enviada = false;
     }
   }
@@ -165,7 +188,7 @@ function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, onSendPhoto,
                 className="h-8 px-3 text-xs text-teal-600 border-teal-200 hover:bg-teal-50 gap-1"
                 disabled={!selectedTerminal || sendingPhoto}
                 onClick={handleSendPhoto}
-                title="Enviar apenas a foto facial para o terminal (requer modelo AI)"
+                title="Enviar foto via codificação Base64 (Protocolo Timmy Face AI)"
               >
                 {sendingPhoto ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
                 Foto
@@ -173,7 +196,6 @@ function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, onSendPhoto,
             )}
           </div>
 
-          {/* Resultados por terminal */}
           {selectedTerminal && results[selectedTerminal] && (
             <div className={cn(
               'flex items-center gap-2 text-xs px-3 py-2 rounded-lg',
@@ -186,7 +208,6 @@ function ColaboradorRow({ colab, terminals, onSendOne, onRemoveOne, onSendPhoto,
             </div>
           )}
 
-          {/* Envio para todos os terminais */}
           <div className="border-t border-slate-200 pt-3">
             <p className="text-xs text-slate-500 mb-2">Enviar para todos os terminais:</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -232,20 +253,17 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
   const [sendingId, setSendingId] = useState(null);
   const [incluirFoto, setIncluirFoto] = useState(false);
 
-  // Envio por departamento
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedTerminalDept, setSelectedTerminalDept] = useState('');
-  const [sendingDept, setSendingDept] = useState(false);
+  const [sendingDept, setSendingDept] =പ്പോഴും = useState(false);
   const [deptProgress, setDeptProgress] = useState(null);
   const [deptResults, setDeptResults] = useState(null);
 
-  // Envio em massa
   const [selectedTerminalAll, setSelectedTerminalAll] = useState('');
   const [sendingAll, setSendingAll] = useState(false);
   const [allProgress, setAllProgress] = useState(null);
   const [allResults, setAllResults] = useState(null);
 
-  // Sync dialog
   const [syncDialogOpen, setSyncDialogOpen] = useState(false);
 
   const { data: terminals = [] } = useQuery({
@@ -274,7 +292,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
     [colaboradores, selectedDept]
   );
 
-  // ── Handlers ──
   const handleSendOne = async (colab, terminalId) => {
     setSendingId(colab.id);
     try {
@@ -292,21 +309,31 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
     }
   };
 
+  // Handler de injeção direta de foto convertida reativa via endpoint de controlo
   const handleSendPhoto = async (colab, terminalId) => {
     try {
+      const cleanBase64 = await converterUrlParaBase64(colab.foto_url);
+      
       const resp = await base44.functions.invoke('terminalControl', {
         terminal_id: terminalId,
-        action: 'setuserphoto',
-        params: { enrollid: colab.enrollid, foto_url: colab.foto_url },
+        action: 'setuserface',
+        params: { 
+          enrollid: colab.enrollid, 
+          name: colab.nome,
+          faceid: 1,
+          face: cleanBase64 
+        },
       });
+      
       const term = terminals.find(t => t.id === terminalId);
-      const ok = !!resp.data?.success;
+      const ok = !!resp.data?.success || resp.data?.result?.result === true;
       ok
-        ? toast.success(`Foto de ${colab.nome} enviada para "${term?.nome}"`)
-        : toast.error(`Erro ao enviar foto: ${resp.data?.message || 'falhou'}`);
+        ? toast.success(`Foto de ${colab.nome} injetada com sucesso em "${term?.nome}"`)
+        : toast.error(`Erro: O terminal recusou processar o template da foto`);
+        
       return { success: ok, message: resp.data?.message || resp.data?.error || '' };
     } catch (e) {
-      toast.error(e.message);
+      toast.error(`Falha ao converter imagem: ${e.message}`);
       return { success: false, message: e.message };
     }
   };
@@ -380,7 +407,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
     fail === 0 ? toast.success(`${ok} colaboradores processados com sucesso`) : toast.error(`${ok} OK / ${fail} erros`);
   };
 
-  // ── Componente de resultados ──
   const ResultsPanel = ({ results }) => {
     if (!results) return null;
     return (
@@ -411,7 +437,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
     );
   };
 
-  // ── Barra de progresso ──
   const ProgressBar = ({ progress, color = 'bg-teal-500' }) => {
     if (!progress) return null;
     const pct = Math.round(progress.done / progress.total * 100);
@@ -442,7 +467,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
 
   return (
     <div className="space-y-4">
-      {/* Sync button */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm font-medium text-slate-700">Envio de colaboradores para os terminais biométricos</p>
         <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSyncDialogOpen(true)}>
@@ -450,7 +474,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Card className="bg-white border-slate-200">
           <CardContent className="p-4 flex items-center gap-3">
@@ -472,12 +495,11 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
         </Card>
       </div>
 
-      {/* Toggle incluir foto */}
       <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
         <Camera className="h-4 w-4 text-teal-600 shrink-0" />
         <div className="flex-1">
           <p className="text-sm font-medium text-slate-700">Incluir foto facial</p>
-          <p className="text-xs text-slate-400">Apenas modelos AI com câmara (TM-AIFace, TM-AI07F, TM-AI08...)</p>
+          <p className="text-xs text-slate-400">Modelos AI Dinâmicos com câmara (TM-AIFace11F, TM-AI07F...)</p>
         </div>
         <button
           onClick={() => setIncluirFoto(v => !v)}
@@ -500,13 +522,12 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
           <TabsTrigger value="todos" className="gap-1.5"><Monitor className="h-3.5 w-3.5" />Todos → Terminal</TabsTrigger>
         </TabsList>
 
-        {/* ── INDIVIDUAL ── */}
         <TabsContent value="individual" className="mt-4 space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input placeholder="Pesquisar colaborador..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 bg-white" />
           </div>
-          <p className="text-xs text-slate-500">{filtered.length} colaboradores · Expanda para enviar para um terminal específico ou todos</p>
+          <p className="text-xs text-slate-500">{filtered.length} colaboradores</p>
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
             {filtered.length === 0 ? (
               <Card className="bg-white"><CardContent className="py-8 text-center text-slate-400"><p>Nenhum colaborador encontrado</p></CardContent></Card>
@@ -524,7 +545,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
           </div>
         </TabsContent>
 
-        {/* ── POR DEPARTAMENTO ── */}
         <TabsContent value="departamento" className="mt-4 space-y-4">
           <Card className="bg-white border-slate-200">
             <CardContent className="p-4 space-y-4">
@@ -592,7 +612,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
             </CardContent>
           </Card>
 
-          {/* Lista de colaboradores do departamento selecionado */}
           {selectedDept && colabsPorDept.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-slate-600 px-1">Colaboradores de "{selectedDept}":</p>
@@ -610,7 +629,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
           )}
         </TabsContent>
 
-        {/* ── TODOS → TERMINAL ── */}
         <TabsContent value="todos" className="mt-4 space-y-4">
           <Card className="bg-white border-slate-200">
             <CardContent className="p-4 space-y-4">
@@ -634,7 +652,7 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
               </div>
 
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-                Serão enviados <strong>{colaboradores.filter(c => c.ativo !== false && c.enrollid).length}</strong> colaboradores ativos (com enrollid) para o terminal selecionado.
+                Serão enviados <strong>{colaboradores.filter(c => c.ativo !== false && c.enrollid).length}</strong> colaboradores ativos para o terminal.
               </div>
 
               <div className="flex gap-2">
@@ -664,10 +682,9 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
         </TabsContent>
       </Tabs>
 
-      {/* Sync Dialog */}
       <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
         <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Sincronizacao com Terminais Timmy</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Sincronização com Terminais Timmy</DialogTitle></DialogHeader>
           <SyncBidirectional terminals={terminals} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
           <div className="flex justify-end pt-3 border-t border-slate-100">
             <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>Fechar</Button>
