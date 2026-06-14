@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Users, MapPin, DoorOpen, UserCheck, Monitor, BarChart3 } from 'lucide-react';
+import { Shield, MapPin, DoorOpen, UserCheck, Monitor, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Importar as páginas existentes como componentes embutidos
@@ -7,12 +7,10 @@ import ControloAcesso from './ControloAcesso';
 import Mapa from './Mapa';
 import ZonasAcesso from './ZonasAcesso';
 import Visitantes from './Visitantes';
-import Utilizadores from './Utilizadores';
 import RelatoriMovimentos from './RelatoriMovimentos';
 
 const TABS = [
   { id: 'controlo',     label: 'Controlo de Portas',      icon: Shield,    desc: 'Comandos remotos de portas e terminais' },
-  { id: 'biometricos',  label: 'Utilizadores Biométricos', icon: Users,     desc: 'Credenciais e sincronização com terminais' },
   { id: 'zonas',        label: 'Zonas de Acesso',          icon: DoorOpen,  desc: 'Áreas restritas e regras de acesso' },
   { id: 'visitantes',   label: 'Visitantes',               icon: UserCheck, desc: 'Registos de entrada e badges temporários' },
   { id: 'mapa',         label: 'Mapa de Terminais',        icon: MapPin,    desc: 'Planta baixa interativa' },
@@ -72,7 +70,6 @@ export default function AcessoHub() {
             <ControloAcessoInner />
           </div>
         )}
-        {activeTab === 'biometricos' && <UtilizadoresWrapper />}
         {activeTab === 'zonas' && <ZonasWrapper />}
         {activeTab === 'visitantes' && <VisitantesWrapper />}
         {activeTab === 'mapa' && <MapaWrapper />}
@@ -85,10 +82,6 @@ export default function AcessoHub() {
 // Wrappers leves — apenas montam o componente existente com ajustes de fundo
 function ControloAcessoInner() {
   return <ControloAcesso />;
-}
-
-function UtilizadoresWrapper() {
-  return <Utilizadores />;
 }
 
 function ZonasWrapper() {
