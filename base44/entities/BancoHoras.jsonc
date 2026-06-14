@@ -37,6 +37,14 @@
       "default": 0,
       "description": "Minutos de horas extra pagos em vez de compensados"
     },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
+    },
     "observacoes": {
       "type": "string",
       "description": "Observa\u00e7\u00f5es"

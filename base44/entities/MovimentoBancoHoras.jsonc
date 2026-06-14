@@ -27,7 +27,7 @@
         "pagamento",
         "expiracao"
       ],
-      "description": "Tipo de movimento: cr\u00e9dito=horas extra ganhas, d\u00e9bito=compensa\u00e7\u00e3o gozada, pagamento=horas extra pagas, expira\u00e7\u00e3o=horas caducadas"
+      "description": "Tipo de movimento"
     },
     "minutos": {
       "type": "number",
@@ -39,11 +39,19 @@
     },
     "registo_extra_id": {
       "type": "string",
-      "description": "ID do RegistoHorasExtra de origem (se cr\u00e9dito)"
+      "description": "ID do RegistoHorasExtra de origem"
     },
     "aprovado_por": {
       "type": "string",
       "description": "Email de quem autorizou"
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
     },
     "owner_email": {
       "type": "string",

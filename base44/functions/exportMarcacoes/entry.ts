@@ -24,15 +24,21 @@ Deno.serve(async (req) => {
     if (!config) return Response.json({ error: 'Configuração não encontrada' }, { status: 404 });
 
     // Verificar permissão
-    const isAdmin = user.role === 'admin';
+    const isSuperAdmin = user.role === 'super_admin';
+    const isAdmin = user.role === 'admin' || isSuperAdmin;
     if (!isAdmin && config.owner_email !== user.email) {
       return Response.json({ error: 'Sem permissão' }, { status: 403 });
     }
 
+    // Base filter — inclui tenant_id para admins não super_admin
+    const baseFilter = {};
+    if (config.apenas_novos !== false) baseFilter.exportado = false;
+    if (!isSuperAdmin && user.tenant_id) baseFilter.tenant_id = user.tenant_id;
+
     // Buscar marcações a exportar
     let marcacoes;
-    if (config.apenas_novos !== false) {
-      marcacoes = await base44.asServiceRole.entities.Marcacao.filter({ exportado: false }, 'timestamp', 1000);
+    if (Object.keys(baseFilter).length > 0) {
+      marcacoes = await base44.asServiceRole.entities.Marcacao.filter(baseFilter, 'timestamp', 1000);
     } else {
       marcacoes = await base44.asServiceRole.entities.Marcacao.list('timestamp', 1000);
     }

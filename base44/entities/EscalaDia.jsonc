@@ -21,7 +21,7 @@
     },
     "horario_id": {
       "type": "string",
-      "description": "ID do Horario atribu\u00eddo neste dia espec\u00edfico (null = folga/aus\u00eancia)"
+      "description": "ID do Horario atribu\u00eddo neste dia espec\u00edfico"
     },
     "tipo": {
       "type": "string",
@@ -33,7 +33,15 @@
         "extra"
       ],
       "default": "normal",
-      "description": "Tipo de escala para este dia"
+      "description": "Tipo de escala"
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
     },
     "observacao": {
       "type": "string",
