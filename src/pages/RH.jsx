@@ -227,7 +227,11 @@ export default function RH() {
 
   const colSaveMutation = useMutation({
     mutationFn: async (data) => {
-      const payload = { ...data, owner_email: data.owner_email || currentUser?.email };
+      // Auto-fill tenant for non-super_admin users
+      const tenantInjection = !perms.isSuperAdmin && currentUser?.tenant_id
+        ? { tenant_id: currentUser.tenant_id, tenant_nome: currentUser.tenant_nome || '' }
+        : {};
+      const payload = { ...data, ...tenantInjection, owner_email: data.owner_email || currentUser?.email };
       if (colEditingId) return base44.entities.Colaborador.update(colEditingId, payload);
       return base44.entities.Colaborador.create(payload);
     },
@@ -284,6 +288,8 @@ export default function RH() {
             telemovel: row['Telem\u00f3vel'] || '',
             data_admissao: row['Data Admiss\u00e3o'] || '',
             ativo: row['Ativo'] !== 'N\u00e3o',
+            tenant_id: currentUser?.tenant_id || '',
+            tenant_nome: currentUser?.tenant_nome || '',
           });
           created++;
         } catch { }
@@ -467,7 +473,7 @@ export default function RH() {
         if (inoutVal === 0 || inoutVal === 'entrada') tipo = 'entrada';
         else if (inoutVal === 1 || inoutVal === 'saida') tipo = 'saida';
         else if (ts) { try { const dt = new Date(ts.includes('T') ? ts : ts + 'T00:00:00'); const hora = dt.getHours(); if (hora >= 7 && hora <= 12) tipo = 'entrada'; else if (hora >= 16 && hora <= 19) tipo = 'saida'; } catch { } }
-        return { terminal_id: terminal.id, terminal_nome: terminal.nome, enrollid: Number(enrollid) || 0, utilizador_nome: userMap[enrollid] || '', timestamp: ts || new Date().toISOString(), modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo, local: terminal.local || '', exportado: false };
+        return { terminal_id: terminal.id, terminal_nome: terminal.nome, enrollid: Number(enrollid) || 0, utilizador_nome: userMap[enrollid] || '', timestamp: ts || new Date().toISOString(), modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo, local: terminal.local || '', exportado: false, tenant_id: currentUser?.tenant_id || '', tenant_nome: currentUser?.tenant_nome || '' };
       });
       const novas = toSave.filter(r => { if (!r.timestamp) return false; const b = Math.floor(new Date(r.timestamp).getTime() / DEDUP_MS); const k = `${r.enrollid}|${b}`; if (dedupSet.has(k)) return false; dedupSet.add(k); return true; });
       if (novas.length > 0) await base44.entities.Marcacao.bulkCreate(novas);
@@ -588,7 +594,14 @@ export default function RH() {
   const [horForm, setHorForm] = useState({ nome: '', hora_entrada: '08:00', hora_saida_almoco: '', hora_entrada_almoco: '', hora_saida: '17:00', horas_diarias: 8, tolerancia_minutos: 10, dias_semana: '[1,2,3,4,5]', ativo: true, cor: '#10b981' });
 
   const horSaveMutation = useMutation({
-    mutationFn: (data) => { const p = { ...data, owner_email: currentUser?.email }; if (horEditingId) return base44.entities.Horario.update(horEditingId, p); return base44.entities.Horario.create(p); },
+    mutationFn: (data) => {
+      const tenantInjection = !perms.isSuperAdmin && currentUser?.tenant_id
+        ? { tenant_id: currentUser.tenant_id, tenant_nome: currentUser.tenant_nome || '' }
+        : {};
+      const p = { ...data, ...tenantInjection, owner_email: currentUser?.email };
+      if (horEditingId) return base44.entities.Horario.update(horEditingId, p);
+      return base44.entities.Horario.create(p);
+    },
     onSuccess: () => { queryClient.invalidateQueries(['horarios']); setHorDialog(false); toast.success(horEditingId ? 'Horário atualizado' : 'Horário criado'); },
   });
   const horDeleteMutation = useMutation({
@@ -636,7 +649,14 @@ export default function RH() {
   const [ausOwnerFilter, setAusOwnerFilter] = useState('all');
 
   const ausSaveMutation = useMutation({
-    mutationFn: (data) => { const p = { ...data, enrollid: Number(data.enrollid), owner_email: currentUser?.email }; if (ausEditingId) return base44.entities.AusenciaFalta.update(ausEditingId, p); return base44.entities.AusenciaFalta.create(p); },
+    mutationFn: (data) => {
+      const tenantInjection = !perms.isSuperAdmin && currentUser?.tenant_id
+        ? { tenant_id: currentUser.tenant_id, tenant_nome: currentUser.tenant_nome || '' }
+        : {};
+      const p = { ...data, ...tenantInjection, enrollid: Number(data.enrollid), owner_email: currentUser?.email };
+      if (ausEditingId) return base44.entities.AusenciaFalta.update(ausEditingId, p);
+      return base44.entities.AusenciaFalta.create(p);
+    },
     onSuccess: () => { queryClient.invalidateQueries(['ausencias']); setAusDialog(false); toast.success('Ausência guardada'); },
   });
   const ausDeleteMutation = useMutation({
@@ -847,7 +867,7 @@ export default function RH() {
                   <FileUp className="h-3.5 w-3.5" /> Importar CSV
                 </Button>
                 <input id="colab-csv-import" type="file" accept=".csv" className="hidden" onChange={handleImportColabCSV} />
-                <Button size="sm" onClick={() => { setColEditingId(null); setColFormData({ ativo: true, num_dependentes: 0, pais: 'Portugal', nacionalidade: 'Portuguesa', genero: 'nao_especificado' }); setColDialog(true); }} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5 text-xs">
+                <Button size="sm" onClick={() => { setColEditingId(null); setColFormData({ ativo: true, num_dependentes: 0, pais: 'Portugal', nacionalidade: 'Portuguesa', genero: 'nao_especificado', tenant_id: perms.isSuperAdmin ? '' : (currentUser?.tenant_id || ''), tenant_nome: perms.isSuperAdmin ? '' : (currentUser?.tenant_nome || '') }); setColDialog(true); }} className="bg-emerald-600 hover:bg-emerald-700 gap-1.5 text-xs">
                   <Plus className="h-3.5 w-3.5" /> Novo
                 </Button>
               </div>

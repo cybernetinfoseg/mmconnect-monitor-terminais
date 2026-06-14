@@ -217,6 +217,7 @@ export default function Marcacoes() {
           timestamp: ts || new Date().toISOString(),
           modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo,
           local: terminal.local || '', exportado: false,
+          tenant_id: currentUser?.tenant_id || '', tenant_nome: currentUser?.tenant_nome || '',
         };
       });
       // Filtrar duplicados
