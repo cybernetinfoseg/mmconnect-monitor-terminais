@@ -799,6 +799,7 @@ Deno.serve(async (req) => {
       case 'setuserprofile': result = await actionSetUserProfile(terminal, params); break;
       case 'getuserprofile': result = await actionGetUserProfile(terminal, params); break;
       case 'setuserphoto':   result = await actionSetUserPhoto(terminal, params); break;
+      case 'exportusers':   result = await actionExportUsers(terminal, params); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }
