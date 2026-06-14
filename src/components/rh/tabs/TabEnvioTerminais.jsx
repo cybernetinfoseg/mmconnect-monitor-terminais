@@ -446,7 +446,7 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm font-medium text-slate-700">Envio de colaboradores para os terminais biométricos</p>
         <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSyncDialogOpen(true)}>
-          <ArrowUpDown className="h-3.5 w-3.5" /> Sincronizar
+          <ArrowUpDown className="h-3.5 w-3.5" /> Sincronizar Todos
         </Button>
       </div>
 
