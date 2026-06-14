@@ -7,7 +7,7 @@ import {
   AlertTriangle, RefreshCw, Info, Users, Clock,
   CheckCircle2, XCircle, Loader2, Zap, Bell, BellOff,
   ChevronDown, ChevronRight, Wifi, WifiOff, Settings,
-  RotateCcw, Trash2, Eye, Ban, UserCheck, Search
+  RotateCcw, Trash2, Eye, Ban, UserCheck, Search, Monitor
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +43,7 @@ export default function ControloAcesso() {
   const [userListLoading, setUserListLoading] = useState(false);
   const [blockingUser, setBlockingUser] = useState(null);
   const [expandedSection, setExpandedSection] = useState('door');
+  const [mobileCmdOpen, setMobileCmdOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [tipoFilter, setTipoFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -331,338 +333,182 @@ export default function ControloAcesso() {
           </div>
         </div>
 
-        {!terminal ? (
-          <div className="text-center py-16">
-            <Shield className="h-16 w-16 text-slate-300 mx-auto mb-4" />
-            <p className="text-slate-500 font-medium">Selecione um terminal para iniciar o controlo</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Desktop: 3-column layout when terminal selected */}
+        {terminal && (
+          <div className="hidden lg:grid lg:grid-cols-3 gap-5">
 
-            {/* Coluna esquerda — Painel de porta */}
-            <div className="lg:col-span-2 space-y-4">
-
-              {/* Painel principal de porta */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-slate-900 font-bold text-base">{terminal.nome}</h2>
-                    <p className="text-slate-500 text-xs">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'} · {terminal.tipo_conexao}</p>
-                  </div>
-                  <div className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border',
-                    doorState === 'normal' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                    doorState === 'unlock' ? 'bg-amber-50 border-amber-200 text-amber-700' :
-                    doorState === 'lock'   ? 'bg-red-50 border-red-200 text-red-700' :
-                    'bg-blue-50 border-blue-200 text-blue-700'
-                  )}>
-                    {React.createElement(DOOR_STATES[doorState].icon, { className: 'h-3.5 w-3.5' })}
-                    {DOOR_STATES[doorState].label}
-                  </div>
-                </div>
-
-                {/* Botões de controlo de porta */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-
-                  {/* ABRIR (pulso) */}
-                  <DoorButton
-                    icon={DoorOpen}
-                    label="Abrir Porta"
-                    sublabel="Pulso único"
-                    color="emerald"
-                    loading={sending === 'opendoor{}'}
-                    onClick={() => sendCmd('opendoor', {}, 'Porta aberta')}
-                  />
-
-                  {/* ABERTO FORÇADO */}
-                  <DoorButton
-                    icon={Unlock}
-                    label="Aberto Forçado"
-                    sublabel="Permanente"
-                    color="amber"
-                    active={doorState === 'unlock'}
-                    loading={sending === 'lockctrl{"fuc":1}'}
-                    disabled={!isTimmy}
-                    onClick={() => handleDoorAction('unlock')}
-                    disabledReason="Apenas Timmy WS"
-                  />
-
-                  {/* FECHADO FORÇADO */}
-                  <DoorButton
-                    icon={Lock}
-                    label="Bloquear"
-                    sublabel="Nenhum acesso"
-                    color="red"
-                    active={doorState === 'lock'}
-                    loading={sending === 'lockctrl{"fuc":2}'}
-                    disabled={!isTimmy}
-                    onClick={() => handleDoorAction('lock')}
-                    disabledReason="Apenas Timmy WS"
-                  />
-
-                  {/* RESET / NORMAL */}
-                  <DoorButton
-                    icon={RotateCcw}
-                    label="Modo Normal"
-                    sublabel="Repor estado"
-                    color="slate"
-                    loading={sending === 'lockctrl{"fuc":4}'}
-                    disabled={!isTimmy}
-                    onClick={() => handleDoorAction('normal')}
-                    disabledReason="Apenas Timmy WS"
-                  />
-
-                  {/* ALARME OFF */}
-                  <DoorButton
-                    icon={BellOff}
-                    label="Cancelar Alarme"
-                    sublabel="Silenciar"
-                    color="violet"
-                    loading={sending === 'lockctrl{"fuc":6}'}
-                    disabled={!isTimmy}
-                    onClick={() => handleAlarm(true)}
-                    disabledReason="Apenas Timmy WS"
-                  />
-
-                  {/* REBOOT */}
-                  <DoorButton
-                    icon={Power}
-                    label="Reiniciar"
-                    sublabel="Reboot terminal"
-                    color="orange"
-                    loading={sending === 'reboot{}'}
-                    onClick={() => sendCmd('reboot', {}, 'Terminal a reiniciar...')}
-                    confirm="Tem a certeza que quer reiniciar o terminal?"
-                  />
-                </div>
-
-                {/* Sincronizar hora */}
-                <div className="flex gap-2 pt-1 border-t border-slate-100">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs gap-1.5"
-                    disabled={!!sending}
-                    onClick={() => sendCmd('settime', {}, 'Relógio sincronizado')}
+            {/* Coluna Esquerda — Lista de Terminais */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 max-h-[70vh] overflow-y-auto">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                <Monitor className="h-4 w-4 text-slate-500" /> Terminais
+              </h3>
+              <div className="space-y-1">
+                {terminaisFiltrados.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setSelectedTerminal(t); setDevInfo(null); setUserList(null); setDoorState('normal'); setExpandedSection('door'); }}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 p-2.5 rounded-lg text-left transition-all',
+                      selectedTerminal?.id === t.id
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    )}
                   >
-                    {sending === 'settime{}' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
-                    Sincronizar Relógio
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-xs gap-1.5"
-                    disabled={!!sending || devInfoLoading}
-                    onClick={handleGetDevInfo}
-                  >
-                    {devInfoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Info className="h-3.5 w-3.5" />}
-                    Info Dispositivo
-                  </Button>
-                </div>
+                    <div className={cn('w-2 h-2 rounded-full shrink-0', t.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300')} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate">{t.nome}</p>
+                      <p className="text-[10px] opacity-60 truncate">{t.local || t.fabricante || t.tipo_conexao}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                {/* Device Info */}
-                {devInfo && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-1.5">
-                    <p className="text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Informação do Dispositivo</p>
-                    {Object.entries(devInfo).filter(([, v]) => v != null && v !== '').map(([k, v]) => (
-                      <div key={k} className="flex justify-between gap-2">
-                        <span className="text-slate-500 capitalize">{k.replace(/_/g, ' ')}</span>
-                        <span className="text-slate-800 font-mono text-right truncate">{String(v)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            {/* Coluna Central — Comandos */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-slate-900 font-bold text-base">{terminal.nome}</h2>
+                  <p className="text-slate-500 text-xs">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'} · {terminal.tipo_conexao}</p>
+                </div>
+                <div className={cn(
+                  'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border',
+                  doorState === 'normal' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                  doorState === 'unlock' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                  doorState === 'lock'   ? 'bg-red-50 border-red-200 text-red-700' :
+                  'bg-blue-50 border-blue-200 text-blue-700'
+                )}>
+                  {React.createElement(DOOR_STATES[doorState].icon, { className: 'h-3.5 w-3.5' })}
+                  {DOOR_STATES[doorState].label}
+                </div>
               </div>
 
-              {/* Agendamentos ativos */}
+              <div className="grid grid-cols-2 gap-3">
+                <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" loading={sending === 'opendoor{}'} onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
+                <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} loading={sending === 'lockctrl{"fuc":1}'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} disabledReason="Apenas Timmy WS" />
+                <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} loading={sending === 'lockctrl{"fuc":2}'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} disabledReason="Apenas Timmy WS" />
+                <DoorButton icon={RotateCcw} label="Modo Normal" sublabel="Repor estado" color="slate" loading={sending === 'lockctrl{"fuc":4}'} disabled={!isTimmy} onClick={() => handleDoorAction('normal')} disabledReason="Apenas Timmy WS" />
+                <DoorButton icon={BellOff} label="Cancelar Alarme" sublabel="Silenciar" color="violet" loading={sending === 'lockctrl{"fuc":6}'} disabled={!isTimmy} onClick={() => handleAlarm(true)} disabledReason="Apenas Timmy WS" />
+                <DoorButton icon={Power} label="Reiniciar" sublabel="Reboot terminal" color="orange" loading={sending === 'reboot{}'} onClick={() => sendCmd('reboot', {}, 'Terminal a reiniciar...')} confirm="Tem a certeza que quer reiniciar o terminal?" />
+              </div>
+
+              {devInfo && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs space-y-1.5">
+                  <p className="text-slate-500 font-semibold text-[10px] uppercase tracking-wider">Informação do Dispositivo</p>
+                  {Object.entries(devInfo).filter(([, v]) => v != null && v !== '').map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-2"><span className="text-slate-500 capitalize">{k.replace(/_/g, ' ')}</span><span className="text-slate-800 font-mono text-right truncate">{String(v)}</span></div>
+                  ))}
+                </div>
+              )}
+
               <Section id="schedule" title={`Agendamentos (${scheduledActions.length})`} icon={Clock}>
                 <div className="pt-3 space-y-2">
-                  {scheduledActions.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-4">Sem agendamentos para este terminal</p>
-                  ) : scheduledActions.map(s => (
+                  {scheduledActions.length === 0 ? <p className="text-sm text-slate-400 text-center py-4">Sem agendamentos</p> : scheduledActions.map(s => (
                     <div key={s.id} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 bg-slate-50">
-                      <div>
-                        <p className="text-xs font-medium text-slate-800">{s.nome}</p>
-                        <div className="flex gap-2 mt-0.5">
-                          <Badge className="text-[10px] bg-slate-200 text-slate-600">{s.acao}</Badge>
-                          <Badge className="text-[10px] bg-blue-100 text-blue-700">{s.frequencia} · {s.hora}</Badge>
-                          {!s.ativo && <Badge className="text-[10px] bg-orange-100 text-orange-700">Inativo</Badge>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {s.ultimo_resultado === 'sucesso' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
-                         s.ultimo_resultado === 'falha' ? <XCircle className="h-4 w-4 text-red-400" /> : null}
-                      </div>
+                      <div><p className="text-xs font-medium text-slate-800">{s.nome}</p><div className="flex gap-2 mt-0.5"><Badge className="text-[10px] bg-slate-200 text-slate-600">{s.acao}</Badge><Badge className="text-[10px] bg-blue-100 text-blue-700">{s.frequencia} · {s.hora}</Badge></div></div>
                     </div>
                   ))}
-                  <p className="text-[11px] text-slate-400 text-center">Gerencie os agendamentos na página <a href="/Agendamentos" className="underline text-blue-500">Agendamentos</a></p>
                 </div>
               </Section>
 
-              {/* Gestão de utilizadores no terminal */}
               {isTimmy && (
                 <Section id="users" title="Utilizadores no Terminal" icon={Users}>
                   <div className="pt-3 space-y-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-xs gap-1.5"
-                      disabled={userListLoading || !!sending}
-                      onClick={handleGetUserList}
-                    >
-                      {userListLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
-                      Obter Lista do Terminal
-                    </Button>
-                    {userList && (
-                      <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                        {userList.map(u => (
-                          <div key={u.enrollid} className="flex items-center justify-between p-2 rounded-lg border border-slate-100 bg-slate-50">
-                            <div>
-                              <p className="text-xs font-medium text-slate-800">{u.name || `ID:${u.enrollid}`}</p>
-                              <p className="text-[10px] text-slate-400 font-mono">#{u.enrollid} · priv:{u.admin ?? 0}</p>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-[10px] text-amber-600 border-amber-200 hover:bg-amber-50"
-                                disabled={blockingUser === u.enrollid}
-                                onClick={() => handleBlockUser(u.enrollid, true)}
-                              >
-                                {blockingUser === u.enrollid ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3 w-3 mr-1" />}
-                                Bloquear
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-7 px-2 text-[10px] text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                                disabled={blockingUser === u.enrollid}
-                                onClick={() => handleBlockUser(u.enrollid, false)}
-                              >
-                                <UserCheck className="h-3 w-3 mr-1" />
-                                Desbloquear
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
+                    <Button size="sm" variant="outline" className="w-full text-xs gap-1.5" disabled={userListLoading || !!sending} onClick={handleGetUserList}>{userListLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}Obter Lista do Terminal</Button>
+                    {userList && <div className="space-y-1.5 max-h-60 overflow-y-auto">{userList.map(u => (
+                      <div key={u.enrollid} className="flex items-center justify-between p-2 rounded-lg border border-slate-100 bg-slate-50">
+                        <div><p className="text-xs font-medium text-slate-800">{u.name || `ID:${u.enrollid}`}</p></div>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-[10px] text-amber-600" disabled={blockingUser === u.enrollid} onClick={() => handleBlockUser(u.enrollid, true)}><Ban className="h-3 w-3 mr-1" />Bloquear</Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2 text-[10px] text-emerald-600" disabled={blockingUser === u.enrollid} onClick={() => handleBlockUser(u.enrollid, false)}><UserCheck className="h-3 w-3 mr-1" />Desbloquear</Button>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </Section>
-              )}
-
-              {/* Operações de manutenção avançadas */}
-              {isAdmin && (
-                <Section id="advanced" title="Operações Avançadas" icon={Settings}>
-                  <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {isTimmy && (
-                      <>
-                        <ActionButton
-                          icon={Eye}
-                          label="Ver Parâmetros"
-                          color="blue"
-                          disabled={!!sending}
-                          onClick={() => sendCmd('getparam', {}, 'Parâmetros obtidos')}
-                        />
-                        <ConfirmActionButton
-                          icon={Trash2}
-                          label="Limpar Logs"
-                          sublabel="Remove logs do terminal"
-                          color="orange"
-                          disabled={!!sending}
-                          onClick={() => sendCmd('clearlog', {}, 'Logs eliminados do terminal')}
-                          confirmMsg="Atenção: esta ação elimina TODOS os logs do terminal. Continuar?"
-                        />
-                        <ConfirmActionButton
-                          icon={Users}
-                          label="Limpar Utilizadores"
-                          sublabel="Remove todos os utlizadores"
-                          color="red"
-                          disabled={!!sending}
-                          onClick={() => sendCmd('clearusers', {}, 'Utilizadores eliminados do terminal')}
-                          confirmMsg="Atenção: esta ação elimina TODOS os utilizadores do terminal. Continuar?"
-                        />
-                        <ConfirmActionButton
-                          icon={RotateCcw}
-                          label="Reset de Fábrica"
-                          sublabel="Inicializa o terminal"
-                          color="red"
-                          disabled={!!sending}
-                          onClick={() => sendCmd('initdevice', {}, 'Terminal inicializado (reset fábrica)')}
-                          confirmMsg="ATENÇÃO CRÍTICA: Reset de fábrica irá apagar TUDO. Tem a certeza?"
-                        />
-                      </>
-                    )}
+                    ))}</div>}
                   </div>
                 </Section>
               )}
             </div>
 
-            {/* Coluna direita — Logs */}
+            {/* Coluna Direita — Operações */}
             <div className="space-y-4">
               <div className="bg-white border border-slate-200 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-slate-900 font-semibold text-sm flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-amber-500" />
-                    Operações Recentes
-                  </h3>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 px-2 text-slate-400 hover:text-slate-700"
-                    onClick={() => queryClient.invalidateQueries(['op-logs-acesso'])}
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                  </Button>
+                  <h3 className="text-slate-900 font-semibold text-sm flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" />Operações Recentes</h3>
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-slate-400" onClick={() => queryClient.invalidateQueries(['op-logs-acesso'])}><RefreshCw className="h-3 w-3" /></Button>
                 </div>
-                <div className="space-y-1.5 max-h-96 overflow-y-auto">
-                  {opLogs.length === 0 ? (
-                    <p className="text-slate-400 text-xs text-center py-6">Sem operações registadas</p>
-                  ) : opLogs.map(log => (
+                <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
+                  {opLogs.length === 0 ? <p className="text-slate-400 text-xs text-center py-6">Sem operações registadas</p> : opLogs.map(log => (
                     <div key={log.id} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
-                      {log.sucesso
-                        ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                        : <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <Badge className="text-[9px] bg-slate-200 text-slate-600 px-1.5">{log.acao}</Badge>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-700 mt-0.5 truncate">{log.mensagem || '—'}</p>
-                        <p className="text-[10px] text-slate-400 truncate">{log.executado_por}</p>
-                      </div>
+                      {log.sucesso ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" /> : <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />}
+                      <div className="flex-1 min-w-0"><div className="flex items-center gap-1.5 flex-wrap"><Badge className="text-[9px] bg-slate-200 text-slate-600 px-1.5">{log.acao}</Badge><span className="text-[10px] text-slate-400 font-mono">{log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</span></div><p className="text-[11px] text-slate-700 mt-0.5 truncate">{log.mensagem || '—'}</p></div>
                     </div>
                   ))}
-                </div>
-              </div>
-
-              {/* Referência rápida de ações */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4">
-                <h3 className="text-slate-900 font-semibold text-sm mb-3 flex items-center gap-2">
-                  <Info className="h-4 w-4 text-blue-500" />
-                  Referência de Comandos
-                </h3>
-                <div className="space-y-2">
-                  {Object.entries(DOOR_STATES).map(([key, s]) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <div className={cn('w-2 h-2 rounded-full shrink-0', s.color)} />
-                      <div>
-                        <p className="text-[11px] text-slate-700 font-medium">{s.label}</p>
-                        <p className="text-[10px] text-slate-400">{s.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                  <div className="pt-2 border-t border-slate-100 mt-2">
-                    <p className="text-[10px] text-slate-400">
-                      Comandos avançados (fuc=1–4) requerem terminal <span className="text-blue-500">Timmy WebSocket Cloud</span>.
-                      Terminais ZKTeco/Hikvision/Dahua suportam abertura básica.
-                    </p>
-                  </div>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Mobile: open commands dialog when terminal is selected */}
+        {terminal && (
+          <div className="lg:hidden">
+            <button
+              onClick={() => setMobileCmdOpen(true)}
+              className="w-full bg-white border border-slate-200 rounded-xl p-4 text-left flex items-center justify-between"
+            >
+              <div>
+                <p className="text-sm font-bold text-slate-900">{terminal.nome}</p>
+                <p className="text-xs text-slate-500">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'}</p>
+              </div>
+              <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border',
+                doorState === 'normal' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                doorState === 'unlock' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                doorState === 'lock' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-200 text-blue-700'
+              )}>
+                {React.createElement(DOOR_STATES[doorState].icon, { className: 'h-3.5 w-3.5' })}
+                {DOOR_STATES[doorState].label}
+              </div>
+            </button>
+
+            <Dialog open={mobileCmdOpen} onOpenChange={setMobileCmdOpen}>
+              <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>{terminal.nome}</DialogTitle></DialogHeader>
+                <p className="text-xs text-slate-500 -mt-2">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'} · {terminal.tipo_conexao}</p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" loading={sending === 'opendoor{}'} onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
+                  <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} loading={sending === 'lockctrl{"fuc":1}'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} disabledReason="Apenas Timmy WS" />
+                  <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} loading={sending === 'lockctrl{"fuc":2}'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} disabledReason="Apenas Timmy WS" />
+                  <DoorButton icon={RotateCcw} label="Modo Normal" sublabel="Repor estado" color="slate" loading={sending === 'lockctrl{"fuc":4}'} disabled={!isTimmy} onClick={() => handleDoorAction('normal')} disabledReason="Apenas Timmy WS" />
+                  <DoorButton icon={BellOff} label="Cancelar Alarme" sublabel="Silenciar" color="violet" loading={sending === 'lockctrl{"fuc":6}'} disabled={!isTimmy} onClick={() => handleAlarm(true)} disabledReason="Apenas Timmy WS" />
+                  <DoorButton icon={Power} label="Reiniciar" sublabel="Reboot terminal" color="orange" loading={sending === 'reboot{}'} onClick={() => sendCmd('reboot', {}, 'Terminal a reiniciar...')} confirm="Tem a certeza que quer reiniciar o terminal?" />
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button variant="outline" size="sm" onClick={() => setMobileCmdOpen(false)}>Fechar</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Mobile Operations */}
+            <div className="mt-4 bg-white border border-slate-200 rounded-xl p-4">
+              <h3 className="text-slate-900 font-semibold text-sm mb-3">Operações Recentes</h3>
+              <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                {opLogs.length === 0 ? <p className="text-slate-400 text-xs text-center py-6">Sem operações</p> : opLogs.map(log => (
+                  <div key={log.id} className="flex items-start gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                    {log.sucesso ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" /> : <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />}
+                    <div className="flex-1 min-w-0"><Badge className="text-[9px] bg-slate-200 text-slate-600 px-1.5">{log.acao}</Badge><p className="text-[11px] text-slate-700 mt-0.5 truncate">{log.mensagem || '—'}</p></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!terminal && (
+          <div className="text-center py-16">
+            <Shield className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500 font-medium">Selecione um terminal para iniciar o controlo</p>
           </div>
         )}
       </div>

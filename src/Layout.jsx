@@ -58,7 +58,6 @@ const ALL_NAV_ITEMS = [
   { name: 'Controlo de Acesso', page: 'AcessoHub', icon: Shield },
   { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
 
-  { name: 'Relatório Movimentos', page: 'RelatorioMovimentos', icon: BarChart3 },
   
   
   { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
@@ -89,6 +88,7 @@ export default function Layout({ children, currentPageName }) {
   const navigate = useNavigate();
   const prevPageRef = useRef(currentPageName);
   const [currentUser, setCurrentUser] = useState(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const isPublicPage = currentPageName === 'TVMode';
   const isProfilePage = currentPageName === 'CompletarPerfil';
 
@@ -279,7 +279,7 @@ export default function Layout({ children, currentPageName }) {
             );
           })}
           {/* Menu button opens sidebar sheet */}
-          <Sheet>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <button className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 select-none transition-colors text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
                 <Menu className="h-5 w-5" />
@@ -287,7 +287,7 @@ export default function Layout({ children, currentPageName }) {
               </button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0 border-r border-slate-200 dark:border-slate-700">
-              <Sidebar />
+              <Sidebar onClose={() => setSheetOpen(false)} />
             </SheetContent>
           </Sheet>
         </div>

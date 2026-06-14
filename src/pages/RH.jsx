@@ -713,33 +713,6 @@ export default function RH() {
               ))}
             </div>
 
-            {/* Estado dos Terminais */}
-            {terminals.length > 0 && (
-              <Card className="bg-white border-slate-200">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Monitor className="h-4 w-4 text-teal-600" />
-                    <h2 className="text-sm font-semibold text-slate-700">Terminais Conectados</h2>
-                    <Badge className={cn('text-xs', terminals.filter(t => t.status === 'online').length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}>
-                      {terminals.filter(t => t.status === 'online').length}/{terminals.length} online
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {terminals.map(t => {
-                      const lastReport = t.ultimo_ping ? new Date(t.ultimo_ping).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit' }) : null;
-                      return (
-                        <div key={t.id} className={cn('flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs', t.status === 'online' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-500')}>
-                          <span className={cn('w-1.5 h-1.5 rounded-full', t.status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300')} />
-                          <span className="font-medium">{t.nome}</span>
-                          {lastReport && <span className="text-[10px] opacity-60">{lastReport}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Alertas */}
             {(contratosAExpirar.length > 0 || feriasPendentes.length > 0) && (
               <div className="space-y-2">
