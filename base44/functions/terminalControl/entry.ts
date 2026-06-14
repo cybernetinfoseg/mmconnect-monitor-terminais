@@ -745,6 +745,27 @@ async function actionSetUserPhoto(terminal, params) {
   };
 }
 
+async function actionExportUsers(terminal, params={}) {
+
+  const backupnum = params.backupnum || 50;
+
+  const resp = await sendTimmyCommand(
+    terminal,
+    {
+      cmd: 'getuser',
+      backupnum: backupnum
+    },
+    2
+  );
+
+
+  return {
+    success: true,
+    message: 'Pedido de exportação FaceID enviado',
+    data: resp
+  };
+}
+
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
