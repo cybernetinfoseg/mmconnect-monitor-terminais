@@ -37,7 +37,7 @@ export default function Visitantes() {
 
   const createMutation = useMutation({
     mutationFn: (data) => {
-      const badge = 'V-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const badge = 'V-' + Math.random().toString(36).substring(2, 8).toUpperCase();
       return base44.entities.Visitante.create({
         ...data,
         numero_badge: badge,

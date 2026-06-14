@@ -96,7 +96,7 @@ export default function Payroll() {
 
   const contratoMap = useMemo(() => {
     const m = {};
-    contratos.forEach(c => { if (!m[c.colaborador_id]) m[c.colaborador_id] = c; });
+    contratos.forEach(c => { m[c.colaborador_id] = c; });
     return m;
   }, [contratos]);
 

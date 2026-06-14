@@ -67,7 +67,7 @@ export default function Presenca() {
   const { data: escalaHoje = [] } = useQuery({
     queryKey: ['escala-hoje'],
     queryFn: () => {
-      const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+      const hoje = new Date().toLocaleDateString('en-CA');
       return base44.entities.EscalaDia.filter({ data: hoje }, '-created_date', 500);
     },
     enabled: !!currentUser,
@@ -82,7 +82,7 @@ export default function Presenca() {
 
   // Mapa enrollid → ausência activa hoje
   const ausenciaMap = useMemo(() => {
-    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+    const hoje = new Date().toLocaleDateString('en-CA');
     const m = {};
     ausencias.forEach(a => {
       if (a.data_inicio <= hoje && a.data_fim >= hoje) {
@@ -109,12 +109,12 @@ export default function Presenca() {
 
   // Calcular presença com todas as marcações de hoje por colaborador
   const presencaStatus = useMemo(() => {
-    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+    const hoje = new Date().toLocaleDateString('en-CA');
 
     const marcoesHoje = marcacoes.filter(m => {
       if (!m.timestamp) return false;
       if (!isAdmin && !myTerminalIds.has(m.terminal_id)) return false;
-      const diaTs = new Date(m.timestamp).toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
+      const diaTs = new Date(m.timestamp).toLocaleDateString('en-CA');
       return diaTs === hoje;
     });
 

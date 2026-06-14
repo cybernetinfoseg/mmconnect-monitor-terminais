@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit2, Trash2, MapPin, Users, Clock, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 export default function ZonasAcesso() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -217,10 +217,12 @@ export default function ZonasAcesso() {
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
-                        <AlertDialogTitle>Remover Zona</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Tem a certeza que deseja remover "{zona.nome}"?
-                        </AlertDialogDescription>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remover Zona</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Tem a certeza que deseja remover "{zona.nome}"?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
                         <div className="flex gap-2 pt-4">
                           <AlertDialogCancel>Cancelar</AlertDialogCancel>
                           <AlertDialogAction

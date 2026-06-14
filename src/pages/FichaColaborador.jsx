@@ -273,7 +273,7 @@ export default function FichaColaborador() {
       </div>
 
       {/* Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) return; setDialogOpen(open); }}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Editar Ficha' : 'Nova Ficha de Colaborador'}</DialogTitle>
