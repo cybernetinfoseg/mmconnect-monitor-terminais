@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import ColaboradorRHForm from '@/components/rh/ColaboradorRHForm';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { format, differenceInYears, parseISO } from 'date-fns';
 
 export default function FichaColaborador() {
@@ -34,37 +33,23 @@ export default function FichaColaborador() {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const perms = resolvePermissions(currentUser);
-  const isAdmin = perms.isAdmin;
-  const isSuperAdmin = perms.isSuperAdmin;
-  const userTenantId = currentUser?.tenant_id;
+  const isAdmin = currentUser?.role === 'admin';
 
   const { data: colaboradores = [], isLoading } = useQuery({
-    queryKey: ['colaboradores', userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.Colaborador.list('-data_admissao', 500);
-      if (!userTenantId) return [];
-      return base44.entities.Colaborador.filter({ tenant_id: userTenantId }, '-data_admissao', 500);
-    },
+    queryKey: ['colaboradores'],
+    queryFn: () => base44.entities.Colaborador.list('-data_admissao', 500),
     enabled: !!currentUser,
   });
 
   const { data: horarios = [] } = useQuery({
-    queryKey: ['horarios-rh', userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.Horario.list('nome');
-      if (!userTenantId) return [];
-      return base44.entities.Horario.filter({ tenant_id: userTenantId }, 'nome');
-    },
+    queryKey: ['horarios-rh'],
+    queryFn: () => base44.entities.Horario.list('nome'),
     enabled: !!currentUser,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const tenantInjection = !isSuperAdmin && userTenantId
-        ? { tenant_id: userTenantId, tenant_nome: currentUser?.tenant_nome || '' }
-        : {};
-      const payload = { ...data, ...tenantInjection, owner_email: data.owner_email || currentUser?.email };
+      const payload = { ...data, owner_email: data.owner_email || currentUser?.email };
       if (editingId) return base44.entities.Colaborador.update(editingId, payload);
       return base44.entities.Colaborador.create(payload);
     },
@@ -126,17 +111,6 @@ export default function FichaColaborador() {
             <div>
               <h1 className="text-xl font-bold text-slate-900">Fichas de Colaborador</h1>
               <p className="text-xs text-slate-500">{filtered.length} de {colaboradores.length} colaborador(es)</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              {!isSuperAdmin && currentUser?.tenant_nome && (
-                <Badge className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {currentUser.tenant_nome}
-                </Badge>
-              )}
-              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-                {ROLE_LABELS[perms.role] || perms.role}
-              </Badge>
             </div>
           </div>
           <Button size="sm" onClick={handleNew} className="bg-blue-600 hover:bg-blue-700 gap-1.5">

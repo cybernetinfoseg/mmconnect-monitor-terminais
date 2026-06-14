@@ -28,7 +28,8 @@
     },
     "subsidio_alimentacao": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Subs\u00eddio de alimenta\u00e7\u00e3o (\u20ac)"
     },
     "subsidio_alimentacao_tipo": {
       "type": "string",
@@ -40,57 +41,70 @@
     },
     "outros_subsidios": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Outros subs\u00eddios (\u20ac)"
     },
     "descricao_outros_subsidios": {
       "type": "string"
     },
     "horas_extra_valor": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Valor horas extra a pagar (\u20ac)"
     },
     "horas_extra_minutos": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Minutos de horas extra pagos"
     },
     "faltas_dias": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Dias de falta n\u00e3o justificada a descontar"
     },
     "faltas_valor": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Valor descontado por faltas (\u20ac)"
     },
     "outros_descontos": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Outros descontos (\u20ac)"
     },
     "descricao_outros_descontos": {
       "type": "string"
     },
     "remuneracao_bruta": {
-      "type": "number"
+      "type": "number",
+      "description": "Total bruto (sal\u00e1rio + subs\u00eddios + extras - descontos falta)"
     },
     "taxa_ss_trabalhador": {
       "type": "number",
-      "default": 11
+      "default": 11,
+      "description": "Taxa SS trabalhador (%)"
     },
     "valor_ss_trabalhador": {
-      "type": "number"
+      "type": "number",
+      "description": "Valor SS trabalhador (\u20ac)"
     },
     "taxa_irs": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Taxa IRS aplicada (%)"
     },
     "valor_irs": {
-      "type": "number"
+      "type": "number",
+      "description": "Valor retido IRS (\u20ac)"
     },
     "outros_descontos_obrigatorios": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Outros descontos obrigat\u00f3rios (\u20ac)"
     },
     "total_descontos": {
-      "type": "number"
+      "type": "number",
+      "description": "Total de descontos (SS + IRS + outros)"
     },
     "remuneracao_liquida": {
       "type": "number",
@@ -98,13 +112,16 @@
     },
     "taxa_ss_entidade": {
       "type": "number",
-      "default": 23.75
+      "default": 23.75,
+      "description": "Taxa SS entidade patronal (%)"
     },
     "valor_ss_entidade": {
-      "type": "number"
+      "type": "number",
+      "description": "Custo SS para a empresa (\u20ac)"
     },
     "custo_total_empresa": {
-      "type": "number"
+      "type": "number",
+      "description": "Custo total para a empresa (\u20ac)"
     },
     "estado": {
       "type": "string",
@@ -117,19 +134,12 @@
     },
     "data_pagamento": {
       "type": "string",
-      "format": "date"
+      "format": "date",
+      "description": "Data do pagamento"
     },
     "recibo_gerado": {
       "type": "boolean",
       "default": false
-    },
-    "tenant_id": {
-      "type": "string",
-      "description": "ID do Tenant ao qual pertence"
-    },
-    "tenant_nome": {
-      "type": "string",
-      "description": "Nome do tenant (cache)"
     },
     "observacoes": {
       "type": "string"

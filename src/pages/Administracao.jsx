@@ -17,15 +17,13 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
+import { ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import ContactMessagesPanel from '../components/admin/ContactMessagesPanel';
 
 const EMPTY_FORM = {
   email: '',
   role: 'user',
   limite_terminais: 10,
-  tenant_id: '',
-  tenant_nome: '',
 };
 
 export default function Administracao() {
@@ -34,13 +32,10 @@ export default function Administracao() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [currentUser, setCurrentUser] = useState(null);
 
+
   useEffect(() => {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
-
-  const perms = resolvePermissions(currentUser);
-  const isSuperAdmin = perms.isSuperAdmin;
-  const userTenantId = perms.tenant_id;
 
   const queryClient = useQueryClient();
 
@@ -50,8 +45,8 @@ export default function Administracao() {
     refetchInterval: 15000,
   });
 
-  const pendingUsers = users.filter(u => u.role !== 'admin' && u.role !== 'super_admin' && !u.aprovado);
-  const approvedUsers = users.filter(u => u.role === 'admin' || u.role === 'super_admin' || u.aprovado);
+  const pendingUsers = users.filter(u => u.role !== 'admin' && !u.aprovado);
+  const approvedUsers = users.filter(u => u.role === 'admin' || u.aprovado);
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, data }) => {
@@ -165,31 +160,22 @@ export default function Administracao() {
     queryFn: () => base44.entities.AlertRule.list(),
   });
 
-  const { data: tenants = [] } = useQuery({
-    queryKey: ['tenants-admin'],
-    queryFn: () => base44.entities.Tenant.list('nome'),
-    enabled: isSuperAdmin,
-  });
-
   const logAudit = (acao, entidade_id, descricao) =>
     base44.functions.invoke('auditLog', { acao, entidade: 'User', entidade_id, descricao }).catch(() => {});
 
   const inviteMutation = useMutation({
-    mutationFn: async ({ email, role, limite_terminais, tenant_id, tenant_nome }) => {
-      const user = await base44.users.inviteUser(email, role === 'admin' || role === 'super_admin' ? 'admin' : 'user');
-      const updateData = {};
-      if (role) updateData.role = role;
-      if (!['admin', 'super_admin'].includes(role)) updateData.limite_terminais = Number(limite_terminais) || 10;
-      if (tenant_id) { updateData.tenant_id = tenant_id; updateData.tenant_nome = tenant_nome || ''; }
-      if (user?.id && Object.keys(updateData).length > 0) {
-        await base44.entities.User.update(user.id, updateData);
+    mutationFn: async ({ email, role, limite_terminais }) => {
+      const user = await base44.users.inviteUser(email, role === 'admin' ? 'admin' : 'user');
+      // Atualizar limite de terminais conforme definido pelo admin
+      if (user?.id && !role?.includes('admin')) {
+        await base44.entities.User.update(user.id, { limite_terminais: Number(limite_terminais) || 10 });
       }
       return user;
     },
-    onSuccess: (_, { email, role, limite_terminais, tenant_nome }) => {
-      logAudit('usuario_convidado', '', `Usuário ${email} convidado com role "${role}" e tenant "${tenant_nome || '—'}"`);
+    onSuccess: (_, { email, role, limite_terminais }) => {
+      logAudit('usuario_convidado', '', `Usuário ${email} convidado com role "${role}" e limite ${limite_terminais}`);
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast.success(`Convite enviado! Limite: ${role === 'admin' || role === 'super_admin' ? 'ilimitado' : limite_terminais} terminais.`);
+      toast.success(`Convite enviado! Limite: ${role === 'admin' ? 'ilimitado' : limite_terminais} terminais.`);
       handleCancel();
     },
     onError: () => toast.error('Erro ao enviar convite'),
@@ -201,15 +187,13 @@ export default function Administracao() {
       email: user.email,
       role: user.role || 'user',
       limite_terminais: user.limite_terminais ?? 10,
-      tenant_id: user.tenant_id || '',
-      tenant_nome: user.tenant_nome || '',
     });
     setShowForm(true);
   };
 
   const handleNew = () => {
     setEditingUser(null);
-    setForm({ ...EMPTY_FORM, tenant_id: isSuperAdmin ? '' : (userTenantId || ''), tenant_nome: isSuperAdmin ? '' : (currentUser?.tenant_nome || '') });
+    setForm(EMPTY_FORM);
     setShowForm(true);
   };
 
@@ -226,18 +210,10 @@ export default function Administracao() {
         data: {
           role: form.role,
           limite_terminais: Number(form.limite_terminais),
-          tenant_id: form.tenant_id || null,
-          tenant_nome: form.tenant_nome || '',
         },
       });
     } else {
-      inviteMutation.mutate({
-        email: form.email,
-        role: form.role,
-        limite_terminais: Number(form.limite_terminais) || 10,
-        tenant_id: isSuperAdmin ? form.tenant_id : (userTenantId || ''),
-        tenant_nome: isSuperAdmin ? form.tenant_nome : (currentUser?.tenant_nome || ''),
-      });
+      inviteMutation.mutate({ email: form.email, role: form.role === 'admin' ? 'admin' : 'user', limite_terminais: Number(form.limite_terminais) || 10 });
     }
   };
 
@@ -246,23 +222,13 @@ export default function Administracao() {
       <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-6xl">
 
         {/* Header */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="p-3 bg-slate-900 rounded-xl shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-slate-900 rounded-xl">
             <Shield className="h-6 w-6 text-white" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div>
             <h1 className="text-2xl font-bold text-slate-900">Administração</h1>
             <p className="text-sm text-slate-500">Gerencie usuários, permissões e configurações do sistema</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isSuperAdmin && currentUser?.tenant_nome && (
-              <Badge className="text-xs px-2 py-1 bg-violet-50 text-violet-700 border-violet-200">
-                {currentUser.tenant_nome}
-              </Badge>
-            )}
-            <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-              {ROLE_LABELS[perms.role] || perms.role}
-            </Badge>
           </div>
         </div>
 
@@ -357,7 +323,7 @@ export default function Administracao() {
             {/* Form */}
             {showForm && (
               <div className="border border-slate-200 rounded-xl p-5 bg-slate-50 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
                     <Label>Email do Usuário</Label>
                     <Input
@@ -377,8 +343,7 @@ export default function Administracao() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {isSuperAdmin && <SelectItem value="super_admin">☆ Super Admin — plataforma</SelectItem>}
-                        <SelectItem value="admin">⊙ Administrador — acesso total ao tenant</SelectItem>
+                        <SelectItem value="admin">⊙ Administrador — acesso total</SelectItem>
                         <SelectItem value="user">👤 Utilizador — acesso aos próprios dados</SelectItem>
                       </SelectContent>
                     </Select>
@@ -391,23 +356,9 @@ export default function Administracao() {
                       value={form.limite_terminais}
                       onChange={e => setForm(prev => ({ ...prev, limite_terminais: e.target.value }))}
                       placeholder="10"
-                      disabled={form.role === 'super_admin'}
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>Tenant</Label>
-                    {isSuperAdmin ? (
-                      <Select value={form.tenant_id} onValueChange={v => {
-                        const t = tenants.find(x => x.id === v);
-                        setForm(prev => ({ ...prev, tenant_id: v, tenant_nome: t?.nome || '' }));
-                      }}>
-                        <SelectTrigger><SelectValue placeholder="Selecionar tenant" /></SelectTrigger>
-                        <SelectContent>{tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Input value={currentUser?.tenant_nome || '—'} disabled className="bg-slate-50" />
-                    )}
-                  </div>
+
                 </div>
 
                 <div className="flex gap-2 pt-2">
@@ -472,7 +423,6 @@ export default function Administracao() {
                       <tr className="bg-slate-50 border-b border-slate-200">
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Email</th>
                         <th className="text-left px-4 py-3 font-semibold text-slate-600">Role</th>
-                        {isSuperAdmin && <th className="text-left px-4 py-3 font-semibold text-slate-600">Tenant</th>}
                         <th className="text-center px-4 py-3 font-semibold text-slate-600">Terminais</th>
                         <th className="text-center px-4 py-3 font-semibold text-slate-600">Ações</th>
                       </tr>
@@ -486,13 +436,10 @@ export default function Administracao() {
                             <td className="px-4 py-3 font-medium text-slate-900 max-w-[200px] truncate">{user.email}</td>
                             <td className="px-4 py-3">
                               <Badge className={cn("text-xs", ROLE_COLORS[user.role] || ROLE_COLORS.user)}>
-                                {user.role === 'admin' ? '⊙ ' : user.role === 'super_admin' ? '☆ ' : '👤 '}
+                                {user.role === 'admin' ? '⊙ ' : '👤 '}
                                 {ROLE_LABELS[user.role] || 'Utilizador'}
                               </Badge>
                             </td>
-                            {isSuperAdmin && (
-                              <td className="px-4 py-3 text-xs text-slate-500">{user.tenant_nome || '—'}</td>
-                            )}
                             <td className="px-4 py-3 text-center">
                               <span className={cn("font-mono text-xs font-semibold", limit > 0 && count >= limit ? "text-red-600" : "text-emerald-600")}>
                                 {count}{limit > 0 ? `/${limit}` : ''}

@@ -52,7 +52,6 @@ import Alertas from './pages/Alertas';
 import Auditoria from './pages/Auditoria';
 import Configuracoes from './pages/Configuracoes';
 import Dashboard from './pages/Dashboard';
-import DashboardExecutivo from './pages/DashboardExecutivo';
 import History from './pages/History';
 import Incidents from './pages/Incidents';
 import TVMode from './pages/TVMode';
@@ -66,7 +65,6 @@ export const PAGES = {
     "Auditoria": Auditoria,
     "Configuracoes": Configuracoes,
     "Dashboard": Dashboard,
-    "DashboardExecutivo": DashboardExecutivo,
     "History": History,
     "Incidents": Incidents,
     "TVMode": TVMode,
@@ -74,7 +72,7 @@ export const PAGES = {
 }
 
 export const pagesConfig = {
-    mainPage: "DashboardExecutivo",
+    mainPage: "Dashboard",
     Pages: PAGES,
     Layout: __Layout,
 };

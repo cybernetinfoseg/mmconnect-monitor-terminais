@@ -15,10 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { format, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Building2 } from 'lucide-react';
 
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -74,40 +72,25 @@ export default function Payroll() {
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-  const perms = resolvePermissions(currentUser);
-  const isAdmin = perms.isAdmin;
-  const isSuperAdmin = perms.isSuperAdmin;
-  const userTenantId = currentUser?.tenant_id;
+  const isAdmin = currentUser?.role === 'admin';
 
-  const qKey = ['payroll', ano, mes, userTenantId, isSuperAdmin];
+  const qKey = ['payroll', ano, mes];
 
   const { data: processamentos = [], isLoading } = useQuery({
     queryKey: qKey,
-    queryFn: async () => {
-      const baseFilter = { ano: Number(ano), mes: Number(mes) };
-      if (!isSuperAdmin && userTenantId) baseFilter.tenant_id = userTenantId;
-      return base44.entities.ProcessamentoSalario.filter(baseFilter, 'colaborador_nome', 500);
-    },
+    queryFn: () => base44.entities.ProcessamentoSalario.filter({ ano: Number(ano), mes: Number(mes) }, 'colaborador_nome', 500),
     enabled: !!currentUser,
   });
 
   const { data: colaboradores = [] } = useQuery({
-    queryKey: ['colaboradores-payroll', userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.Colaborador.filter({ ativo: true }, 'nome', 500);
-      if (!userTenantId) return [];
-      return base44.entities.Colaborador.filter({ ativo: true, tenant_id: userTenantId }, 'nome', 500);
-    },
+    queryKey: ['colaboradores-payroll'],
+    queryFn: () => base44.entities.Colaborador.filter({ ativo: true }, 'nome', 500),
     enabled: !!currentUser,
   });
 
   const { data: contratos = [] } = useQuery({
-    queryKey: ['contratos-payroll', userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.Contrato.filter({ estado: 'ativo' }, 'colaborador_id', 500);
-      if (!userTenantId) return [];
-      return base44.entities.Contrato.filter({ estado: 'ativo', tenant_id: userTenantId }, 'colaborador_id', 500);
-    },
+    queryKey: ['contratos-payroll'],
+    queryFn: () => base44.entities.Contrato.filter({ estado: 'ativo' }, 'colaborador_id', 500),
     enabled: !!currentUser,
   });
 
@@ -154,10 +137,7 @@ export default function Payroll() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       const calc = calcular(form);
-      const tenantInjection = !isSuperAdmin && userTenantId
-        ? { tenant_id: userTenantId, tenant_nome: currentUser?.tenant_nome || '' }
-        : {};
-      const payload = { ...form, ...calc, ...tenantInjection, ano: Number(ano), mes: Number(mes), owner_email: currentUser?.email };
+      const payload = { ...form, ...calc, ano: Number(ano), mes: Number(mes), owner_email: currentUser?.email };
       if (editItem) return base44.entities.ProcessamentoSalario.update(editItem.id, payload);
       return base44.entities.ProcessamentoSalario.create(payload);
     },
@@ -200,8 +180,6 @@ export default function Payroll() {
         outros_descontos_obrigatorios: p.outros_descontos_obrigatorios,
         total_descontos: p.total_descontos, remuneracao_liquida: p.remuneracao_liquida,
         estado: 'emitido', owner_email: currentUser?.email,
-        tenant_id: !isSuperAdmin ? userTenantId || '' : undefined,
-        tenant_nome: !isSuperAdmin ? currentUser?.tenant_nome || '' : undefined,
       });
       await base44.entities.ProcessamentoSalario.update(p.id, { recibo_gerado: true, estado: 'processado' });
     },
@@ -232,17 +210,6 @@ export default function Payroll() {
             <div>
               <h1 className="text-xl font-bold text-slate-900">Processamento Salarial</h1>
               <p className="text-xs text-slate-500">Cálculo de remunerações — {MESES[Number(mes) - 1]} {ano}</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              {!isSuperAdmin && currentUser?.tenant_nome && (
-                <Badge className="text-xs px-2 py-1 bg-green-50 text-green-700 border-green-200">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {currentUser.tenant_nome}
-                </Badge>
-              )}
-              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-                {ROLE_LABELS[perms.role] || perms.role}
-              </Badge>
             </div>
           </div>
           <div className="flex gap-2 items-center flex-wrap">

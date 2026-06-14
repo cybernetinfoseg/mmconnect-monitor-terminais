@@ -17,9 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { format, parseISO, differenceInDays, addDays, isPast, isFuture } from 'date-fns';
-import { Building2 } from 'lucide-react';
 
 const TIPO_LABELS = {
   sem_termo: 'Sem Termo',
@@ -62,37 +60,21 @@ export default function GestaoContratos() {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const perms = resolvePermissions(currentUser);
-  const isAdmin = perms.isAdmin;
-  const isSuperAdmin = perms.isSuperAdmin;
-  const userTenantId = currentUser?.tenant_id;
-
   const { data: contratos = [], isLoading } = useQuery({
-    queryKey: ['contratos', userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.Contrato.list('-data_inicio', 500);
-      if (!userTenantId) return [];
-      return base44.entities.Contrato.filter({ tenant_id: userTenantId }, '-data_inicio', 500);
-    },
+    queryKey: ['contratos'],
+    queryFn: () => base44.entities.Contrato.list('-data_inicio', 500),
     enabled: !!currentUser,
   });
 
   const { data: colaboradores = [] } = useQuery({
-    queryKey: ['colaboradores-select', userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.Colaborador.filter({ ativo: true }, 'nome', 500);
-      if (!userTenantId) return [];
-      return base44.entities.Colaborador.filter({ ativo: true, tenant_id: userTenantId }, 'nome', 500);
-    },
+    queryKey: ['colaboradores-select'],
+    queryFn: () => base44.entities.Colaborador.filter({ ativo: true }, 'nome', 500),
     enabled: !!currentUser,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const tenantInjection = !isSuperAdmin && userTenantId
-        ? { tenant_id: userTenantId, tenant_nome: currentUser?.tenant_nome || '' }
-        : {};
-      const payload = { ...data, ...tenantInjection, owner_email: data.owner_email || currentUser?.email };
+      const payload = { ...data, owner_email: data.owner_email || currentUser?.email };
       if (editingId) return base44.entities.Contrato.update(editingId, payload);
       return base44.entities.Contrato.create(payload);
     },
@@ -152,17 +134,6 @@ export default function GestaoContratos() {
             <div>
               <h1 className="text-xl font-bold text-slate-900">Gestão de Contratos</h1>
               <p className="text-xs text-slate-500">{filtered.length} contrato(s)</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              {!isSuperAdmin && currentUser?.tenant_nome && (
-                <Badge className="text-xs px-2 py-1 bg-purple-50 text-purple-700 border-purple-200">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {currentUser.tenant_nome}
-                </Badge>
-              )}
-              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-                {ROLE_LABELS[perms.role] || perms.role}
-              </Badge>
             </div>
           </div>
           <Button size="sm" onClick={handleNew} className="bg-purple-600 hover:bg-purple-700 gap-1.5">

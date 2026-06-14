@@ -1,7 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import useTenantContext from '@/hooks/useTenantContext';
-import { ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subDays } from 'date-fns';
@@ -44,15 +42,11 @@ export default function Marcacoes() {
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
 
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
+  const isAdmin = currentUser?.role === 'admin';
 
   const { data: marcacoes = [], isLoading, refetch } = useQuery({
-    queryKey: ['marcacoes', currentUser?.tenant_id, isAdmin],
-    queryFn: async () => {
-      if (currentUser?.role === 'super_admin') return base44.entities.Marcacao.list('-timestamp', 1000);
-      if (!currentUser?.tenant_id) return [];
-      return base44.entities.Marcacao.filter({ tenant_id: currentUser.tenant_id }, '-timestamp', 1000);
-    },
+    queryKey: ['marcacoes'],
+    queryFn: () => base44.entities.Marcacao.list('-timestamp', 1000),
     enabled: !!currentUser,
     refetchInterval: 30000,
   });
@@ -221,7 +215,6 @@ export default function Marcacoes() {
           timestamp: ts || new Date().toISOString(),
           modo, raw_mode: rawMode != null ? Number(rawMode) : null, tipo,
           local: terminal.local || '', exportado: false,
-          tenant_id: currentUser?.tenant_id || '', tenant_nome: currentUser?.tenant_nome || '',
         };
       });
       // Filtrar duplicados
@@ -301,7 +294,7 @@ export default function Marcacoes() {
             <div className="p-2.5 bg-blue-100 rounded-xl shrink-0">
               <ClipboardList className="h-5 w-5 text-blue-600" />
             </div>
-            <div className="flex-1">
+            <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Marcações</h1>
               <p className="text-xs text-slate-500">Registos de ponto dos terminais biométricos</p>
             </div>

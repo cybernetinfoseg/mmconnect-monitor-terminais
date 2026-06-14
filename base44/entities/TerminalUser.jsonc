@@ -44,14 +44,6 @@
       "type": "string",
       "description": "JSON array com IDs dos terminais onde este utilizador est\u00e1 inscrito"
     },
-    "tenant_id": {
-      "type": "string",
-      "description": "ID do Tenant ao qual pertence"
-    },
-    "tenant_nome": {
-      "type": "string",
-      "description": "Nome do tenant (cache)"
-    },
     "owner_email": {
       "type": "string",
       "description": "Email do respons\u00e1vel/dono deste registo"

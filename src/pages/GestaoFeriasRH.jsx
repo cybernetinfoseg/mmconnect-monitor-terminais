@@ -54,7 +54,7 @@ export default function GestaoFeriasRH() {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
+  const isAdmin = currentUser?.role === 'admin';
   const anoAtual = new Date().getFullYear();
 
   const { data: pedidos = [], isLoading } = useQuery({

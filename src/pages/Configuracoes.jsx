@@ -12,14 +12,12 @@ import {
   AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 
 import TelegramConfig from '../components/configuracoes/TelegramConfig';
 import AdmsServerCode from '../components/configuracoes/AdmsServerCode';
@@ -57,8 +55,7 @@ export default function Configuracoes() {
     }).catch(() => {});
   }, []);
 
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
-  const perms = resolvePermissions(currentUser);
+  const isAdmin = currentUser?.role === 'admin';
 
   const { data: monitorConfig = [], refetch: refetchMonitorConfig } = useQuery({
     queryKey: ['monitor-config'],
@@ -144,21 +141,11 @@ export default function Configuracoes() {
           <div className="p-2 sm:p-3 bg-slate-900 rounded-xl shrink-0">
             <Settings className="h-5 sm:h-6 w-5 sm:w-6 text-white" />
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Configurações</h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                {isAdmin ? 'Agente local, servidores e configurações do sistema' : 'Agente local e preferências de conta'}
-              </p>
-            </div>
-            {!perms.isSuperAdmin && currentUser?.tenant_nome && (
-              <Badge className="text-xs px-2 py-1 bg-violet-50 text-violet-700 border-violet-200">
-                {currentUser.tenant_nome}
-              </Badge>
-            )}
-            <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-              {ROLE_LABELS[perms.role] || perms.role}
-            </Badge>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Configurações</h1>
+            <p className="text-xs sm:text-sm text-slate-500">
+              {isAdmin ? 'Agente local, servidores e configurações do sistema' : 'Agente local e preferências de conta'}
+            </p>
           </div>
         </div>
 

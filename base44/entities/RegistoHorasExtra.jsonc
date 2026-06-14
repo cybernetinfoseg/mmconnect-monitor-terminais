@@ -31,16 +31,16 @@
         "feriado"
       ],
       "default": "util",
-      "description": "Tipo de dia"
+      "description": "Tipo de dia (afeta multiplicador legal)"
     },
     "motivo": {
       "type": "string",
-      "description": "Motivo / justifica\u00e7\u00e3o"
+      "description": "Motivo / justifica\u00e7\u00e3o das horas extra"
     },
     "aprovado": {
       "type": "boolean",
       "default": false,
-      "description": "Se foi aprovado"
+      "description": "Se foi aprovado pelo respons\u00e1vel"
     },
     "aprovado_por": {
       "type": "string",
@@ -58,36 +58,30 @@
         "pagamento",
         "pendente"
       ],
-      "default": "pendente"
+      "default": "pendente",
+      "description": "Se vai para banco de horas ou \u00e9 pago"
     },
     "processado": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "description": "Se j\u00e1 foi processado (banco ou pagamento)"
     },
     "fator_aplicado": {
       "type": "number",
-      "description": "Multiplicador aplicado"
+      "description": "Multiplicador aplicado (1.25, 1.375, 1.5, 1.75, 2.0)"
     },
     "minutos_compensados": {
       "type": "number",
-      "description": "Minutos ap\u00f3s aplicar o multiplicador"
+      "description": "Minutos ap\u00f3s aplicar o multiplicador (para banco de horas)"
     },
     "valor_pagar": {
       "type": "number",
-      "description": "Valor em \u20ac a pagar"
+      "description": "Valor em \u20ac a pagar (se destino=pagamento)"
     },
     "acumulado_ano_antes": {
       "type": "number",
       "default": 0,
-      "description": "Horas extra acumuladas no ano antes deste registo"
-    },
-    "tenant_id": {
-      "type": "string",
-      "description": "ID do Tenant ao qual pertence"
-    },
-    "tenant_nome": {
-      "type": "string",
-      "description": "Nome do tenant (cache)"
+      "description": "Horas extra acumuladas no ano antes deste registo (para determinar tabela)"
     },
     "owner_email": {
       "type": "string",

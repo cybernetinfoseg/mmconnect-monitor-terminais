@@ -35,14 +35,6 @@
       "type": "boolean",
       "default": true
     },
-    "tenant_id": {
-      "type": "string",
-      "description": "ID do Tenant ao qual pertence"
-    },
-    "tenant_nome": {
-      "type": "string",
-      "description": "Nome do tenant (cache)"
-    },
     "owner_email": {
       "type": "string"
     }

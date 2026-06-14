@@ -1,11 +1,46 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { resolvePermissions, NAV_MODULES, BOTTOM_NAV_ITEMS, ROLE_LABELS, ROLE_COLORS, filterNavModules } from '@/components/auth/usePermissions.jsx';
+import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
-  Menu, ChevronLeft, LogOut, User, LayoutGrid,
+  LayoutDashboard, 
+  Monitor, 
+  History, 
+  AlertTriangle,
+  Tv,
+  Menu,
+  ChevronLeft,
+  Bell,
+  Shield,
+  Settings,
+  ClipboardList,
+  LogOut,
+  User,
+  Wrench,
+  FileBarChart2,
+  CalendarClock,
+  MapPin,
+  Users,
+  Fingerprint,
+  Share2,
+  Building2,
+  CalendarOff,
+  Clock,
+  Briefcase,
+  FileSignature,
+  Palmtree,
+  TrendingUp,
+  Archive,
+  LayoutGrid,
+  Banknote,
+  FileText,
+  DoorOpen,
+  UserCheck,
+  BarChart3,
+  Activity,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,8 +50,39 @@ import PendingApproval from './components/auth/PendingApproval';
 import { useRequireAuth } from './components/auth/useRequireAuth';
 import SidebarClock from './components/dashboard/SidebarClock';
 
+const ALL_NAV_ITEMS = [
+  { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
+  { name: 'Modo TV', page: 'TVMode', icon: Tv },
+  { name: 'Terminais', page: 'Terminais', icon: Monitor },
+
+  { name: 'Controlo de Acesso', page: 'AcessoHub', icon: Shield },
+  { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
+
+  { name: 'Relatório Movimentos', page: 'RelatorioMovimentos', icon: BarChart3 },
+  
+  
+  { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
+  { name: 'Histórico', page: 'History', icon: History },
+  { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
+  { name: 'Alertas', page: 'Alertas', icon: Bell },
+  { name: 'Manutenção', page: 'Manutencao', icon: Wrench },
+  { name: 'Agendamentos', page: 'Agendamentos', icon: CalendarClock },
+  { name: 'Relatórios', page: 'Relatorios', icon: FileBarChart2 },
+  { name: 'Auditoria', page: 'Auditoria', icon: ClipboardList },
+  { name: 'Configurações', page: 'Configuracoes', icon: Settings },
+  { name: 'Administração', page: 'Administracao', icon: Shield },
+];
+
+// Pages shown in the bottom bar on mobile
+const bottomNavItems = [
+  { name: 'Dashboard', page: 'Dashboard', icon: LayoutDashboard },
+  { name: 'Terminais', page: 'Terminais', icon: Monitor },
+  { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
+  { name: 'Mapa', page: 'Mapa', icon: MapPin },
+];
+
 // Root pages (no back button)
-const rootPages = ['DashboardExecutivo', 'Dashboard', 'DashboardTecnico', 'TVMode'];
+const rootPages = ['Dashboard', 'TVMode'];
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
@@ -34,13 +100,6 @@ export default function Layout({ children, currentPageName }) {
   }, []);
 
   const perms = resolvePermissions(currentUser);
-
-  const [expandedModules, setExpandedModules] = useState(() => {
-    const activeModule = NAV_MODULES.find(m => 
-      m.items.some(i => i.page === currentPageName)
-    );
-    return activeModule ? new Set([activeModule.label]) : new Set(['Dashboard']);
-  });
 
   if (currentPageName === 'TVMode') {
     return children;
@@ -69,8 +128,7 @@ export default function Layout({ children, currentPageName }) {
   }
 
   // Admins are always approved; non-admins must have aprovado === true
-  // Only super_admin and admin are auto-approved; others need explicit approval
-  const isPending = currentUser && !perms.isAdmin && !currentUser.aprovado;
+  const isPending = currentUser && currentUser.role !== 'admin' && !currentUser.aprovado;
   if (isPending) {
     return <PendingApproval user={currentUser} />;
   }
@@ -108,99 +166,51 @@ export default function Layout({ children, currentPageName }) {
     );
   };
 
-  const toggleModule = (label) => {
-    setExpandedModules(prev => {
-      const next = new Set(prev);
-      next.has(label) ? next.delete(label) : next.add(label);
-      return next;
-    });
-  };
-
-  // Filter nav items based on user role
-  const filteredModules = filterNavModules(NAV_MODULES, perms.role);
-  const filteredBottomNav = BOTTOM_NAV_ITEMS.filter(item => {
-    const allowed = item.roles || ['super_admin'];
-    return allowed.includes(perms.role);
+  // Filter nav items based on user permissions
+  const navItems = ALL_NAV_ITEMS.filter(item => {
+    if (!currentUser) return false;
+    if (item.adminOnly && !perms.isAdmin) return false;
+    return perms.paginas_permitidas.includes(item.page);
   });
 
   const Sidebar = ({ onClose }) => (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900">
-      <div className="p-5 border-b border-slate-200 dark:border-slate-700">
+      <div className="p-6 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg shadow-emerald-500/20">
-            <LayoutGrid className="h-5 w-5 text-white" />
+          <div className="p-2 bg-slate-900 dark:bg-emerald-600 rounded-xl">
+            <Monitor className="h-6 w-6 text-emerald-400 dark:text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-base text-slate-900 dark:text-white">MMConnect</h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">Platform</p>
+            <h1 className="font-bold text-slate-900 dark:text-white">NOC Monitor</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Terminais Biométricos</p>
           </div>
         </div>
       </div>
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {filteredModules.map((mod) => {
-          const ModuleIcon = mod.icon;
-          const isExpanded = expandedModules.has(mod.label);
-          const hasActiveItem = mod.items.some(i => currentPageName === i.page);
-          return (
-            <div key={mod.label}>
-              <button
-                onClick={() => toggleModule(mod.label)}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors",
-                  hasActiveItem
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                )}
-              >
-                <ModuleIcon className="h-3.5 w-3.5 shrink-0" />
-                <span className="flex-1 text-left">{mod.label}</span>
-                <ChevronLeft className={cn(
-                  "h-3 w-3 shrink-0 transition-transform",
-                  isExpanded && "-rotate-90"
-                )} />
-              </button>
-              {isExpanded && (
-                <div className="mt-1 ml-2 space-y-0.5">
-                  {mod.items.map((item) => (
-                    <NavLink key={item.page} item={item} onClick={onClose} />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {navItems.map((item) => (
+          <NavLink key={item.page} item={item} onClick={onClose} />
+        ))}
       </nav>
-      <div className="p-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+
         <SidebarClock />
         {currentUser && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
-              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center shrink-0">
-                <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">{currentUser.full_name || currentUser.email}</p>
-                <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1 px-2">
-              <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium", ROLE_COLORS[perms.role] || ROLE_COLORS.viewer)}>
-                {ROLE_LABELS[perms.role] || perms.role}
-              </span>
-              {currentUser.tenant_nome && (
-                <span className="text-[10px] text-slate-400 truncate">· {currentUser.tenant_nome}</span>
-              )}
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
+            <User className="h-4 w-4 text-slate-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">{currentUser.full_name || currentUser.email}</p>
+              <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
             </div>
           </div>
         )}
         <button
           onClick={() => base44.auth.logout()}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
         >
-          <LogOut className="h-3.5 w-3.5" />
+          <LogOut className="h-4 w-4" />
           Sair
         </button>
-        <p className="text-[10px] text-slate-400 text-center">MMConnect Platform v2.0</p>
+        <p className="text-xs text-slate-400 text-center">Enterprise NOC v1.0</p>
       </div>
     </div>
   );
@@ -243,7 +253,7 @@ export default function Layout({ children, currentPageName }) {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-stretch">
-          {filteredBottomNav.map((item) => {
+          {bottomNavItems.map((item) => {
             const isActive = currentPageName === item.page;
             const Icon = item.icon;
             return (

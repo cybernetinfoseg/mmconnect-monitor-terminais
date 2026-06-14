@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Plus, Pencil, Trash2, Clock, Users, LayoutGrid, TableProperties, Building2 } from 'lucide-react';
+import { CalendarClock, Plus, Pencil, Trash2, Clock, Users, LayoutGrid, TableProperties } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import EscalaTrabalho from '@/components/horarios/EscalaTrabalho';
 
 const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -35,9 +34,7 @@ export default function GestaoHorarios() {
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-
-  const perms = resolvePermissions(currentUser);
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
+  const isAdmin = currentUser?.role === 'admin';
   const queryClient = useQueryClient();
 
   const { data: horarios = [], isLoading } = useQuery({
@@ -57,10 +54,7 @@ export default function GestaoHorarios() {
 
   const saveMutation = useMutation({
     mutationFn: (data) => {
-      const tenantInjection = !perms.isSuperAdmin && currentUser?.tenant_id
-        ? { tenant_id: currentUser.tenant_id, tenant_nome: currentUser.tenant_nome || '' }
-        : {};
-      const payload = { ...data, ...tenantInjection, owner_email: currentUser?.email };
+      const payload = { ...data, owner_email: currentUser?.email };
       if (editingId) return base44.entities.Horario.update(editingId, payload);
       return base44.entities.Horario.create(payload);
     },
@@ -161,17 +155,6 @@ export default function GestaoHorarios() {
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Horários & Turnos</h1>
               <p className="text-xs text-slate-500">Gestão de horários, escalas e atribuições</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {!perms.isSuperAdmin && currentUser?.tenant_nome && (
-                <Badge className="text-xs px-2 py-1 bg-violet-50 text-violet-700 border-violet-200">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {currentUser.tenant_nome}
-                </Badge>
-              )}
-              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-                {ROLE_LABELS[perms.role] || perms.role}
-              </Badge>
             </div>
           </div>
           <Button onClick={handleNew} className="bg-violet-600 hover:bg-violet-700 gap-1.5 text-xs">

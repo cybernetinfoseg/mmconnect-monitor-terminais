@@ -23,7 +23,8 @@
         "prestacao_servicos",
         "trabalho_temporario",
         "estagio"
-      ]
+      ],
+      "description": "Tipo de contrato"
     },
     "data_inicio": {
       "type": "string",
@@ -33,11 +34,12 @@
     "data_fim": {
       "type": "string",
       "format": "date",
-      "description": "Data de fim"
+      "description": "Data de fim (null = indeterminado)"
     },
     "data_fim_periodo_experimental": {
       "type": "string",
-      "format": "date"
+      "format": "date",
+      "description": "Fim do per\u00edodo experimental"
     },
     "salario_base": {
       "type": "number",
@@ -45,7 +47,8 @@
     },
     "subsidio_alimentacao": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Subs\u00eddio de alimenta\u00e7\u00e3o di\u00e1rio (\u20ac)"
     },
     "subsidio_alimentacao_tipo": {
       "type": "string",
@@ -53,18 +56,22 @@
         "dinheiro",
         "cartao_refeicao"
       ],
-      "default": "cartao_refeicao"
+      "default": "cartao_refeicao",
+      "description": "Forma de pagamento do subs\u00eddio de alimenta\u00e7\u00e3o"
     },
     "outros_subsidios": {
       "type": "number",
-      "default": 0
+      "default": 0,
+      "description": "Outros subs\u00eddios mensais fixos (\u20ac)"
     },
     "descricao_outros_subsidios": {
-      "type": "string"
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o dos outros subs\u00eddios"
     },
     "horas_semanais": {
       "type": "number",
-      "default": 40
+      "default": 40,
+      "description": "Horas semanais contratadas"
     },
     "regime": {
       "type": "string",
@@ -73,15 +80,18 @@
         "remoto",
         "hibrido"
       ],
-      "default": "presencial"
+      "default": "presencial",
+      "description": "Regime de trabalho"
     },
     "renovacao_automatica": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "description": "Se o contrato renova automaticamente"
     },
     "aviso_expiracao_dias": {
       "type": "number",
-      "default": 30
+      "default": 30,
+      "description": "Dias de anteced\u00eancia para alerta de expira\u00e7\u00e3o"
     },
     "estado": {
       "type": "string",
@@ -91,25 +101,20 @@
         "rescindido",
         "pendente_assinatura"
       ],
-      "default": "ativo"
+      "default": "ativo",
+      "description": "Estado do contrato"
     },
     "documento_url": {
       "type": "string",
       "description": "URL do documento do contrato"
     },
-    "tenant_id": {
-      "type": "string",
-      "description": "ID do Tenant ao qual pertence"
-    },
-    "tenant_nome": {
-      "type": "string",
-      "description": "Nome do tenant (cache)"
-    },
     "observacoes": {
-      "type": "string"
+      "type": "string",
+      "description": "Observa\u00e7\u00f5es"
     },
     "owner_email": {
-      "type": "string"
+      "type": "string",
+      "description": "Email do respons\u00e1vel"
     }
   },
   "required": [

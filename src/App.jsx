@@ -43,11 +43,6 @@ import Adiantamentos from './pages/Adiantamentos.jsx';
 import Organigrama from './pages/Organigrama.jsx';
 import ColaboradorPerfil from './pages/ColaboradorPerfil.jsx';
 import AcessoHub from './pages/AcessoHub.jsx';
-import DashboardExecutivo from './pages/DashboardExecutivo.jsx';
-import DashboardTecnico from './pages/DashboardTecnico.jsx';
-import AgentesLocais from './pages/AgentesLocais.jsx';
-import Tenants from './pages/Tenants.jsx';
-import Sites from './pages/Sites.jsx';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -141,11 +136,6 @@ const AuthenticatedApp = () => {
       <Route path="/Organigrama" element={<LayoutWrapper currentPageName="Organigrama"><Organigrama /></LayoutWrapper>} />
       <Route path="/ColaboradorPerfil" element={<LayoutWrapper currentPageName="ColaboradorPerfil"><ColaboradorPerfil /></LayoutWrapper>} />
       <Route path="/AcessoHub" element={<LayoutWrapper currentPageName="AcessoHub"><AcessoHub /></LayoutWrapper>} />
-      <Route path="/DashboardExecutivo" element={<LayoutWrapper currentPageName="DashboardExecutivo"><DashboardExecutivo /></LayoutWrapper>} />
-      <Route path="/DashboardTecnico" element={<LayoutWrapper currentPageName="DashboardTecnico"><DashboardTecnico /></LayoutWrapper>} />
-      <Route path="/AgentesLocais" element={<LayoutWrapper currentPageName="AgentesLocais"><AgentesLocais /></LayoutWrapper>} />
-      <Route path="/Tenants" element={<LayoutWrapper currentPageName="Tenants"><Tenants /></LayoutWrapper>} />
-      <Route path="/Sites" element={<LayoutWrapper currentPageName="Sites"><Sites /></LayoutWrapper>} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

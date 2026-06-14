@@ -10,15 +10,14 @@
       "type": "string"
     },
     "colaborador_nome": {
-      "type": "string",
-      "description": "Nome do colaborador (cache)"
+      "type": "string"
     },
     "enrollid": {
       "type": "number"
     },
     "numero_recibo": {
       "type": "string",
-      "description": "N\u00famero do recibo (RV-ANO-SEQ)"
+      "description": "N\u00famero \u00fanico do recibo (ex: RV-2025-001)"
     },
     "ano": {
       "type": "number"
@@ -94,19 +93,19 @@
     "remuneracao_bruta": {
       "type": "number"
     },
+    "valor_ss_trabalhador": {
+      "type": "number"
+    },
     "taxa_ss_trabalhador": {
       "type": "number",
       "default": 11
     },
-    "valor_ss_trabalhador": {
+    "valor_irs": {
       "type": "number"
     },
     "taxa_irs": {
       "type": "number",
       "default": 0
-    },
-    "valor_irs": {
-      "type": "number"
     },
     "outros_descontos_obrigatorios": {
       "type": "number",
@@ -121,27 +120,19 @@
     "estado": {
       "type": "string",
       "enum": [
-        "rascunho",
         "emitido",
+        "entregue",
         "anulado"
       ],
-      "default": "rascunho"
-    },
-    "tenant_id": {
-      "type": "string",
-      "description": "ID do Tenant ao qual pertence"
-    },
-    "tenant_nome": {
-      "type": "string",
-      "description": "Nome do tenant (cache)"
+      "default": "emitido"
     },
     "owner_email": {
       "type": "string"
     }
   },
   "required": [
-    "processamento_id",
     "colaborador_id",
-    "numero_recibo"
+    "ano",
+    "mes"
   ]
 }

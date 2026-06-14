@@ -27,7 +27,7 @@ export default function BancoHoras() {
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
+  const isAdmin = currentUser?.role === 'admin';
 
   const { data: saldos = [], isLoading } = useQuery({
     queryKey: ['banco-horas', anoFilter],

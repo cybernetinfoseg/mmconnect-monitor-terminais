@@ -58,14 +58,6 @@
       "default": "dentro",
       "description": "Estado atual do visitante"
     },
-    "tenant_id": {
-      "type": "string",
-      "description": "ID do Tenant ao qual pertence"
-    },
-    "tenant_nome": {
-      "type": "string",
-      "description": "Nome do tenant (cache)"
-    },
     "observacoes": {
       "type": "string"
     },

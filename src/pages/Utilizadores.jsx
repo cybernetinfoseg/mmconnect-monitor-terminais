@@ -20,9 +20,6 @@ import { cn } from '@/lib/utils';
 import ColaboradorForm from '@/components/colaboradores/ColaboradorForm';
 import SyncPanel from '@/components/colaboradores/SyncPanel';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
-import useTenantContext from '@/hooks/useTenantContext';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
-import { Building2 } from 'lucide-react';
 
 export default function Utilizadores() {
   const navigate = useNavigate();
@@ -38,6 +35,7 @@ export default function Utilizadores() {
   const [deletingFromTerminal, setDeletingFromTerminal] = useState(null);
   const [deletingFromAll, setDeletingFromAll] = useState(null);
   const [selectedTerminals, setSelectedTerminals] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [expandedUser, setExpandedUser] = useState(null);
   const [expandedOwnerFilter, setExpandedOwnerFilter] = useState({});
   const [importProgress, setImportProgress] = useState(null);
@@ -50,9 +48,12 @@ export default function Utilizadores() {
   const importRef = useRef();
 
   const queryClient = useQueryClient();
-  const { currentUser, perms } = useTenantContext();
 
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
+  useEffect(() => {
+    base44.auth.me().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  const isAdmin = currentUser?.role === 'admin';
   const { timezone: userTimezone } = useUserTimezone();
 
   const { data: appUsers = [] } = useQuery({
@@ -97,9 +98,8 @@ export default function Utilizadores() {
   const { data: allUsers = [], isLoading, refetch } = useQuery({
     queryKey: ['terminal-users', currentUser?.email, isAdmin],
     queryFn: async () => {
-      if (perms.isSuperAdmin) return base44.entities.TerminalUser.list('-created_date', 500);
-      if (isAdmin) return base44.entities.TerminalUser.filter({ tenant_id: currentUser?.tenant_id }, '-created_date', 500);
-      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email, tenant_id: currentUser?.tenant_id }, '-created_date', 500);
+      if (isAdmin) return base44.entities.TerminalUser.list('-created_date', 500);
+      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email }, '-created_date', 500);
     },
     enabled: !!currentUser,
   });
@@ -127,10 +127,7 @@ export default function Utilizadores() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const tenantInjection = !perms.isSuperAdmin && currentUser?.tenant_id
-        ? { tenant_id: currentUser.tenant_id, tenant_nome: currentUser?.tenant_nome || '' }
-        : {};
-      const payload = { ...data, ...tenantInjection, owner_email: data.owner_email || currentUser?.email, terminais_ids: JSON.stringify(selectedTerminals) };
+      const payload = { ...data, owner_email: data.owner_email || currentUser?.email, terminais_ids: JSON.stringify(selectedTerminals) };
       if (editingUser) return base44.entities.TerminalUser.update(editingUser.id, payload);
       return base44.entities.TerminalUser.create(payload);
     },
@@ -259,7 +256,6 @@ export default function Utilizadores() {
           data_inicio: row.data_inicio || '', data_fim: row.data_fim || '',
           grupo_acesso: row.grupo_acesso || '', observacoes: row.observacoes || '',
           owner_email: row.owner_email || currentUser?.email, terminais_ids: '[]', bio_types: '[]',
-          tenant_id: currentUser?.tenant_id || '', tenant_nome: currentUser?.tenant_nome || '',
         });
         ok++;
       } catch {}
@@ -428,17 +424,6 @@ export default function Utilizadores() {
             <div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Colaboradores</h1>
               <p className="text-xs text-slate-500">{filtered.length} de {allUsers.length} colaborador(es) · Sincronização com terminais biométricos</p>
-            </div>
-            <div className="flex items-center gap-2">
-              {!perms.isSuperAdmin && currentUser?.tenant_nome && (
-                <Badge className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {currentUser.tenant_nome}
-                </Badge>
-              )}
-              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-                {ROLE_LABELS[perms.role] || perms.role}
-              </Badge>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

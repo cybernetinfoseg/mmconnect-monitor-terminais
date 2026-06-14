@@ -16,9 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { fmtMin } from '@/lib/calculoHoras';
-import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { format, parseISO, getYear } from 'date-fns';
-import { Building2 } from 'lucide-react';
 
 const LIMITE_ANUAL_MIN = 150 * 60;
 
@@ -40,28 +38,17 @@ export default function HorasExtra() {
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-  const perms = resolvePermissions(currentUser);
-  const isAdmin = perms.isAdmin;
-  const isSuperAdmin = perms.isSuperAdmin;
-  const userTenantId = currentUser?.tenant_id;
+  const isAdmin = currentUser?.role === 'admin';
 
   const { data: registos = [], isLoading } = useQuery({
-    queryKey: ['horas-extra', anoFilter, userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.RegistoHorasExtra.list('-data', 1000);
-      if (!userTenantId) return [];
-      return base44.entities.RegistoHorasExtra.filter({ tenant_id: userTenantId }, '-data', 1000);
-    },
+    queryKey: ['horas-extra', anoFilter],
+    queryFn: () => base44.entities.RegistoHorasExtra.list('-data', 1000),
     enabled: !!currentUser,
   });
 
   const { data: colaboradores = [] } = useQuery({
-    queryKey: ['colaboradores-he', userTenantId, isSuperAdmin],
-    queryFn: async () => {
-      if (isSuperAdmin) return base44.entities.Colaborador.filter({ ativo: true }, 'nome', 500);
-      if (!userTenantId) return [];
-      return base44.entities.Colaborador.filter({ ativo: true, tenant_id: userTenantId }, 'nome', 500);
-    },
+    queryKey: ['colaboradores-he'],
+    queryFn: () => base44.entities.Colaborador.filter({ ativo: true }, 'nome', 500),
     enabled: !!currentUser,
   });
 
@@ -87,8 +74,6 @@ export default function HorasExtra() {
         processado: false,
         destino: data.destino || 'pendente',
         owner_email: currentUser?.email,
-        tenant_id: !isSuperAdmin ? userTenantId || '' : undefined,
-        tenant_nome: !isSuperAdmin ? currentUser?.tenant_nome || '' : undefined,
       });
     },
     onSuccess: () => {
@@ -113,8 +98,6 @@ export default function HorasExtra() {
           minutos: registo.minutos_compensados || registo.minutos_extra,
           descricao: `Horas extra ${registo.data} aprovadas`,
           registo_extra_id: id, aprovado_por: currentUser?.email, owner_email: currentUser?.email,
-          tenant_id: !isSuperAdmin ? userTenantId || '' : undefined,
-          tenant_nome: !isSuperAdmin ? currentUser?.tenant_nome || '' : undefined,
         });
         const ano = getYear(parseISO(registo.data));
         const saldos = await base44.entities.BancoHoras.filter({ colaborador_id: registo.colaborador_id, ano }, 'created_date', 1);
@@ -128,8 +111,6 @@ export default function HorasExtra() {
             enrollid: registo.enrollid, ano,
             minutos_credito: registo.minutos_compensados || registo.minutos_extra,
             minutos_debito: 0, minutos_pagos: 0, owner_email: currentUser?.email,
-            tenant_id: !isSuperAdmin ? userTenantId || '' : undefined,
-            tenant_nome: !isSuperAdmin ? currentUser?.tenant_nome || '' : undefined,
           });
         }
       }
@@ -175,17 +156,6 @@ export default function HorasExtra() {
             <div>
               <h1 className="text-xl font-bold text-slate-900">Horas Extra</h1>
               <p className="text-xs text-slate-500">Registo formal e aprovação — art. 268º Código do Trabalho</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              {!isSuperAdmin && currentUser?.tenant_nome && (
-                <Badge className="text-xs px-2 py-1 bg-violet-50 text-violet-700 border-violet-200">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {currentUser.tenant_nome}
-                </Badge>
-              )}
-              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
-                {ROLE_LABELS[perms.role] || perms.role}
-              </Badge>
             </div>
           </div>
           <Button size="sm" onClick={() => { setFormData({ tipo_dia: 'util', destino: 'banco_horas', data: new Date().toLocaleDateString('en-CA') }); setDialogOpen(true); }} className="bg-violet-600 hover:bg-violet-700 gap-1.5">

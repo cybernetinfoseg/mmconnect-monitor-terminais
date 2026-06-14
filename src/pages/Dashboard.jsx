@@ -51,7 +51,7 @@ export default function Dashboard() {
   }, []);
 
   const perms = resolvePermissions(currentUser);
-  const canSeeAll = ['admin', 'super_admin'].includes(currentUser?.role);
+  const canSeeAll = currentUser?.role === 'admin';
 
   // Fetch terminals via backend function to bypass RLS limitations on custom fields
   const { data: terminals = [], isLoading, refetch } = useQuery({
