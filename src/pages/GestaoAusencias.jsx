@@ -3,7 +3,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO, eachDayOfInterval } from 'date-fns';
-import { CalendarOff, Plus, Pencil, Trash2, CheckCircle2, XCircle, Search } from 'lucide-react';
+import { CalendarOff, Plus, Pencil, Trash2, CheckCircle2, XCircle, Search, Building2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 
 const TIPO_LABELS = { ferias: '🌴 Férias', baixa_medica: '🏥 Baixa Médica', feriado: '🎉 Feriado', justificada: '📋 Justificada', injustificada: '⚠️ Injustificada' };
 const TIPO_COLORS = {
@@ -35,7 +36,11 @@ export default function GestaoAusencias() {
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-  const isAdmin = currentUser?.role === 'admin';
+
+  const perms = resolvePermissions(currentUser);
+  const isAdmin = perms.isAdmin;
+  const isSuperAdmin = perms.isSuperAdmin;
+  const userTenantId = currentUser?.tenant_id;
   
   // "hoje" na timezone do utilizador (YYYY-MM-DD)
   const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
@@ -47,10 +52,11 @@ export default function GestaoAusencias() {
   });
 
   const { data: colaboradores = [] } = useQuery({
-    queryKey: ['colaboradores-ausencias', currentUser?.email, isAdmin],
+    queryKey: ['colaboradores-ausencias', currentUser?.email, isAdmin, userTenantId],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.TerminalUser.list('nome', 500);
-      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email }, 'nome', 500);
+      if (isSuperAdmin) return base44.entities.TerminalUser.list('nome', 500);
+      if (isAdmin) return base44.entities.TerminalUser.filter({ tenant_id: userTenantId }, 'nome', 500);
+      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email, tenant_id: userTenantId }, 'nome', 500);
     },
     enabled: !!currentUser,
   });
@@ -60,6 +66,13 @@ export default function GestaoAusencias() {
     queryFn: () => base44.entities.User.list(),
     enabled: !!currentUser && isAdmin,
   });
+
+  // Tenant-filtered ausencias
+  const filteredAusencias = useMemo(() => {
+    if (isSuperAdmin) return ausencias;
+    if (!userTenantId) return [];
+    return ausencias.filter(a => a.tenant_id === userTenantId);
+  }, [ausencias, isSuperAdmin, userTenantId]);
 
   // Últimas marcações para mostrar na tabela de ausências
   const { data: ultimasMarcacoes = [] } = useQuery({
@@ -89,7 +102,10 @@ export default function GestaoAusencias() {
 
   const saveMutation = useMutation({
     mutationFn: (data) => {
-      const payload = { ...data, enrollid: Number(data.enrollid), owner_email: currentUser?.email };
+      const tenantInjection = !isSuperAdmin && userTenantId
+        ? { tenant_id: userTenantId, tenant_nome: currentUser?.tenant_nome || '' }
+        : {};
+      const payload = { ...data, ...tenantInjection, enrollid: Number(data.enrollid), owner_email: currentUser?.email };
       if (editingId) return base44.entities.AusenciaFalta.update(editingId, payload);
       return base44.entities.AusenciaFalta.create(payload);
     },
@@ -128,8 +144,8 @@ export default function GestaoAusencias() {
     } catch { return 0; }
   };
 
-  const ativas = ausencias.filter(a => a.data_fim >= hoje);
-  const passadas = ausencias.filter(a => a.data_fim < hoje);
+  const ativas = filteredAusencias.filter(a => a.data_fim >= hoje);
+  const passadas = filteredAusencias.filter(a => a.data_fim < hoje);
 
   const renderRow = (a) => {
     const dias = calcDias(a.data_inicio, a.data_fim);
@@ -196,6 +212,17 @@ export default function GestaoAusencias() {
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Ausências & Faltas</h1>
               <p className="text-xs text-slate-500">Férias, baixas médicas, feriados e ausências justificadas</p>
             </div>
+            <div className="hidden sm:flex items-center gap-2">
+              {!isSuperAdmin && currentUser?.tenant_nome && (
+                <Badge className="text-xs px-2 py-1 bg-orange-50 text-orange-700 border-orange-200">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  {currentUser.tenant_nome}
+                </Badge>
+              )}
+              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+                {ROLE_LABELS[perms.role] || perms.role}
+              </Badge>
+            </div>
           </div>
           <Button onClick={handleNew} className="bg-orange-600 hover:bg-orange-700 gap-1.5 text-xs">
             <Plus className="h-3.5 w-3.5" /> Registar Ausência
@@ -205,7 +232,7 @@ export default function GestaoAusencias() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {Object.entries(TIPO_LABELS).map(([tipo, label]) => {
-            const count = ausencias.filter(a => a.tipo === tipo && a.data_fim >= hoje).length;
+            const count = filteredAusencias.filter(a => a.tipo === tipo && a.data_fim >= hoje).length;
             return (
               <div key={tipo} className="bg-white border border-slate-200 rounded-lg p-3 text-center">
                 <p className="text-xl font-bold text-slate-800">{count}</p>
@@ -262,7 +289,7 @@ export default function GestaoAusencias() {
                 </div>
               </Card>
             )}
-            {ausencias.length === 0 && (
+            {filteredAusencias.length === 0 && (
               <Card className="bg-white border-slate-200">
                 <CardContent className="py-16 text-center text-slate-400">
                   <CalendarOff className="h-12 w-12 mx-auto mb-3 opacity-30" />

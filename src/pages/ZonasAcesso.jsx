@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit2, Trash2, MapPin, Users, Clock, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, MapPin, Users, Clock, Search, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 export default function ZonasAcesso() {
+  const [currentUser, setCurrentUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingZona, setEditingZona] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -23,18 +26,35 @@ export default function ZonasAcesso() {
 
   const queryClient = useQueryClient();
 
+  useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
+
+  const perms = resolvePermissions(currentUser);
+  const isSuperAdmin = perms.isSuperAdmin;
+  const userTenantId = currentUser?.tenant_id;
+
   const { data: zonas = [], isLoading } = useQuery({
     queryKey: ['zonas_acesso'],
-    queryFn: () => base44.entities.ZonaAcesso.list()
+    queryFn: () => base44.entities.ZonaAcesso.list(),
+    enabled: !!currentUser,
   });
 
   const { data: colaboradores = [] } = useQuery({
-    queryKey: ['colaboradores_simples'],
-    queryFn: () => base44.entities.Colaborador.list('-updated_date', 500)
+    queryKey: ['colaboradores_simples', userTenantId],
+    queryFn: async () => {
+      if (isSuperAdmin) return base44.entities.Colaborador.list('-updated_date', 500);
+      if (!userTenantId) return [];
+      return base44.entities.Colaborador.filter({ tenant_id: userTenantId }, '-updated_date', 500);
+    },
+    enabled: !!currentUser,
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.ZonaAcesso.create(data),
+    mutationFn: (data) => {
+      const tenantInjection = !isSuperAdmin && userTenantId
+        ? { tenant_id: userTenantId, tenant_nome: currentUser?.tenant_nome || '' }
+        : {};
+      return base44.entities.ZonaAcesso.create({ ...data, ...tenantInjection });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['zonas_acesso'] });
       resetForm();
@@ -89,10 +109,18 @@ export default function ZonasAcesso() {
     setFormData({ nome: '', descricao: '', local: '', requer_badge_temporario: false, ativa: true });
   };
 
-  const filteredZonas = zonas.filter(z =>
-    z.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    z.local?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredZonas = useMemo(() => {
+    let list = zonas;
+    if (!isSuperAdmin && userTenantId) list = list.filter(z => z.tenant_id === userTenantId);
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(z =>
+        z.nome.toLowerCase().includes(q) ||
+        z.local?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [zonas, isSuperAdmin, userTenantId, searchTerm]);
 
   if (isLoading) return <div className="p-6 text-center">A carregar zonas...</div>;
 
@@ -101,7 +129,18 @@ export default function ZonasAcesso() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Zonas de Acesso</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900">Zonas de Acesso</h1>
+            {!isSuperAdmin && currentUser?.tenant_nome && (
+              <Badge className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200">
+                <Building2 className="h-3 w-3 mr-1" />
+                {currentUser.tenant_nome}
+              </Badge>
+            )}
+            <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+              {ROLE_LABELS[perms.role] || perms.role}
+            </Badge>
+          </div>
           <p className="text-slate-600">Defina áreas de acesso restrito e horários permitidos</p>
         </div>
 

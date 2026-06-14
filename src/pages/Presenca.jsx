@@ -5,6 +5,7 @@ import { useUserTimezone } from '@/hooks/useUserTimezone';
 import useTenantContext from '@/hooks/useTenantContext';
 import { ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, Moon, TrendingUp, CalendarOff, AlertTriangle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,31 +20,40 @@ export default function Presenca() {
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
 
-  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
+  const { perms } = useTenantContext();
+  const isAdmin = perms.isAdmin;
+  const isSuperAdmin = perms.isSuperAdmin;
+  const userTenantId = currentUser?.tenant_id;
 
   const { data: marcacoes = [], isLoading, refetch, dataUpdatedAt } = useQuery({
-    queryKey: ['presenca-marcacoes'],
-    queryFn: () => base44.entities.Marcacao.list('-timestamp', 2000),
+    queryKey: ['presenca-marcacoes', userTenantId, isSuperAdmin],
+    queryFn: async () => {
+      if (isSuperAdmin) return base44.entities.Marcacao.list('-timestamp', 2000);
+      if (!userTenantId) return [];
+      return base44.entities.Marcacao.filter({ tenant_id: userTenantId }, '-timestamp', 2000);
+    },
     enabled: !!currentUser,
     refetchInterval: 30000,
   });
 
   const { data: terminalUsers = [] } = useQuery({
-    queryKey: ['presenca-users', currentUser?.email, isAdmin],
+    queryKey: ['presenca-users', currentUser?.email, isAdmin, userTenantId, isSuperAdmin],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.TerminalUser.list('nome', 500);
-      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email }, 'nome', 500);
+      if (isSuperAdmin) return base44.entities.TerminalUser.list('nome', 500);
+      if (isAdmin) return base44.entities.TerminalUser.filter({ tenant_id: userTenantId }, 'nome', 500);
+      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email, tenant_id: userTenantId }, 'nome', 500);
     },
     enabled: !!currentUser,
   });
 
   const { data: terminals = [] } = useQuery({
-    queryKey: ['presenca-terminals', currentUser?.email, isAdmin],
+    queryKey: ['presenca-terminals', currentUser?.email, isAdmin, userTenantId, isSuperAdmin],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.Terminal.list('nome');
+      if (isSuperAdmin) return base44.entities.Terminal.list('nome');
+      if (isAdmin) return base44.entities.Terminal.filter({ tenant_id: userTenantId }, 'nome');
       const [a, b] = await Promise.all([
-        base44.entities.Terminal.filter({ usuario_email: currentUser?.email }, 'nome'),
-        base44.entities.Terminal.filter({ created_by: currentUser?.email }, 'nome'),
+        base44.entities.Terminal.filter({ usuario_email: currentUser?.email, tenant_id: userTenantId }, 'nome'),
+        base44.entities.Terminal.filter({ created_by: currentUser?.email, tenant_id: userTenantId }, 'nome'),
       ]);
       const seen = new Set();
       return [...a, ...b].filter(t => { if (seen.has(t.id)) return false; seen.add(t.id); return true; });
@@ -52,15 +62,23 @@ export default function Presenca() {
   });
 
   const { data: horarios = [] } = useQuery({
-    queryKey: ['horarios-presenca'],
-    queryFn: () => base44.entities.Horario.list('nome'),
+    queryKey: ['horarios-presenca', userTenantId, isSuperAdmin],
+    queryFn: async () => {
+      if (isSuperAdmin) return base44.entities.Horario.list('nome');
+      if (!userTenantId) return [];
+      return base44.entities.Horario.filter({ tenant_id: userTenantId }, 'nome');
+    },
     enabled: !!currentUser,
   });
 
   // Ausências activas hoje
   const { data: ausencias = [] } = useQuery({
-    queryKey: ['ausencias-presenca'],
-    queryFn: () => base44.entities.AusenciaFalta.list('-data_inicio', 200),
+    queryKey: ['ausencias-presenca', userTenantId, isSuperAdmin],
+    queryFn: async () => {
+      if (isSuperAdmin) return base44.entities.AusenciaFalta.list('-data_inicio', 200);
+      if (!userTenantId) return [];
+      return base44.entities.AusenciaFalta.filter({ tenant_id: userTenantId }, '-data_inicio', 200);
+    },
     enabled: !!currentUser,
     refetchInterval: 60000,
   });
@@ -218,6 +236,17 @@ export default function Presenca() {
                   ? new Date(dataUpdatedAt).toLocaleTimeString('pt-PT', { timeZone: userTimezone || 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit' })
                   : '—'} · auto-refresh 30s
               </p>
+            </div>
+            <div className="hidden sm:flex items-center gap-2">
+              {!isSuperAdmin && currentUser?.tenant_nome && (
+                <Badge className="text-xs px-2 py-1 bg-emerald-50 text-emerald-700 border-emerald-200">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  {currentUser.tenant_nome}
+                </Badge>
+              )}
+              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+                {ROLE_LABELS[perms.role] || perms.role}
+              </Badge>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5 text-xs">

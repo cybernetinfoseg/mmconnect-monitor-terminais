@@ -47,8 +47,12 @@ export default function Marcacoes() {
   const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
 
   const { data: marcacoes = [], isLoading, refetch } = useQuery({
-    queryKey: ['marcacoes'],
-    queryFn: () => base44.entities.Marcacao.list('-timestamp', 1000),
+    queryKey: ['marcacoes', currentUser?.tenant_id, isAdmin],
+    queryFn: async () => {
+      if (currentUser?.role === 'super_admin') return base44.entities.Marcacao.list('-timestamp', 1000);
+      if (!currentUser?.tenant_id) return [];
+      return base44.entities.Marcacao.filter({ tenant_id: currentUser.tenant_id }, '-timestamp', 1000);
+    },
     enabled: !!currentUser,
     refetchInterval: 30000,
   });

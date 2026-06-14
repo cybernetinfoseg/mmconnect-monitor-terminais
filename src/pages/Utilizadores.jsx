@@ -97,8 +97,9 @@ export default function Utilizadores() {
   const { data: allUsers = [], isLoading, refetch } = useQuery({
     queryKey: ['terminal-users', currentUser?.email, isAdmin],
     queryFn: async () => {
-      if (isAdmin) return base44.entities.TerminalUser.list('-created_date', 500);
-      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email }, '-created_date', 500);
+      if (perms.isSuperAdmin) return base44.entities.TerminalUser.list('-created_date', 500);
+      if (isAdmin) return base44.entities.TerminalUser.filter({ tenant_id: currentUser?.tenant_id }, '-created_date', 500);
+      return base44.entities.TerminalUser.filter({ owner_email: currentUser?.email, tenant_id: currentUser?.tenant_id }, '-created_date', 500);
     },
     enabled: !!currentUser,
   });
@@ -126,7 +127,10 @@ export default function Utilizadores() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
-      const payload = { ...data, owner_email: data.owner_email || currentUser?.email, terminais_ids: JSON.stringify(selectedTerminals) };
+      const tenantInjection = !perms.isSuperAdmin && currentUser?.tenant_id
+        ? { tenant_id: currentUser.tenant_id, tenant_nome: currentUser?.tenant_nome || '' }
+        : {};
+      const payload = { ...data, ...tenantInjection, owner_email: data.owner_email || currentUser?.email, terminais_ids: JSON.stringify(selectedTerminals) };
       if (editingUser) return base44.entities.TerminalUser.update(editingUser.id, payload);
       return base44.entities.TerminalUser.create(payload);
     },
@@ -255,6 +259,7 @@ export default function Utilizadores() {
           data_inicio: row.data_inicio || '', data_fim: row.data_fim || '',
           grupo_acesso: row.grupo_acesso || '', observacoes: row.observacoes || '',
           owner_email: row.owner_email || currentUser?.email, terminais_ids: '[]', bio_types: '[]',
+          tenant_id: currentUser?.tenant_id || '', tenant_nome: currentUser?.tenant_nome || '',
         });
         ok++;
       } catch {}

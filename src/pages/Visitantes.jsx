@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, LogOut, Trash2 } from 'lucide-react';
+import { Plus, Search, LogOut, Trash2, Building2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { format, formatDistanceToNow } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 
 export default function Visitantes() {
+  const [currentUser, setCurrentUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -25,21 +28,45 @@ export default function Visitantes() {
 
   const queryClient = useQueryClient();
 
+  useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
+
+  const perms = resolvePermissions(currentUser);
+  const isSuperAdmin = perms.isSuperAdmin;
+  const userTenantId = currentUser?.tenant_id;
+
   const { data: visitantes = [] } = useQuery({
     queryKey: ['visitantes'],
-    queryFn: () => base44.entities.Visitante.list('-updated_date', 100)
+    queryFn: () => base44.entities.Visitante.list('-updated_date', 200),
+    enabled: !!currentUser,
   });
+  
+  // Tenant-filtered visitantes
+  const filteredVisitantes = useMemo(() => {
+    if (isSuperAdmin) return visitantes;
+    if (!userTenantId) return [];
+    return visitantes.filter(v => v.tenant_id === userTenantId);
+  }, [visitantes, isSuperAdmin, userTenantId]);
 
   const { data: colaboradores = [] } = useQuery({
-    queryKey: ['colaboradores_simple'],
-    queryFn: () => base44.entities.Colaborador.list('nome', 500)
+    queryKey: ['colaboradores_simple', userTenantId],
+    queryFn: async () => {
+      if (isSuperAdmin) return base44.entities.Colaborador.list('nome', 500);
+      if (!userTenantId) return [];
+      return base44.entities.Colaborador.filter({ tenant_id: userTenantId }, 'nome', 500);
+    },
+    enabled: !!currentUser,
   });
 
   const createMutation = useMutation({
     mutationFn: (data) => {
       const badge = 'V-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+      const tenantInjection = !isSuperAdmin && userTenantId
+        ? { tenant_id: userTenantId, tenant_nome: currentUser?.tenant_nome || '' }
+        : {};
       return base44.entities.Visitante.create({
         ...data,
+        ...tenantInjection,
+        data_entrada: new Date().toISOString(),
         numero_badge: badge,
         status: 'dentro'
       });
@@ -67,8 +94,8 @@ export default function Visitantes() {
     createMutation.mutate(formData);
   };
 
-  const currentVisitantes = visitantes.filter(v => v.status === 'dentro');
-  const pastVisitantes = visitantes.filter(v => v.status === 'saido');
+  const currentVisitantes = filteredVisitantes.filter(v => v.status === 'dentro');
+  const pastVisitantes = filteredVisitantes.filter(v => v.status === 'saido');
 
   const filteredCurrent = currentVisitantes.filter(v =>
     v.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -86,7 +113,18 @@ export default function Visitantes() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Visitantes</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900">Gestão de Visitantes</h1>
+            {!isSuperAdmin && currentUser?.tenant_nome && (
+              <Badge className="text-xs px-2 py-1 bg-slate-100 text-slate-700 border-slate-200">
+                <Building2 className="h-3 w-3 mr-1" />
+                {currentUser.tenant_nome}
+              </Badge>
+            )}
+            <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+              {ROLE_LABELS[perms.role] || perms.role}
+            </Badge>
+          </div>
           <p className="text-slate-600">Registe entradas de visitantes com badges temporários</p>
         </div>
 
