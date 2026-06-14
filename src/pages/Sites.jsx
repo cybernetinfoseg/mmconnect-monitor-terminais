@@ -10,11 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MapPin, Plus, Search, Edit, Trash2, Building2, Monitor, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import useTenantContext from '@/hooks/useTenantContext';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 
 export default function Sites() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
+  const { currentUser, perms, userTenantId } = useTenantContext();
   const [form, setForm] = useState({ nome: '', codigo: '', tenant_id: '', morada: '', localidade: '', pais: 'Portugal', ativo: true });
   const queryClient = useQueryClient();
 
@@ -26,6 +29,11 @@ export default function Sites() {
     queryKey: ['tenants'],
     queryFn: () => base44.entities.Tenant.list('nome'),
   });
+
+  // Multi-tenant filtering
+  const filteredSites = perms.isSuperAdmin
+    ? sites
+    : sites.filter(s => s.tenant_id === userTenantId);
 
   const createMutation = useMutation({
     mutationFn: (data) => base44.entities.Site.create(data),
@@ -40,7 +48,7 @@ export default function Sites() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['sites-all'] }); toast.success('Site removido'); },
   });
 
-  const resetForm = () => { setEditing(null); setForm({ nome: '', codigo: '', tenant_id: '', morada: '', localidade: '', pais: 'Portugal', ativo: true }); };
+  const resetForm = () => { setEditing(null); setForm({ nome: '', codigo: '', tenant_id: perms.isSuperAdmin ? '' : (userTenantId || ''), morada: '', localidade: '', pais: 'Portugal', ativo: true }); };
 
   const openCreate = () => { resetForm(); setShowModal(true); };
   const openEdit = (s) => { setEditing(s); setForm({ nome: s.nome, codigo: s.codigo || '', tenant_id: s.tenant_id || '', morada: s.morada || '', localidade: s.localidade || '', pais: s.pais || 'Portugal', ativo: s.ativo !== false }); setShowModal(true); };
@@ -50,7 +58,7 @@ export default function Sites() {
     editing ? updateMutation.mutate({ id: editing.id, data: form }) : createMutation.mutate(form);
   };
 
-  const filtered = sites.filter(s => s.nome?.toLowerCase().includes(search.toLowerCase()) || s.localidade?.toLowerCase().includes(search.toLowerCase()) || s.codigo?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = filteredSites.filter(s => s.nome?.toLowerCase().includes(search.toLowerCase()) || s.localidade?.toLowerCase().includes(search.toLowerCase()) || s.codigo?.toLowerCase().includes(search.toLowerCase()));
 
   const getTenantName = (id) => tenants.find(t => t.id === id)?.nome || '—';
 
@@ -63,6 +71,17 @@ export default function Sites() {
             <div>
               <h1 className="text-2xl font-bold text-slate-900">Sites</h1>
               <p className="text-sm text-slate-500">Locais e instalações</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {!perms.isSuperAdmin && currentUser?.tenant_nome && (
+                <Badge className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  {currentUser.tenant_nome}
+                </Badge>
+              )}
+              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+                {ROLE_LABELS[perms.role] || perms.role}
+              </Badge>
             </div>
           </div>
           <Button onClick={openCreate} className="bg-blue-600 hover:bg-blue-700 gap-2"><Plus className="h-4 w-4" /> Novo Site</Button>
@@ -92,10 +111,12 @@ export default function Sites() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <Building2 className="h-3 w-3" />
-                    <span>{getTenantName(s.tenant_id)}</span>
-                  </div>
+                  {perms.isSuperAdmin && (
+                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <Building2 className="h-3 w-3" />
+                      <span>{getTenantName(s.tenant_id)}</span>
+                    </div>
+                  )}
                   <p className="text-xs text-slate-400">{[s.morada, s.localidade, s.pais].filter(Boolean).join(', ') || '—'}</p>
                   <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEdit(s)}><Edit className="h-3 w-3 mr-1" /> Editar</Button>
@@ -123,10 +144,14 @@ export default function Sites() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">Tenant</label>
-                  <Select value={form.tenant_id} onValueChange={v => setForm({...form, tenant_id: v})}>
-                    <SelectTrigger><SelectValue placeholder="Selecionar tenant" /></SelectTrigger>
-                    <SelectContent>{tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}</SelectContent>
-                  </Select>
+                  {perms.isSuperAdmin ? (
+                    <Select value={form.tenant_id} onValueChange={v => setForm({...form, tenant_id: v})}>
+                      <SelectTrigger><SelectValue placeholder="Selecionar tenant" /></SelectTrigger>
+                      <SelectContent>{tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>)}</SelectContent>
+                    </Select>
+                  ) : (
+                    <Input value={getTenantName(form.tenant_id) || currentUser?.tenant_nome || '—'} disabled className="bg-slate-50" />
+                  )}
                 </div>
               </div>
               <div>

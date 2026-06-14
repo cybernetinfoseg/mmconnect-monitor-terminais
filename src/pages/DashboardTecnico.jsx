@@ -1,45 +1,55 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import useTenantContext from '@/hooks/useTenantContext';
+import { ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import {
   Activity, Wrench, Server, Cpu, Clock,
-  AlertTriangle, Wifi, WifiOff
+  AlertTriangle, Wifi, WifiOff, Building2,
 } from 'lucide-react';
 
 export default function DashboardTecnico() {
-  const [currentUser, setCurrentUser] = useState(null);
-  useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
+  const { currentUser, perms, filterByTenant, filterBySiteTenant, userTenantId } = useTenantContext();
 
   const { data: terminals = [] } = useQuery({
-    queryKey: ['terminals-tech'],
+    queryKey: ['terminals-tech', userTenantId],
     queryFn: () => base44.entities.Terminal.list('nome'),
     enabled: !!currentUser,
     refetchInterval: 15000,
   });
+  const { data: sites = [] } = useQuery({
+    queryKey: ['sites-tech', userTenantId],
+    queryFn: () => base44.entities.Site.list('nome'),
+    enabled: !!currentUser,
+  });
   const { data: agents = [] } = useQuery({
-    queryKey: ['agents-tech'],
+    queryKey: ['agents-tech', userTenantId],
     queryFn: () => base44.entities.AgentRegistry.list('-ultimo_heartbeat'),
     enabled: !!currentUser,
     refetchInterval: 15000,
   });
   const { data: alerts = [] } = useQuery({
-    queryKey: ['alerts-tech'],
+    queryKey: ['alerts-tech', userTenantId],
     queryFn: () => base44.entities.AlertaAcesso.list('-timestamp', 100),
     enabled: !!currentUser,
   });
   const { data: logs = [] } = useQuery({
-    queryKey: ['logs-tech'],
+    queryKey: ['logs-tech', userTenantId],
     queryFn: () => base44.entities.AuditLog.list('-created_date', 50),
     enabled: !!currentUser,
   });
 
-  const online = terminals.filter(t => t.status === 'online').length;
-  const offline = terminals.filter(t => t.status !== 'online').length;
-  const latencies = terminals.filter(t => t.latencia_ms != null).map(t => t.latencia_ms);
+  // Multi-tenant filtering
+  const filteredTerminals = filterBySiteTenant(terminals, sites, 'site_id');
+  const filteredAgents = filterByTenant(agents, 'tenant_id');
+
+  const online = filteredTerminals.filter(t => t.status === 'online').length;
+  const offline = filteredTerminals.filter(t => t.status !== 'online').length;
+  const latencies = filteredTerminals.filter(t => t.latencia_ms != null).map(t => t.latencia_ms);
   const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : null;
   const criticalAlerts = alerts.filter(a => a.severidade === 'critico' && !a.resolvido);
   const warningAlerts = alerts.filter(a => a.severidade === 'aviso' && !a.resolvido);
@@ -47,14 +57,23 @@ export default function DashboardTecnico() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="p-3 bg-slate-800 rounded-xl border border-slate-700">
             <Activity className="h-6 w-6 text-emerald-400" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-white">Dashboard Técnico</h1>
             <p className="text-sm text-slate-400">Monitoramento de infraestrutura e agentes</p>
           </div>
+          {!perms.isSuperAdmin && currentUser?.tenant_nome && (
+            <Badge className="text-xs px-2 py-1 bg-slate-800 text-slate-300 border-slate-700">
+              <Building2 className="h-3 w-3 mr-1" />
+              {currentUser.tenant_nome}
+            </Badge>
+          )}
+          <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+            {ROLE_LABELS[perms.role] || perms.role}
+          </Badge>
         </div>
 
         {/* Status Pills */}
@@ -63,7 +82,7 @@ export default function DashboardTecnico() {
             { label: 'Online', value: online, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
             { label: 'Offline', value: offline, color: 'bg-red-500/20 text-red-400 border-red-500/30' },
             { label: 'Latência', value: avgLatency ? `${avgLatency}ms` : '—', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30' },
-            { label: 'Agentes', value: agents.filter(a => a.status === 'online').length, color: 'bg-violet-500/20 text-violet-400 border-violet-500/30' },
+            { label: 'Agentes', value: filteredAgents.filter(a => a.status === 'online').length, color: 'bg-violet-500/20 text-violet-400 border-violet-500/30' },
             { label: 'Críticos', value: criticalAlerts.length, color: 'bg-red-500/20 text-red-400 border-red-500/30', pulse: criticalAlerts.length > 0 },
             { label: 'Avisos', value: warningAlerts.length, color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
             { label: 'Logs', value: logs.length, color: 'bg-slate-500/20 text-slate-400 border-slate-500/30' },
@@ -80,7 +99,7 @@ export default function DashboardTecnico() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Server className="h-4 w-4 text-emerald-400" />
-              <h2 className="font-semibold text-white text-sm">Terminais ({terminals.length})</h2>
+              <h2 className="font-semibold text-white text-sm">Terminais ({filteredTerminals.length})</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -94,7 +113,7 @@ export default function DashboardTecnico() {
                   </tr>
                 </thead>
                 <tbody>
-                  {terminals.map(t => (
+                  {filteredTerminals.map(t => (
                     <tr key={t.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
                       <td className="py-2.5 px-2 font-medium text-slate-200">{t.nome}</td>
                       <td className="py-2.5 px-2 text-slate-400">{t.marca || '—'}</td>
@@ -131,13 +150,13 @@ export default function DashboardTecnico() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Wrench className="h-4 w-4 text-violet-400" />
-                <h2 className="font-semibold text-white text-sm">Agentes ({agents.length})</h2>
+                <h2 className="font-semibold text-white text-sm">Agentes ({filteredAgents.length})</h2>
               </div>
-              {agents.length === 0 ? (
+              {filteredAgents.length === 0 ? (
                 <p className="text-slate-500 text-xs py-4 text-center">Nenhum agente registado</p>
               ) : (
                 <div className="space-y-2">
-                  {agents.map(a => (
+                  {filteredAgents.map(a => (
                     <div key={a.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-slate-800/50 border border-slate-800">
                       <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
                         a.status === 'online' ? 'bg-emerald-500/20' : 'bg-red-500/20')}>
@@ -145,7 +164,7 @@ export default function DashboardTecnico() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-slate-200 truncate">{a.hostname}</p>
-                        <p className="text-[10px] text-slate-500">v{a.versao || '?.?'} · {a.ip_local || '—'}</p>
+                        <p className="text-[10px] text-slate-500">v{a.versao || '?.?'} · {a.ip_local || '—'}{a.tenant_nome ? ` · ${a.tenant_nome}` : ''}</p>
                       </div>
                       <div className="text-right">
                         <Badge className={cn('text-[9px]', a.status === 'online' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400')}>

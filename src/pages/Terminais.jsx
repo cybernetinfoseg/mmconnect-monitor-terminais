@@ -51,8 +51,9 @@ import StatusBadge from '../components/dashboard/StatusBadge';
 import TerminalControlPanel from '../components/terminais/TerminalControlPanel';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
-import { User as UserIcon, Zap } from 'lucide-react';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
+import { User as UserIcon, Zap, Building2 } from 'lucide-react';
+import useTenantContext from '@/hooks/useTenantContext';
 
 export default function Terminais() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -68,14 +69,16 @@ export default function Terminais() {
   const [currentUser, setCurrentUser] = useState(null);
   
   const queryClient = useQueryClient();
+  const { perms } = useTenantContext();
 
   useEffect(() => {
-    base44.auth.me().then(setCurrentUser).catch(() => {});
+    base44.auth.me().then(u => { setCurrentUser(u); }).catch(() => {});
   }, []);
 
-  const perms = resolvePermissions(currentUser);
-  const isAdmin = perms.isAdmin;
-  const limiteTerminais = perms.limite_terminais;
+  // For backward compatibility, merge tenantContext perms with user state
+  const resolvedPerms = currentUser ? resolvePermissions(currentUser) : perms;
+  const isAdmin = resolvedPerms.isAdmin;
+  const limiteTerminais = resolvedPerms.limite_terminais;
 
   const [refreshInterval, setRefreshInterval] = useState(5000);
 
@@ -373,7 +376,7 @@ export default function Terminais() {
             <div className="p-3 bg-blue-100 rounded-xl shrink-0">
               <Monitor className="h-6 w-6 text-blue-600" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Gestão de Terminais</h1>
               <p className="text-xs sm:text-sm text-emerald-600 flex items-center gap-1">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shrink-0 inline-block"></span>
@@ -401,6 +404,15 @@ export default function Terminais() {
               <RefreshCw className={cn("h-4 w-4 sm:mr-2", verificandoTodos && "animate-spin")} />
               <span className="hidden sm:inline">{verificandoTodos ? 'A verificar...' : 'Verificar Tudo'}</span>
             </Button>
+            {!resolvedPerms.isSuperAdmin && currentUser?.tenant_nome && (
+              <Badge className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200">
+                <Building2 className="h-3 w-3 mr-1" />
+                {currentUser.tenant_nome}
+              </Badge>
+            )}
+            <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[resolvedPerms.role] || '')}>
+              {ROLE_LABELS[resolvedPerms.role] || resolvedPerms.role}
+            </Badge>
             <Button
               onClick={handleNew}
               size="sm"
