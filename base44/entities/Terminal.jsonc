@@ -22,6 +22,14 @@
       "type": "string",
       "description": "Nome do cliente (cache)"
     },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
+    },
     "tipo_conexao": {
       "type": "string",
       "enum": [

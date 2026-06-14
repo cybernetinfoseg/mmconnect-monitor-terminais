@@ -113,6 +113,12 @@ export default function Terminais() {
 
   const saveMutation = useMutation({
     mutationFn: async (data) => {
+      // Inject tenant context for non-super_admin
+      const tenantData = !resolvedPerms.isSuperAdmin && currentUser?.tenant_id
+        ? { tenant_id: currentUser.tenant_id, tenant_nome: currentUser.tenant_nome || '' }
+        : {};
+      const enrichedData = { ...data, ...tenantData };
+
       if (editingTerminal) {
         if (isAdmin) {
           // Check if admin is changing ownership (usuario_email changed)
@@ -132,7 +138,7 @@ export default function Terminais() {
       }
       // On create: admin sets usuario_email, then transfer ownership via backend
       const targetEmail = data.usuario_email || currentUser?.email;
-      const result = await base44.entities.Terminal.create({ ...data, usuario_email: targetEmail });
+      const result = await base44.entities.Terminal.create({ ...enrichedData, usuario_email: targetEmail });
       if (isAdmin && targetEmail !== currentUser?.email && result?.id) {
         await base44.functions.invoke('assignTerminal', { terminalId: result.id, targetEmail });
       }

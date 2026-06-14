@@ -36,6 +36,14 @@
       "default": 8,
       "description": "Horas de trabalho efectivo di\u00e1rio esperadas (ex: 8)"
     },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
+    },
     "owner_email": {
       "type": "string",
       "description": "Email do respons\u00e1vel"

@@ -40,6 +40,14 @@
       "default": false,
       "description": "Se a aus\u00eancia foi aprovada"
     },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
+    },
     "owner_email": {
       "type": "string",
       "description": "Email do respons\u00e1vel"

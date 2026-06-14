@@ -54,6 +54,14 @@
       "type": "string",
       "format": "date-time",
       "description": "Data/hora da exporta\u00e7\u00e3o"
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
     }
   },
   "required": [

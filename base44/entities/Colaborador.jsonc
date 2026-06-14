@@ -198,6 +198,14 @@
       "type": "string",
       "description": "Grupo de acesso no terminal"
     },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
+    },
     "observacoes": {
       "type": "string",
       "description": "Observa\u00e7\u00f5es internas"
