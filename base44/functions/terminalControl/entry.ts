@@ -551,7 +551,7 @@ async function actionGetUserList(terminal, params) {
   // Protocolo Timmy: "getalluserinfo" devolve todos os utilizadores registados no terminal
   // Fallback para "getalluser" em firmwares mais antigos
   let lastError;
-  for (const cmd of ['getalluserinfo', 'getalluser']) {
+  for (const cmd of ['getalluserinfo', 'senduser']) {
     try {
       const resp = await sendTimmyCommand(terminal, { cmd });
       const users = resp.record || [];
