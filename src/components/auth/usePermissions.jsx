@@ -24,6 +24,7 @@ const ALL_PAGES = [
   'GestAoBaixas', 'GestaoDesempenho', 'GestaoFormacao', 'DocumentosColaborador',
   'FichaSalarial', 'CustosDepartamentos', 'Adiantamentos', 'Organigrama',
   'ColaboradorPerfil', 'DashboardRHExecutivo', 'RelatorioAbsentismo',
+  'DashboardExecutivo', 'DashboardTecnico', 'AgentesLocais',
 ];
 
 const ADMIN_ONLY_PAGES = ['Administracao', 'Configuracoes', 'ExportacaoMarcacoes'];

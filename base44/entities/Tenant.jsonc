@@ -1,0 +1,70 @@
+{
+  "name": "Tenant",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "description": "Nome da empresa/cliente"
+    },
+    "documento": {
+      "type": "string",
+      "description": "NIF/CNPJ/Documento fiscal"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email de contacto"
+    },
+    "telefone": {
+      "type": "string"
+    },
+    "morada": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ativo",
+        "inativo",
+        "trial",
+        "suspenso"
+      ],
+      "default": "trial"
+    },
+    "plano": {
+      "type": "string",
+      "enum": [
+        "free",
+        "basic",
+        "pro",
+        "enterprise"
+      ],
+      "default": "free"
+    },
+    "limite_usuarios": {
+      "type": "number",
+      "default": 5
+    },
+    "limite_terminais": {
+      "type": "number",
+      "default": 10
+    },
+    "limite_sites": {
+      "type": "number",
+      "default": 3
+    },
+    "logo_url": {
+      "type": "string",
+      "description": "URL do logotipo"
+    },
+    "timezone": {
+      "type": "string",
+      "default": "Europe/London"
+    },
+    "owner_email": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}
