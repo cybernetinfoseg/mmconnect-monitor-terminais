@@ -35,7 +35,7 @@ export default function PendingApproval({ user: initialUser }) {
               <Clock className="h-12 w-12 text-amber-600" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900">Bem-vindo ao NOC Monitor</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Bem-vindo à MMConnect Platform</h1>
           <p className="text-slate-500 mt-2">Seu cadastro está em análise para aprovação</p>
         </div>
 

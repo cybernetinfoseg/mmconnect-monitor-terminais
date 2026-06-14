@@ -5,16 +5,26 @@
     "role": {
       "type": "string",
       "enum": [
+        "super_admin",
         "admin",
-        "user"
+        "operator",
+        "viewer"
       ],
-      "default": "user",
-      "description": "Role do utilizador no sistema"
+      "default": "viewer",
+      "description": "N\u00edvel de acesso: super_admin (plataforma), admin (tenant), operator (opera\u00e7\u00e3o di\u00e1ria), viewer (consulta)"
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "ID do Tenant ao qual o utilizador pertence"
+    },
+    "tenant_nome": {
+      "type": "string",
+      "description": "Nome do tenant (cache)"
     },
     "aprovado": {
       "type": "boolean",
       "default": false,
-      "description": "Se o utilizador foi aprovado pelo admin para aceder ao sistema"
+      "description": "Se o utilizador foi aprovado para aceder ao sistema"
     },
     "primeiroAcesso": {
       "type": "boolean",
@@ -23,50 +33,40 @@
     },
     "nome": {
       "type": "string",
-      "description": "Primeiro nome do utilizador"
+      "description": "Primeiro nome"
     },
     "sobrenome": {
       "type": "string",
-      "description": "Sobrenome do utilizador"
+      "description": "Sobrenome"
     },
     "pais_telefone": {
       "type": "string",
-      "description": "Pa\u00eds para o telefone de contato"
+      "description": "Pa\u00eds para telefone"
     },
     "telefone": {
       "type": "string",
-      "description": "Telefone de contato"
+      "description": "Telefone de contacto"
     },
     "motivo_acesso": {
       "type": "string",
-      "description": "Motivo para solicitar acesso ao sistema"
+      "description": "Motivo para solicitar acesso"
     },
     "limite_terminais": {
       "type": "number",
-      "default": 10,
-      "description": "Limite de terminais que o utilizador pode cadastrar"
+      "default": 10
     },
     "telegram_bot_token": {
-      "type": "string",
-      "description": "Token do bot Telegram para notifica\u00e7\u00f5es pessoais"
+      "type": "string"
     },
     "telegram_chat_id": {
-      "type": "string",
-      "description": "Chat ID do grupo/canal Telegram"
-    },
-    "data_inscricao": {
-      "type": "string",
-      "format": "date-time",
-      "description": "Data e hora da inscri\u00e7\u00e3o no sistema"
-    },
-    "api_key": {
-      "type": "string",
-      "description": "API Key pessoal para autentica\u00e7\u00e3o do agente local"
+      "type": "string"
     },
     "timezone": {
       "type": "string",
-      "default": "Europe/London",
-      "description": "Timezone preferida do utilizador (IANA, ex: America/Sao_Paulo)"
+      "default": "Europe/London"
+    },
+    "api_key": {
+      "type": "string"
     }
   },
   "required": []

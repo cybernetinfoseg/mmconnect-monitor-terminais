@@ -1,46 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { resolvePermissions } from '@/components/auth/usePermissions.jsx';
+import { resolvePermissions, NAV_MODULES, BOTTOM_NAV_ITEMS, ROLE_LABELS, ROLE_COLORS, filterNavModules } from '@/components/auth/usePermissions.jsx';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from './utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { 
-  LayoutDashboard, 
-  Monitor, 
-  History, 
-  AlertTriangle,
-  Tv,
-  Menu,
-  ChevronLeft,
-  Bell,
-  Shield,
-  Settings,
-  ClipboardList,
-  LogOut,
-  User,
-  Wrench,
-  FileBarChart2,
-  CalendarClock,
-  MapPin,
-  Users,
-  Fingerprint,
-  Share2,
-  Building2,
-  CalendarOff,
-  Clock,
-  Briefcase,
-  FileSignature,
-  Palmtree,
-  TrendingUp,
-  Archive,
-  LayoutGrid,
-  Banknote,
-  FileText,
-  DoorOpen,
-  UserCheck,
-  BarChart3,
-  Activity,
-  BookOpen
+  Menu, ChevronLeft, LogOut, User, LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -49,64 +14,6 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import PendingApproval from './components/auth/PendingApproval';
 import { useRequireAuth } from './components/auth/useRequireAuth';
 import SidebarClock from './components/dashboard/SidebarClock';
-
-const NAV_MODULES = [
-  {
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-    items: [
-      { name: 'Executivo', page: 'DashboardExecutivo', icon: TrendingUp },
-      { name: 'Operacional', page: 'Dashboard', icon: LayoutDashboard },
-      { name: 'Técnico', page: 'DashboardTecnico', icon: Activity },
-    ]
-  },
-  {
-    label: 'Monitoramento',
-    icon: Monitor,
-    items: [
-      { name: 'Terminais', page: 'Terminais', icon: Monitor },
-      { name: 'Mapa', page: 'Mapa', icon: MapPin },
-      { name: 'Incidentes', page: 'Incidents', icon: AlertTriangle },
-      { name: 'Alertas', page: 'Alertas', icon: Bell },
-      { name: 'Modo TV', page: 'TVMode', icon: Tv },
-    ]
-  },
-  {
-    label: 'Operações',
-    icon: Briefcase,
-    items: [
-      { name: 'Recursos Humanos', page: 'RH', icon: Briefcase },
-      { name: 'Controlo de Acesso', page: 'AcessoHub', icon: Shield },
-      { name: 'Visitantes', page: 'Visitantes', icon: UserCheck },
-    ]
-  },
-  {
-    label: 'Integrações',
-    icon: Share2,
-    items: [
-      { name: 'Agentes', page: 'AgentesLocais', icon: Wrench },
-      { name: 'Exportação', page: 'ExportacaoMarcacoes', icon: Share2, adminOnly: true },
-    ]
-  },
-  {
-    label: 'Administração',
-    icon: Settings,
-    items: [
-      { name: 'Usuários', page: 'Utilizadores', icon: Users },
-      { name: 'API Keys', page: 'Administracao', icon: Shield, adminOnly: true },
-      { name: 'Auditoria', page: 'Auditoria', icon: ClipboardList },
-      { name: 'Configurações', page: 'Configuracoes', icon: Settings },
-    ]
-  },
-];
-
-// Pages shown in the bottom bar on mobile
-const bottomNavItems = [
-  { name: 'Início', page: 'DashboardExecutivo', icon: LayoutDashboard },
-  { name: 'Terminais', page: 'Terminais', icon: Monitor },
-  { name: 'RH', page: 'RH', icon: Briefcase },
-  { name: 'Agentes', page: 'AgentesLocais', icon: Wrench },
-];
 
 // Root pages (no back button)
 const rootPages = ['DashboardExecutivo', 'Dashboard', 'DashboardTecnico', 'TVMode'];
@@ -162,7 +69,8 @@ export default function Layout({ children, currentPageName }) {
   }
 
   // Admins are always approved; non-admins must have aprovado === true
-  const isPending = currentUser && currentUser.role !== 'admin' && !currentUser.aprovado;
+  // Only super_admin and admin are auto-approved; others need explicit approval
+  const isPending = currentUser && !perms.isAdmin && !currentUser.aprovado;
   if (isPending) {
     return <PendingApproval user={currentUser} />;
   }
@@ -208,15 +116,12 @@ export default function Layout({ children, currentPageName }) {
     });
   };
 
-  // Filter nav items based on user permissions
-  const filteredModules = NAV_MODULES.map(mod => ({
-    ...mod,
-    items: mod.items.filter(item => {
-      if (!currentUser) return false;
-      if (item.adminOnly && !perms.isAdmin) return false;
-      return perms.paginas_permitidas.includes(item.page);
-    })
-  })).filter(mod => mod.items.length > 0);
+  // Filter nav items based on user role
+  const filteredModules = filterNavModules(NAV_MODULES, perms.role);
+  const filteredBottomNav = BOTTOM_NAV_ITEMS.filter(item => {
+    const allowed = item.roles || ['super_admin'];
+    return allowed.includes(perms.role);
+  });
 
   const Sidebar = ({ onClose }) => (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900">
@@ -268,13 +173,23 @@ export default function Layout({ children, currentPageName }) {
       <div className="p-3 border-t border-slate-200 dark:border-slate-700 space-y-2">
         <SidebarClock />
         {currentUser && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
-            <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center shrink-0">
-              <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800">
+              <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center shrink-0">
+                <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">{currentUser.full_name || currentUser.email}</p>
+                <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-medium text-slate-700 dark:text-slate-300 truncate">{currentUser.full_name || currentUser.email}</p>
-              <p className="text-[10px] text-slate-400 truncate">{currentUser.email}</p>
+            <div className="flex items-center gap-1 px-2">
+              <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-medium", ROLE_COLORS[perms.role] || ROLE_COLORS.viewer)}>
+                {ROLE_LABELS[perms.role] || perms.role}
+              </span>
+              {currentUser.tenant_nome && (
+                <span className="text-[10px] text-slate-400 truncate">· {currentUser.tenant_nome}</span>
+              )}
             </div>
           </div>
         )}
@@ -328,7 +243,7 @@ export default function Layout({ children, currentPageName }) {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-stretch">
-          {bottomNavItems.map((item) => {
+          {filteredBottomNav.map((item) => {
             const isActive = currentPageName === item.page;
             const Icon = item.icon;
             return (

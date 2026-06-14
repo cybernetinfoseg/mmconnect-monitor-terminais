@@ -4,45 +4,56 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import {
   Building2, Monitor, Users, Activity, TrendingUp,
-  AlertTriangle, Clock, Wifi, WifiOff, MapPin, Shield,
-  BarChart3, ArrowUpRight, ArrowDownRight
+  AlertTriangle, Wifi, WifiOff, MapPin,
 } from 'lucide-react';
 
 export default function DashboardExecutivo() {
   const [currentUser, setCurrentUser] = useState(null);
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
 
+  const perms = resolvePermissions(currentUser);
+  const userTenantId = perms.tenant_id;
+
   const { data: terminals = [] } = useQuery({
-    queryKey: ['terminals-exec'],
+    queryKey: ['terminals-exec', userTenantId],
     queryFn: () => base44.entities.Terminal.list('nome'),
     enabled: !!currentUser,
   });
   const { data: colaboradores = [] } = useQuery({
-    queryKey: ['colab-exec'],
+    queryKey: ['colab-exec', userTenantId],
     queryFn: () => base44.entities.Colaborador.list('-created_date', 500),
     enabled: !!currentUser,
   });
   const { data: incidents = [] } = useQuery({
-    queryKey: ['incidents-exec'],
+    queryKey: ['incidents-exec', userTenantId],
     queryFn: () => base44.entities.AlertIncident.list('-created_date', 100),
     enabled: !!currentUser,
   });
   const { data: sites = [] } = useQuery({
-    queryKey: ['sites-exec'],
+    queryKey: ['sites-exec', userTenantId],
     queryFn: () => base44.entities.Site.list('nome'),
     enabled: !!currentUser,
   });
   const { data: tenants = [] } = useQuery({
-    queryKey: ['tenants-exec'],
+    queryKey: ['tenants-exec', userTenantId],
     queryFn: () => base44.entities.Tenant.list('nome'),
     enabled: !!currentUser,
   });
 
-  const online = terminals.filter(t => t.status === 'online').length;
-  const offline = terminals.filter(t => t.status !== 'online').length;
-  const totalTerminais = terminals.length;
+  // Multi-tenant filtering
+  const filteredSites = perms.isSuperAdmin ? sites : sites.filter(s => s.tenant_id === userTenantId);
+  const filteredTenants = perms.isSuperAdmin ? tenants : tenants.filter(t => t.id === userTenantId);
+  const filteredTerminals = perms.isSuperAdmin ? terminals : terminals.filter(t => {
+    const site = sites.find(s => s.id === t.site_id);
+    return site?.tenant_id === userTenantId;
+  });
+
+  const online = filteredTerminals.filter(t => t.status === 'online').length;
+  const offline = filteredTerminals.filter(t => t.status !== 'online').length;
+  const totalTerminais = filteredTerminals.length;
   const uptime = totalTerminais > 0 ? Math.round((online / totalTerminais) * 100) : 0;
   const ativos = colaboradores.filter(c => c.ativo !== false).length;
 
@@ -72,8 +83,8 @@ export default function DashboardExecutivo() {
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
-            { label: 'Tenants', value: tenants.length, icon: Building2, color: 'bg-violet-50 border-violet-200', text: 'text-violet-700', iconColor: 'text-violet-600' },
-            { label: 'Sites', value: sites.length, icon: MapPin, color: 'bg-blue-50 border-blue-200', text: 'text-blue-700', iconColor: 'text-blue-600' },
+          { label: 'Tenants', value: filteredTenants.length, icon: Building2, color: 'bg-violet-50 border-violet-200', text: 'text-violet-700', iconColor: 'text-violet-600' },
+          { label: 'Sites', value: filteredSites.length, icon: MapPin, color: 'bg-blue-50 border-blue-200', text: 'text-blue-700', iconColor: 'text-blue-600' },
             { label: 'Terminais', value: totalTerminais, icon: Monitor, color: 'bg-teal-50 border-teal-200', text: 'text-teal-700', iconColor: 'text-teal-600' },
             { label: 'Colaboradores', value: ativos, icon: Users, color: 'bg-amber-50 border-amber-200', text: 'text-amber-700', iconColor: 'text-amber-600' },
             { label: 'Online', value: online, icon: Wifi, color: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', iconColor: 'text-emerald-600' },
@@ -144,7 +155,7 @@ export default function DashboardExecutivo() {
         </div>
 
         {/* Sites overview */}
-        {sites.length > 0 && (
+        {filteredSites.length > 0 && (
           <Card className="bg-white border-slate-200">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -152,8 +163,8 @@ export default function DashboardExecutivo() {
                 <h2 className="font-semibold text-slate-800 text-sm">Sites</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {sites.map(site => {
-                  const siteTerminals = terminals.filter(t => t.site_id === site.id);
+                {filteredSites.map(site => {
+                  const siteTerminals = filteredTerminals.filter(t => t.site_id === site.id);
                   const siteOnline = siteTerminals.filter(t => t.status === 'online').length;
                   return (
                     <div key={site.id} className="border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors">
