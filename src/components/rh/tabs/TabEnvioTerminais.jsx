@@ -3,8 +3,10 @@ import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import {
   Send, Search, Loader2, CheckCircle2, XCircle,
-  Monitor, Users, Building2, ChevronDown, ChevronUp, Trash2, RefreshCw, Camera
+  Monitor, Users, Building2, ChevronDown, ChevronUp, Trash2, RefreshCw, Camera, ArrowUpDown
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import SyncBidirectional from '@/components/rh/SyncBidirectional';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -243,6 +245,9 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
   const [allProgress, setAllProgress] = useState(null);
   const [allResults, setAllResults] = useState(null);
 
+  // Sync dialog
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+
   const { data: terminals = [] } = useQuery({
     queryKey: ['terminals-rh-envio'],
     queryFn: () => base44.entities.Terminal.list('nome'),
@@ -437,6 +442,14 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
 
   return (
     <div className="space-y-4">
+      {/* Sync button */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-sm font-medium text-slate-700">Envio de colaboradores para os terminais biométricos</p>
+        <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSyncDialogOpen(true)}>
+          <ArrowUpDown className="h-3.5 w-3.5" /> Sincronizar
+        </Button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <Card className="bg-white border-slate-200">
@@ -650,6 +663,17 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Sync Dialog */}
+      <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Sincronizacao com Terminais Timmy</DialogTitle></DialogHeader>
+          <SyncBidirectional terminals={terminals} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
+          <div className="flex justify-end pt-3 border-t border-slate-100">
+            <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>Fechar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

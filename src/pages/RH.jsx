@@ -41,7 +41,7 @@ import TabPayroll from '@/components/rh/tabs/TabPayroll';
 import TabContratos from '@/components/rh/tabs/TabContratos';
 import TabBaixasJustificacoes from '@/components/rh/tabs/TabBaixasJustificacoes';
 import TabEnvioTerminais from '@/components/rh/tabs/TabEnvioTerminais';
-import SyncBidirectional from '@/components/rh/SyncBidirectional';
+
 import FeriasTab from '@/components/rh/FeriasTab';
 
 import { calcularDia, fmtMin } from '@/lib/calculoHoras';
@@ -201,7 +201,6 @@ export default function RH() {
   const [colEditingId, setColEditingId] = useState(null);
   const [colFormData, setColFormData] = useState({});
   const [colDeleteId, setColDeleteId] = useState(null);
-  const [colSyncDialog, setColSyncDialog] = useState(false);
 
   const syncColabToTerminal = async (colData) => {
     const enrollid = Number(colData.enrollid);
@@ -825,9 +824,6 @@ export default function RH() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setColSyncDialog(true)}>
-                  <ArrowUpDown className="h-3.5 w-3.5" /> Sincronizar
-                </Button>
                 <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => handleExportColabCSV()}>
                   <FileDown className="h-3.5 w-3.5" /> Exportar CSV
                 </Button>
@@ -1659,17 +1655,6 @@ export default function RH() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Sincronizacao dialog */}
-      <Dialog open={colSyncDialog} onOpenChange={(open) => setColSyncDialog(open)}>
-        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Sincronizacao com Terminais Timmy</DialogTitle></DialogHeader>
-          <SyncBidirectional terminals={terminals} colaboradores={colaboradores.filter(c => c.ativo !== false)} />
-          <div className="flex justify-end pt-3 border-t border-slate-100">
-            <Button variant="outline" onClick={() => setColSyncDialog(false)}>Fechar</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
 
 
