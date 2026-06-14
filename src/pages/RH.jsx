@@ -84,7 +84,8 @@ const STATUS_PONTO = {
 const TIPO_MARCACAO_COLORS = { entrada: 'bg-emerald-100 text-emerald-700 border-emerald-200', saida: 'bg-rose-100 text-rose-700 border-rose-200', desconhecido: 'bg-slate-100 text-slate-600 border-slate-200' };
 
 function parseDias(str) { try { return JSON.parse(str || '[]'); } catch { return []; } }
-function fmtHora(ts, tz) { if (!ts) return '—'; return new Date(ts).toLocaleTimeString('pt-PT', { timeZone: tz || 'UTC', hour: '2-digit', minute: '2-digit' }); }
+function fmtHora(ts) { if (!ts) return '—'; const raw = ts.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, ''); const d = new Date(raw); if (isNaN(d.getTime())) return ts; return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' }); }
+function fmtDataHora(ts) { if (!ts) return '—'; const raw = ts.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, ''); const d = new Date(raw); if (isNaN(d.getTime())) return ts; return d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
 function calcDiasUteis(inicio, fim) {
   if (!inicio || !fim) return 0;
   try { return eachDayOfInterval({ start: parseISO(inicio), end: parseISO(fim) }).filter(d => !isWeekend(d)).length; }
@@ -484,7 +485,7 @@ export default function RH() {
   const handleExportMarcacoesCSV = () => {
     const headers = ['Data/Hora', 'Terminal', 'ID', 'Utilizador', 'Tipo', 'Modo'];
     const rows = marcacoesFiltered.map(m => [
-      m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '',
+      fmtDataHora(m.timestamp),
       m.terminal_nome || '', m.enrollid, m.utilizador_nome || userMap[m.enrollid] || '', m.tipo || '', m.modo || '',
     ]);
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -566,7 +567,7 @@ export default function RH() {
     const headers = ['Nome', 'ID', 'Estado', 'Entrada Real', 'Saída Real', 'Entrada Prev.', 'Saída Prev.', 'Atraso', 'Hora Extra', 'Efectivas'];
     const rows = pontoFiltered.map(l => [
       l.u.nome, l.u.enrollid, STATUS_PONTO[l.status]?.label || l.status,
-      fmtHora(l.primeira?.timestamp, userTimezone), fmtHora(l.ultima?.tipo === 'saida' ? l.ultima?.timestamp : null, userTimezone),
+      fmtHora(l.primeira?.timestamp), fmtHora(l.ultima?.tipo === 'saida' ? l.ultima?.timestamp : null),
       l.horario?.hora_entrada || '', l.horario?.hora_saida || '',
       l.calc.minutosAtraso > 0 ? fmtMin(l.calc.minutosAtraso) : '', l.calc.minutosExtra > 0 ? fmtMin(l.calc.minutosExtra) : '', fmtMin(l.calc.minutosEfetivos),
     ]);
@@ -1153,7 +1154,7 @@ export default function RH() {
                             const modeInfo = getModeInfo(m.modo, m.raw_mode);
                             return (
                               <tr key={m.id || i} className="hover:bg-slate-50 group">
-                                <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{m.timestamp ? new Date(m.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</td>
+                                <td className="px-4 py-2.5 font-mono text-xs text-slate-600 whitespace-nowrap">{fmtDataHora(m.timestamp)}</td>
                                 <td className="px-4 py-2.5 text-xs font-medium text-slate-800">{m.terminal_nome || '—'}</td>
                                 <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{m.enrollid}</td>
                                 <td className="px-4 py-2.5 text-xs font-medium text-slate-700">{nome}</td>
@@ -1269,9 +1270,9 @@ export default function RH() {
                               <td className="px-3 py-3 text-center">
                                 <Badge className={cn('text-[10px] px-2 py-0.5 border gap-1', cfg?.color)}>{Icon && <Icon className="h-3 w-3" />}{cfg?.label || status}</Badge>
                               </td>
-                              <td className="px-3 py-3 text-center font-mono text-slate-700">{primeira ? fmtHora(primeira.timestamp, userTimezone) : <span className="text-slate-200">—</span>}</td>
+                              <td className="px-3 py-3 text-center font-mono text-slate-700">{primeira ? fmtHora(primeira.timestamp) : <span className="text-slate-200">—</span>}</td>
                               <td className="px-3 py-3 text-center font-mono text-slate-700">
-                                {calc.aindaDentro && !saidaReal ? <span className="text-emerald-500 animate-pulse text-[10px]">● dentro</span> : saidaReal ? fmtHora(saidaReal, userTimezone) : <span className="text-slate-200">—</span>}
+                                {calc.aindaDentro && !saidaReal ? <span className="text-emerald-500 animate-pulse text-[10px]">● dentro</span> : saidaReal ? fmtHora(saidaReal) : <span className="text-slate-200">—</span>}
                               </td>
                               <td className="px-3 py-3 text-center">{calc.minutosAtraso > 0 ? <span className="font-semibold text-amber-600">+{fmtMin(calc.minutosAtraso)}</span> : <span className="text-slate-200">—</span>}</td>
                               <td className="px-3 py-3 text-center">{calc.minutosExtra > 0 ? <span className="font-semibold text-violet-600">{fmtMin(calc.minutosExtra)}</span> : <span className="text-slate-200">—</span>}</td>

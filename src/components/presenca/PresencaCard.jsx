@@ -18,8 +18,13 @@ export default function PresencaCard({ pessoa, timezone, horarioMap, ausenciaAti
     return () => clearInterval(t);
   }, [dentro]);
 
-  const fmtTime = (ts) =>
-    ts ? new Date(ts).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', timeZone: timezone || 'UTC' }) : '—';
+  const fmtTime = (ts) => {
+    if (!ts) return '—';
+    const raw = ts.replace(/Z$/, '').replace(/[+-]\d{2}:\d{2}$/, '');
+    const d = new Date(raw);
+    if (isNaN(d.getTime())) return ts;
+    return d.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+  };
 
   // Encontrar horário do colaborador
   const horario = pessoa.horario_id ? horarioMap?.[pessoa.horario_id] : null;
