@@ -767,7 +767,7 @@ Deno.serve(async (req) => {
 
     const isAdmin = user.role === 'admin';
     // Ações de gestão de utilizadores (adduser/deleteuser) são permitidas a qualquer utilizador autenticado
-    const isUserManagementAction = ['adduser', 'deleteuser', 'blockuser', 'getuserlist', 'getuserinfo', 'setuserphoto'].includes(action);
+    const isUserManagementAction = ['adduser', 'deleteuser', 'blockuser', 'getuserlist', 'getuserinfo', 'setuserphoto', 'exportusers'].includes(action);
     if (!isAdmin && !isUserManagementAction && terminal.created_by !== user.email && terminal.usuario_email !== user.email) {
       return Response.json({ error: 'Sem permissão para controlar este terminal' }, { status: 403 });
     }
