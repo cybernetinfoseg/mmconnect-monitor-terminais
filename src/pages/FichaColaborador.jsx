@@ -33,7 +33,7 @@ export default function FichaColaborador() {
     base44.auth.me().then(setCurrentUser).catch(() => {});
   }, []);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
 
   const { data: colaboradores = [], isLoading } = useQuery({
     queryKey: ['colaboradores'],

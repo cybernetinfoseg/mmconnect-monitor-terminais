@@ -38,7 +38,7 @@ export default function HorasExtra() {
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
 
   const { data: registos = [], isLoading } = useQuery({
     queryKey: ['horas-extra', anoFilter],

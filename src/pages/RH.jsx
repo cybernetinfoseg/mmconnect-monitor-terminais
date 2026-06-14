@@ -3,6 +3,8 @@ import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
+import useTenantContext from '@/hooks/useTenantContext';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { cn } from '@/lib/utils';
 import { addDays, differenceInDays, parseISO, format, differenceInYears } from 'date-fns';
 
@@ -115,9 +117,10 @@ export default function RH() {
   const [currentUser, setCurrentUser] = useState(null);
   const { timezone: userTimezone } = useUserTimezone();
   const queryClient = useQueryClient();
+  const { perms } = useTenantContext();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
   const hoje = new Date().toLocaleDateString('en-CA', { timeZone: userTimezone || 'UTC' });
 
   // ── Shared data ──────────────────────────────
@@ -664,13 +667,24 @@ export default function RH() {
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
         {/* Header */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="p-3 bg-blue-100 rounded-xl">
             <Users className="h-6 w-6 text-blue-600" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-slate-900">Recursos Humanos</h1>
             <p className="text-sm text-slate-500">Centro de gestão de colaboradores, ponto, horários e férias</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {!perms.isSuperAdmin && currentUser?.tenant_nome && (
+              <Badge className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border-blue-200">
+                <Building2 className="h-3 w-3 mr-1" />
+                {currentUser.tenant_nome}
+              </Badge>
+            )}
+            <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+              {ROLE_LABELS[perms.role] || perms.role}
+            </Badge>
           </div>
         </div>
 

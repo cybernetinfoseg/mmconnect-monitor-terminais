@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { useUserTimezone } from '@/hooks/useUserTimezone';
+import useTenantContext from '@/hooks/useTenantContext';
+import { ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 import { Users, LogIn, LogOut, Clock, Search, RefreshCw, Building2, Moon, TrendingUp, CalendarOff, AlertTriangle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,7 +19,7 @@ export default function Presenca() {
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
 
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
 
   const { data: marcacoes = [], isLoading, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['presenca-marcacoes'],
@@ -209,7 +211,7 @@ export default function Presenca() {
             <div className="p-2.5 bg-emerald-100 rounded-xl shrink-0">
               <Building2 className="h-5 w-5 text-emerald-600" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">Presença em Tempo Real</h1>
               <p className="text-xs text-slate-500">
                 Hoje · Atualizado {dataUpdatedAt

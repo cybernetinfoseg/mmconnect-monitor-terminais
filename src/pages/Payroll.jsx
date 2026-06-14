@@ -72,7 +72,7 @@ export default function Payroll() {
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
-  const isAdmin = currentUser?.role === 'admin';
+  const isAdmin = ['admin', 'super_admin'].includes(currentUser?.role);
 
   const qKey = ['payroll', ano, mes];
 
