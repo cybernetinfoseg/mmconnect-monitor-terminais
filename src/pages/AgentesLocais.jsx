@@ -8,10 +8,12 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
+import useTenantContext from '@/hooks/useTenantContext';
 import {
   Wrench, Cpu, HardDrive, Monitor, Plus, Trash2,
   RefreshCw, Search, Wifi, WifiOff, ExternalLink,
-  Clock, Calendar, Server
+  Clock, Calendar, Server, Building2
 } from 'lucide-react';
 
 export default function AgentesLocais() {
@@ -20,6 +22,8 @@ export default function AgentesLocais() {
   const queryClient = useQueryClient();
 
   useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
+
+  const { perms } = useTenantContext();
 
   const { data: agents = [], isLoading } = useQuery({
     queryKey: ['agents-list'],
@@ -43,13 +47,25 @@ export default function AgentesLocais() {
     onSuccess: () => { queryClient.invalidateQueries(['agents-list']); toast.success('Agente removido'); },
   });
 
-  const filtered = agents.filter(a => {
+  // Multi-tenant filtering
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const userTenantId = currentUser?.tenant_id;
+
+  const tenantFiltered = isSuperAdmin ? agents : agents.filter(a => {
+    if (!userTenantId) return false;
+    return a.tenant_id === userTenantId;
+  });
+
+  const filtered = tenantFiltered.filter(a => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (a.hostname || '').toLowerCase().includes(q) ||
            (a.tenant_nome || '').toLowerCase().includes(q) ||
            (a.ip_local || '').includes(q);
   });
+
+  // Use tenant-filtered agents for stats
+  const displayAgents = tenantFiltered;
 
   const tenantMap = {};
   tenants.forEach(t => { tenantMap[t.id] = t.nome; });
@@ -65,9 +81,22 @@ export default function AgentesLocais() {
             <div className="p-3 bg-violet-100 rounded-xl">
               <Wrench className="h-6 w-6 text-violet-600" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Agentes Locais</h1>
-              <p className="text-sm text-slate-500">Gestão de agentes de monitoramento instalados nos sites</p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">Agentes Locais</h1>
+                <p className="text-sm text-slate-500">Gestão de agentes de monitoramento instalados nos sites</p>
+              </div>
+              {!perms?.isSuperAdmin && currentUser?.tenant_nome && (
+                <Badge className="text-xs px-2 py-1 bg-violet-50 text-violet-700 border-violet-200">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  {currentUser.tenant_nome}
+                </Badge>
+              )}
+              {perms?.role && (
+                <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+                  {ROLE_LABELS[perms.role] || perms.role}
+                </Badge>
+              )}
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries(['agents-list'])} className="gap-1.5 text-xs">
@@ -78,10 +107,10 @@ export default function AgentesLocais() {
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total', value: agents.length, icon: Server, color: 'bg-slate-50 border-slate-200 text-slate-700' },
-            { label: 'Online', value: agents.filter(a => a.status === 'online').length, icon: Wifi, color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
-            { label: 'Offline', value: agents.filter(a => a.status !== 'online').length, icon: WifiOff, color: 'bg-red-50 border-red-200 text-red-700' },
-            { label: 'Heartbeat <5min', value: agents.filter(a => {
+            { label: 'Total', value: displayAgents.length, icon: Server, color: 'bg-slate-50 border-slate-200 text-slate-700' },
+            { label: 'Online', value: displayAgents.filter(a => a.status === 'online').length, icon: Wifi, color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+            { label: 'Offline', value: displayAgents.filter(a => a.status !== 'online').length, icon: WifiOff, color: 'bg-red-50 border-red-200 text-red-700' },
+            { label: 'Heartbeat <5min', value: displayAgents.filter(a => {
               if (!a.ultimo_heartbeat) return false;
               return (now - new Date(a.ultimo_heartbeat)) < 5 * 60 * 1000;
             }).length, icon: Clock, color: 'bg-blue-50 border-blue-200 text-blue-700' },

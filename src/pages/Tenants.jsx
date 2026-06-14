@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Building2, Plus, Search, Edit, Trash2, Users, MapPin, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { resolvePermissions, ROLE_LABELS, ROLE_COLORS } from '@/components/auth/usePermissions.jsx';
 
 const STATUS_LABELS = { ativo: 'Ativo', inativo: 'Inativo', trial: 'Trial', suspenso: 'Suspenso' };
 const STATUS_COLORS = {
@@ -67,9 +68,15 @@ export default function Tenants() {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl shadow-lg"><Building2 className="h-5 w-5 text-white" /></div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Tenants</h1>
-              <p className="text-sm text-slate-500">Gestão de clientes e organizações</p>
+            <div className="flex items-center gap-3">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900">Tenants</h1>
+                <p className="text-sm text-slate-500">Gestão de clientes e organizações</p>
+              </div>
+              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS.super_admin || 'bg-violet-100 text-violet-700')}>
+                <Building2 className="h-3 w-3 mr-1" />
+                Super Admin
+              </Badge>
             </div>
           </div>
           <Button onClick={openCreate} className="bg-violet-600 hover:bg-violet-700 gap-2"><Plus className="h-4 w-4" /> Novo Tenant</Button>

@@ -45,8 +45,8 @@ export default function Administracao() {
     refetchInterval: 15000,
   });
 
-  const pendingUsers = users.filter(u => u.role !== 'admin' && !u.aprovado);
-  const approvedUsers = users.filter(u => u.role === 'admin' || u.aprovado);
+  const pendingUsers = users.filter(u => u.role !== 'admin' && u.role !== 'super_admin' && !u.aprovado);
+  const approvedUsers = users.filter(u => u.role === 'admin' || u.role === 'super_admin' || u.aprovado);
 
   const approveMutation = useMutation({
     mutationFn: async ({ id, data }) => {

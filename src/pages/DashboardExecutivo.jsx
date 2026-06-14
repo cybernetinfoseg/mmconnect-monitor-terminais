@@ -74,6 +74,17 @@ export default function DashboardExecutivo() {
               <h1 className="text-2xl font-bold text-slate-900">Dashboard Executivo</h1>
               <p className="text-sm text-slate-500">Visão estratégica da plataforma</p>
             </div>
+            <div className="flex items-center gap-2">
+              {!perms.isSuperAdmin && currentUser?.tenant_nome && (
+                <Badge className="text-xs px-2 py-1 bg-violet-50 text-violet-700 border-violet-200">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  {currentUser.tenant_nome}
+                </Badge>
+              )}
+              <Badge className={cn('text-xs px-2 py-1', ROLE_COLORS[perms.role] || '')}>
+                {ROLE_LABELS[perms.role] || perms.role}
+              </Badge>
+            </div>
           </div>
           <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs px-3 py-1.5">
             {new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
