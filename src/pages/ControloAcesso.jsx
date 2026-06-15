@@ -59,6 +59,7 @@ export default function ControloAcesso() {
     refetchInterval: 15000,
   });
 
+  // Terminais suportados para controlo de acesso
   const terminaisAcesso = useMemo(() =>
     terminals.filter(t =>
       t.tipo_conexao === 'websocket_cloud' ||
@@ -115,160 +116,175 @@ export default function ControloAcesso() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 w-full flex flex-col">
-      {/* Header Interno do Controlo de Acesso */}
-      <div className="w-full border-b border-slate-200 bg-white px-6 py-4 flex items-center justify-between shrink-0">
+    <div className="h-full w-full bg-slate-50 flex flex-col overflow-hidden">
+      
+      {/* Top Header */}
+      <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-900 rounded-lg shrink-0">
-            <Shield className="h-4 w-4 text-emerald-400" />
+          <div className="p-2 bg-slate-900 rounded-lg">
+            <Shield className="h-5 w-5 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-900">Controlo de Portas</h1>
+            <h1 className="text-lg font-bold text-slate-900">Controlo de Acesso</h1>
             <p className="text-xs text-slate-500">Gestão centralizada de acessos, zonas, visitantes e planta</p>
           </div>
         </div>
         {terminal && (
-          <span className={cn(
-            'flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border font-medium transition-all',
-            terminal.status === 'online'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-              : 'bg-red-50 border-red-200 text-red-700'
-          )}>
-            {terminal.status === 'online' ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {terminal.status === 'online' ? 'Online' : 'Offline'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              'flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border font-medium shadow-sm',
+              terminal.status === 'online'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            )}>
+              {terminal.status === 'online' ? <Wifi className="h-3 w-3 animate-pulse" /> : <WifiOff className="h-3 w-3" />}
+              {terminal.status === 'online' ? 'Online' : 'Offline'}
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Grid Principal — Ocupa o restante do espaço disponível dentro do enquadramento azul */}
-      <div className="flex-1 overflow-hidden grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-        
-        {/* Coluna Esquerda — Lista de Terminais (Ocupa toda a altura vertical disponível) */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col min-h-0 h-full shadow-sm">
-          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Monitor className="h-3.5 w-3.5" /> Terminais
-          </h3>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-1 custom-scrollbar">
+      {/* Main Container - Enquadramento Azul */}
+      <div className="flex flex-1 overflow-hidden p-4 gap-4 h-[calc(100vh-140px)]">
+
+        {/* Coluna Esquerda: Lista de Terminais (Sempre Ativa) */}
+        <div className="w-80 bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden shadow-sm shrink-0">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+            <Monitor className="h-4 w-4 text-slate-600" />
+            <h3 className="text-sm font-semibold text-slate-700">Terminais</h3>
+            <Badge variant="secondary" className="ml-auto text-[10px]">{terminaisAcesso.length}</Badge>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {terminaisAcesso.map(t => (
               <button
                 key={t.id}
                 onClick={() => { setSelectedTerminal(t); setDoorState('normal'); }}
                 className={cn(
-                  'w-full flex items-center gap-2.5 p-3 rounded-lg text-left transition-all border',
+                  'w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all border border-transparent',
                   selectedTerminal?.id === t.id
-                    ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                    : 'bg-white border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-100'
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-md'
+                    : 'text-slate-700 hover:bg-slate-50 hover:border-slate-100'
                 )}
               >
-                <div className={cn('w-2 h-2 rounded-full shrink-0', t.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300')} />
+                <div className={cn('w-2.5 h-2.5 rounded-full shrink-0 shadow-sm', t.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300')} />
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold truncate">{t.nome}</p>
-                  <p className="text-[10px] opacity-60 truncate mt-0.5">{t.local || t.fabricante || t.tipo_conexao}</p>
+                  <p className={cn("text-[10px] truncate mt-0.5", selectedTerminal?.id === t.id ? "text-slate-400" : "text-slate-400")}>
+                    {t.local || t.fabricante || t.tipo_conexao}
+                  </p>
                 </div>
               </button>
             ))}
             {terminaisAcesso.length === 0 && (
-              <p className="text-slate-400 text-xs py-8 text-center">Nenhum terminal configurado.</p>
+              <p className="text-slate-400 text-xs py-8 text-center">Nenhum terminal encontrado.</p>
             )}
           </div>
         </div>
 
-        {/* Coluna Direita Dupla — Comandos no Topo (Vermelho) e Operações Recentes Abaixo (Verde) */}
-        <div className="lg:col-span-2 flex flex-col min-h-0 h-full gap-4">
+        {/* Conteúdo Dinâmico Centralizado */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           {terminal ? (
-            <>
-              {/* Bloco de Comandos (Antigo Retângulo Vermelho) */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shrink-0 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-slate-900 font-bold text-sm">{terminal.nome}</h2>
-                    <p className="text-slate-500 text-[11px]">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'} · {terminal.tipo_conexao}</p>
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
+              
+              {/* Bloco de Comandos (Ocupa 2 colunas horizontais para melhor enquadramento) */}
+              <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 flex flex-col justify-between overflow-y-auto shadow-sm">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                      <h2 className="text-slate-900 font-bold text-base">{terminal.nome}</h2>
+                      <p className="text-slate-500 text-xs">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'} · {terminal.tipo_conexao}</p>
+                    </div>
+                    <div className={cn(
+                      'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border shadow-sm',
+                      doorState === 'normal' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
+                      doorState === 'unlock' ? 'bg-amber-50 border-amber-200 text-amber-700' :
+                      doorState === 'lock'   ? 'bg-red-50 border-red-200 text-red-700' :
+                      'bg-blue-50 border-blue-200 text-blue-700'
+                    )}>
+                      {React.createElement(DOOR_STATES[doorState].icon, { className: 'h-3.5 w-3.5' })}
+                      {DOOR_STATES[doorState].label}
+                    </div>
                   </div>
-                  <div className={cn(
-                    'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border',
-                    doorState === 'normal' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' :
-                    doorState === 'unlock' ? 'bg-amber-50 border-amber-200 text-amber-700' :
-                    doorState === 'lock'   ? 'bg-red-50 border-red-200 text-red-700' :
-                    'bg-blue-50 border-blue-200 text-blue-700'
-                  )}>
-                    {React.createElement(DOOR_STATES[doorState].icon, { className: 'h-3.5 w-3.5' })}
-                    {DOOR_STATES[doorState].label}
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" loading={sending === 'opendoor{}'} onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
-                  <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} loading={sending === 'lockctrl{"fuc":1}'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} disabledReason="Apenas Timmy WS" />
-                  <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} loading={sending === 'lockctrl{"fuc":2}'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} disabledReason="Apenas Timmy WS" />
-                  <DoorButton icon={RotateCcw} label="Modo Normal" sublabel="Repor estado" color="slate" loading={sending === 'lockctrl{"fuc":4}'} disabled={!isTimmy} onClick={() => handleDoorAction('normal')} disabledReason="Apenas Timmy WS" />
-                  <DoorButton icon={BellOff} label="Cancelar Alarme" sublabel="Silenciar" color="violet" loading={sending === 'lockctrl{"fuc":6}'} disabled={!isTimmy} onClick={() => handleAlarm(true)} disabledReason="Apenas Timmy WS" />
-                  <DoorButton icon={Power} label="Reiniciar" sublabel="Reboot terminal" color="orange" loading={sending === 'reboot{}'} onClick={() => sendCmd('reboot', {}, 'Terminal a reiniciar...')} confirm="Tem a certeza que quer reiniciar o terminal?" />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" loading={sending === 'opendoor{}'} onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
+                    <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} loading={sending === 'lockctrl{"fuc":1}'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} disabledReason="Apenas Timmy WS" />
+                    <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} loading={sending === 'lockctrl{"fuc":2}'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} disabledReason="Apenas Timmy WS" />
+                    <DoorButton icon={RotateCcw} label="Modo Normal" sublabel="Repor estado" color="slate" loading={sending === 'lockctrl{"fuc":4}'} disabled={!isTimmy} onClick={() => handleDoorAction('normal')} disabledReason="Apenas Timmy WS" />
+                    <DoorButton icon={BellOff} label="Cancelar Alarme" sublabel="Silenciar" color="violet" loading={sending === 'lockctrl{"fuc":6}'} disabled={!isTimmy} onClick={() => handleAlarm(true)} disabledReason="Apenas Timmy WS" />
+                    <DoorButton icon={Power} label="Reiniciar" sublabel="Reboot terminal" color="orange" loading={sending === 'reboot{}'} onClick={() => sendCmd('reboot', {}, 'Terminal a reiniciar...')} confirm="Tem a certeza que quer reiniciar o terminal?" />
+                  </div>
                 </div>
               </div>
 
-              {/* Bloco de Operações Recentes — Agora posicionado ABAIXO dos comandos (Antigo Retângulo Verde) */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col min-h-0 flex-1 shadow-sm">
-                <div className="flex items-center justify-between mb-3 shrink-0">
-                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                    <Zap className="h-3.5 w-3.5 text-amber-500" /> Operações Recentes
+              {/* Coluna Verde (Operações Recentes) - Agora Posicionada ao Lado/Abaixo integrada */}
+              <div className="bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
+                  <h3 className="text-slate-900 font-semibold text-xs flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-amber-500" />
+                    Operações Recentes
                   </h3>
                   <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600" onClick={() => queryClient.invalidateQueries(['op-logs-acesso'])}>
-                    <RefreshCw className="h-3..5 w-3.5" />
+                    <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50/30">
                   {opLogs.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
-                      <p className="text-xs">Nenhum evento registado para este dispositivo.</p>
+                    <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
+                      <p className="text-xs">Sem operações registadas</p>
                     </div>
-                  ) : opLogs.map(log => (
-                    <div key={log.id} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-100 transition-colors hover:bg-slate-100/50">
-                      {log.sucesso ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /> : <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                          <Badge className="text-[9px] font-bold bg-slate-200 text-slate-600 px-1.5 py-0.5 border-none uppercase">{log.acao}</Badge>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}
-                          </span>
+                  ) : (
+                    opLogs.map(log => (
+                      <div key={log.id} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-slate-100 shadow-sm transition-all hover:border-slate-200">
+                        {log.sucesso ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /> : <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap justify-between">
+                            <Badge className="text-[9px] bg-slate-100 text-slate-600 border-slate-200 px-1.5 font-medium">{log.acao}</Badge>
+                            <span className="text-[9px] text-slate-400 font-mono">
+                              {log.timestamp ? new Date(log.timestamp).toLocaleString('pt-PT', { timeZone: userTimezone || 'UTC', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-700 mt-1 leading-relaxed break-words">{log.mensagem || '—'}</p>
                         </div>
-                        <p className="text-xs text-slate-700 mt-1 font-medium leading-relaxed">{log.mensagem || '—'}</p>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
-            </>
+
+            </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center border border-dashed border-slate-200 bg-white rounded-xl p-8 shadow-sm">
-              <Shield className="h-12 w-12 text-slate-200 mb-3 animate-pulse" />
-              <p className="text-slate-500 text-xs font-semibold">Nenhum Dispositivo Selecionado</p>
-              <p className="text-slate-400 text-[11px] max-w-xs mt-1">Escolha um terminal na árvore à esquerda para monitorizar as operações e disparar comandos remotos.</p>
+            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl bg-white p-8 text-center shadow-sm">
+              <Shield className="h-12 w-12 text-slate-300 mb-3" />
+              <p className="text-slate-500 text-sm font-medium">Selecione um terminal na barra lateral esquerda para iniciar o controlo e monitorização.</p>
             </div>
           )}
         </div>
 
       </div>
 
-      {/* Mobile Modal View */}
+      {/* Mobile Control Dialog Trigger */}
       {terminal && (
-        <Dialog open={mobileCmdOpen} onOpenChange={setMobileCmdOpen}>
-          <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{terminal.nome}</DialogTitle></DialogHeader>
-            <p className="text-xs text-slate-500 -mt-2">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'} · {terminal.tipo_conexao}</p>
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" loading={sending === 'opendoor{}'} onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
-              <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} loading={sending === 'lockctrl{"fuc":1}'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} disabledReason="Apenas Timmy WS" />
-              <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} loading={sending === 'lockctrl{"fuc":2}'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} disabledReason="Apenas Timmy WS" />
-              <DoorButton icon={RotateCcw} label="Modo Normal" sublabel="Repor estado" color="slate" loading={sending === 'lockctrl{"fuc":4}'} disabled={!isTimmy} onClick={() => handleDoorAction('normal')} disabledReason="Apenas Timmy WS" />
-              <DoorButton icon={BellOff} label="Cancelar Alarme" sublabel="Silenciar" color="violet" loading={sending === 'lockctrl{"fuc":6}'} disabled={!isTimmy} onClick={() => handleAlarm(true)} disabledReason="Apenas Timmy WS" />
-              <DoorButton icon={Power} label="Reiniciar" sublabel="Reboot terminal" color="orange" loading={sending === 'reboot{}'} onClick={() => sendCmd('reboot', {}, 'Terminal a reiniciar...')} confirm="Tem a certeza que quer reiniciar o terminal?" />
-            </div>
-            <div className="flex justify-end pt-2">
-              <Button variant="outline" size="sm" onClick={() => setMobileCmdOpen(false)}>Fechar</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <div className="lg:hidden p-4 bg-white border-t border-slate-200 shrink-0">
+          <Button onClick={() => setMobileCmdOpen(true)} className="w-full bg-slate-900 text-white text-xs">
+            Ver Painel de Controlo do Terminal
+          </Button>
+          <Dialog open={mobileCmdOpen} onOpenChange={setMobileCmdOpen}>
+            <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{terminal.nome}</DialogTitle></DialogHeader>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
+                <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} />
+                <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} />
+                <DoorButton icon={RotateCcw} label="Modo Normal" sublabel="Repor estado" color="slate" disabled={!isTimmy} onClick={() => handleDoorAction('normal')} />
+                <DoorButton icon={BellOff} label="Cancelar Alarme" color="violet" disabled={!isTimmy} onClick={() => handleAlarm(true)} />
+                <DoorButton icon={Power} label="Reiniciar" color="orange" onClick={() => sendCmd('reboot', {}, 'A reiniciar...')} confirm="Reiniciar terminal?" />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       )}
     </div>
   );
@@ -284,7 +300,6 @@ function DoorButton({ icon: Icon, label, sublabel, color, loading, onClick, disa
     slate:   { btn: 'bg-slate-600 hover:bg-slate-700 border-slate-500',   active: 'ring-2 ring-slate-400' },
     violet:  { btn: 'bg-violet-700 hover:bg-violet-800 border-violet-600',active: 'ring-2 ring-violet-400' },
     orange:  { btn: 'bg-orange-700 hover:bg-orange-800 border-orange-600',active: 'ring-2 ring-orange-400' },
-    blue:    { btn: 'bg-blue-700 hover:bg-blue-800 border-blue-600',      active: 'ring-2 ring-blue-400' },
   };
   const c = colorMap[color] || colorMap.slate;
 
@@ -302,13 +317,13 @@ function DoorButton({ icon: Icon, label, sublabel, color, loading, onClick, disa
         'flex flex-col items-center justify-center gap-1.5 p-3.5 rounded-xl border text-white transition-all shadow-sm',
         c.btn,
         active && c.active,
-        (disabled || loading) && 'opacity-40 cursor-not-allowed'
+        (disabled || loading) && 'opacity-30 cursor-not-allowed'
       )}
     >
       {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Icon className="h-5 w-5" />}
       <div className="text-center">
-        <p className="text-xs font-bold tracking-wide">{label}</p>
-        {sublabel && <p className="text-[10px] opacity-75 mt-0.5">{sublabel}</p>}
+        <p className="text-xs font-bold leading-tight">{label}</p>
+        {sublabel && <p className="text-[9px] opacity-70 mt-0.5">{sublabel}</p>}
       </div>
     </button>
   );
