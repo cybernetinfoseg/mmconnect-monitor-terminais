@@ -147,7 +147,7 @@ export default function ControloAcesso() {
         </div>
 
         {/* Main Grid Layout (Sempre visível para manter a coluna de seleção ativa) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_1fr] gap-5">
 
           {/* Coluna Esquerda — Lista de Terminais (Fica sempre visível à esquerda) */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 max-h-[70vh] overflow-y-auto">
