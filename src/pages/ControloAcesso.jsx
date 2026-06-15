@@ -59,7 +59,7 @@ export default function ControloAcesso() {
     refetchInterval: 15000,
   });
 
-  // Terminais suportados para controlo de acesso
+  // Terminais filtrados para controlo de acesso
   const terminaisAcesso = useMemo(() =>
     terminals.filter(t =>
       t.tipo_conexao === 'websocket_cloud' ||
@@ -116,13 +116,13 @@ export default function ControloAcesso() {
   };
 
   return (
-    <div className="w-full flex flex-col overflow-hidden bg-slate-50">
+    <div className="w-full bg-transparent flex flex-col overflow-hidden">
       
-      {/* Layout Principal em Duas Colunas Lado a Lado (Garante visibilidade contínua da lista) */}
-      <div className="w-full flex flex-row items-start gap-4 p-1">
+      {/* Grid Principal — Garante que a lista à esquerda nunca desaparece */}
+      <div className="w-full grid grid-cols-12 gap-4 items-start">
         
-        {/* COLUNA ESQUERDA: Sempre Visível e Ativa */}
-        <div className="w-72 md:w-80 bg-white border border-slate-200 rounded-xl p-4 flex flex-col max-h-[78vh] overflow-y-auto shrink-0 shadow-sm">
+        {/* COLUNA ESQUERDA: Lista de Terminais (Sempre Fixa e Ativa nas 12 Colunas) */}
+        <div className="col-span-12 lg:col-span-4 xl:col-span-3 bg-white border border-slate-200 rounded-xl p-4 flex flex-col max-h-[78vh] overflow-y-auto shadow-sm">
           <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
             <Monitor className="h-4 w-4 text-slate-500" /> Terminais
           </h3>
@@ -146,18 +146,18 @@ export default function ControloAcesso() {
               </button>
             ))}
             {terminaisAcesso.length === 0 && (
-              <p className="text-slate-500 text-xs py-4 text-center">Nenhum terminal disponível para controlo</p>
+              <p className="text-slate-500 text-xs py-4 text-center">Nenhum terminal disponível</p>
             )}
           </div>
         </div>
 
-        {/* COLUNA DIREITA: Área de Ação Dinâmica dos Comandos e Logs */}
-        <div className="flex-1 flex flex-col gap-4 max-h-[78vh]">
+        {/* COLUNA DIREITA: Área de Comandos e Logs Remotos */}
+        <div className="col-span-12 lg:col-span-8 xl:col-span-9 flex flex-col gap-4 max-h-[78vh]">
           {terminal ? (
             <>
-              {/* BLOCO SUPERIOR: Comandos Principais (Retângulo Vermelho) */}
+              {/* PAINEL DE COMANDOS (Aproveitamento total do Retângulo Vermelho) */}
               <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-sm shrink-0">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
                     <h2 className="text-slate-900 font-bold text-base">{terminal.nome}</h2>
                     <p className="text-slate-500 text-xs">{terminal.local} · {terminal.fabricante?.toUpperCase() || 'Terminal'} · {terminal.tipo_conexao}</p>
@@ -174,7 +174,8 @@ export default function ControloAcesso() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {/* Grelha de botões esticada para ocupar o máximo de espaço horizontal */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                   <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" loading={sending === 'opendoor{}'} onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
                   <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} loading={sending === 'lockctrl{"fuc":1}'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} disabledReason="Apenas Timmy WS" />
                   <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} loading={sending === 'lockctrl{"fuc":2}'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} disabledReason="Apenas Timmy WS" />
@@ -184,12 +185,17 @@ export default function ControloAcesso() {
                 </div>
               </div>
 
-              {/* BLOCO INFERIOR: Operações Recentes Integradas (Retângulo Verde) */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col flex-1 overflow-hidden shadow-sm">
+              {/* OPERAÇÕES RECENTES (Retângulo Verde perfeitamente acoplado abaixo dos comandos) */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col overflow-hidden shadow-sm min-h-[25vh]">
                 <div className="flex items-center justify-between mb-3 shrink-0">
-                  <h3 className="text-slate-900 font-semibold text-sm flex items-center gap-2"><Zap className="h-4 w-4 text-amber-500" />Operações Recentes</h3>
-                  <Button size="sm" variant="ghost" className="h-6 px-2 text-slate-400 hover:text-slate-600" onClick={() => queryClient.invalidateQueries(['op-logs-acesso'])}><RefreshCw className="h-3 w-3" /></Button>
+                  <h3 className="text-slate-900 font-semibold text-sm flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-amber-500" /> Operações Recentes
+                  </h3>
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-slate-400 hover:text-slate-600" onClick={() => queryClient.invalidateQueries(['op-logs-acesso'])}>
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
                 </div>
+                
                 <div className="space-y-1.5 flex-1 overflow-y-auto pr-1">
                   {opLogs.length === 0 ? (
                     <p className="text-slate-400 text-xs text-center py-6">Sem operações registadas</p>
@@ -213,19 +219,19 @@ export default function ControloAcesso() {
               </div>
             </>
           ) : (
-            /* Estado Inicial de Boas-vindas Dinâmico */
-            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl bg-white p-8 text-center min-h-[40vh] shadow-sm">
+            /* Estado Inicial: Ocupa a coluna direita com uma mensagem limpa até selecionar */
+            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl bg-white p-8 text-center min-h-[50vh] shadow-sm">
               <Shield className="h-12 w-12 text-slate-300 mb-3 animate-pulse" />
-              <p className="text-slate-500 text-sm font-medium">Selecione um terminal na barra lateral esquerda para gerir remotamente os acessos.</p>
+              <p className="text-slate-500 text-sm font-medium">Selecione um terminal na lista lateral para gerir os acessos.</p>
             </div>
           )}
         </div>
 
       </div>
 
-      {/* Suporte Mobile Opcional via Janela Dialog */}
+      {/* Mobile View Support */}
       {terminal && (
-        <div className="lg:hidden p-3 bg-white border-t border-slate-200 shrink-0">
+        <div className="lg:hidden p-3 bg-white border-t border-slate-200 shrink-0 mt-4">
           <Button onClick={() => setMobileCmdOpen(true)} className="w-full bg-slate-900 text-white text-xs">
             Abrir Comandos Remotos
           </Button>
@@ -272,7 +278,7 @@ function DoorButton({ icon: Icon, label, sublabel, color, loading, onClick, disa
       onClick={handleClick}
       title={disabled ? disabledReason : undefined}
       className={cn(
-        'flex flex-col items-center justify-center gap-1 p-3 rounded-xl border text-white transition-all shadow-sm',
+        'flex flex-col items-center justify-center gap-1 p-3.5 rounded-xl border text-white transition-all shadow-sm w-full',
         c.btn,
         active && c.active,
         (disabled || loading) && 'opacity-35 cursor-not-allowed'
