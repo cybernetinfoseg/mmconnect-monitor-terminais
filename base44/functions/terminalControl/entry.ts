@@ -551,7 +551,7 @@ async function actionGetUserList(terminal, params) {
   // Protocolo Timmy: "getalluserinfo" devolve todos os utilizadores registados no terminal
   // Fallback para "getalluser" em firmwares mais antigos
   let lastError;
-  for (const cmd of ['getalluser']) {
+  for (const cmd of ['getalluserinfo', 'getalluser']) {
     try {
       const resp = await sendTimmyCommand(terminal, { cmd });
       const users = resp.record || [];
@@ -745,27 +745,6 @@ async function actionSetUserPhoto(terminal, params) {
   };
 }
 
-async function actionExportUsers(terminal, params={}) {
-
-  const backupnum = params.backupnum || 50;
-
-  const resp = await sendTimmyCommand(
-    terminal,
-    {
-      cmd: 'getuser',
-      backupnum: backupnum
-    },
-    2
-  );
-
-
-  return {
-    success: true,
-    message: 'Pedido de exportação FaceID enviado',
-    data: resp
-  };
-}
-
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -788,7 +767,7 @@ Deno.serve(async (req) => {
 
     const isAdmin = user.role === 'admin';
     // Ações de gestão de utilizadores (adduser/deleteuser) são permitidas a qualquer utilizador autenticado
-    const isUserManagementAction = ['adduser', 'deleteuser', 'blockuser', 'getuserlist', 'getuserinfo', 'setuserphoto', 'exportusers'].includes(action);
+    const isUserManagementAction = ['adduser', 'deleteuser', 'blockuser', 'getuserlist', 'getuserinfo', 'setuserphoto'].includes(action);
     if (!isAdmin && !isUserManagementAction && terminal.created_by !== user.email && terminal.usuario_email !== user.email) {
       return Response.json({ error: 'Sem permissão para controlar este terminal' }, { status: 403 });
     }
@@ -820,7 +799,6 @@ Deno.serve(async (req) => {
       case 'setuserprofile': result = await actionSetUserProfile(terminal, params); break;
       case 'getuserprofile': result = await actionGetUserProfile(terminal, params); break;
       case 'setuserphoto':   result = await actionSetUserPhoto(terminal, params); break;
-      case 'exportusers':   result = await actionExportUsers(terminal, params); break;
       default:
         return Response.json({ error: `Ação desconhecida: ${action}` }, { status: 400 });
     }

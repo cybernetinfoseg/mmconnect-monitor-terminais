@@ -59,24 +59,6 @@ async function enviarColaborador(colaborador, terminalId, comFoto = false) {
   return result;
 }
 
-
-// ── Timmy WS: pedir/exportar utilizadores FaceID do terminal ────────────────
-async function solicitarExportacaoFaces(terminalId) {
-  const resp = await base44.functions.invoke('terminalControl', {
-    terminal_id: terminalId,
-    action: 'exportusers',
-    params: {
-      mode: 'face',
-      backupnum: 50,
-    },
-  });
-
-  return {
-    success: !!resp.data?.success,
-    message: resp.data?.message || resp.data?.error || '',
-  };
-}
-
 async function removerColaborador(colaborador, terminalId) {
   const resp = await base44.functions.invoke('terminalControl', {
     terminal_id: terminalId,
@@ -329,23 +311,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
     }
   };
 
-
-  const handleExportFaces = async (terminalId) => {
-    try {
-      const result = await solicitarExportacaoFaces(terminalId);
-      const term = terminals.find(t => t.id === terminalId);
-
-      result.success
-        ? toast.success(`Pedido de exportação FaceID enviado para "${term?.nome}"`)
-        : toast.error(`Erro: ${result.message}`);
-
-      return result;
-    } catch (e) {
-      toast.error(e.message);
-      return { success: false, message: e.message };
-    }
-  };
-
   const handleRemoveOne = async (colab, terminalId) => {
     setSendingId(colab.id);
     try {
@@ -481,7 +446,7 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm font-medium text-slate-700">Envio de colaboradores para os terminais biométricos</p>
         <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSyncDialogOpen(true)}>
-          <ArrowUpDown className="h-3.5 w-3.5" /> Sincronizar Todos
+          <ArrowUpDown className="h-3.5 w-3.5" /> Sincronizar
         </Button>
       </div>
 
@@ -505,28 +470,6 @@ export default function TabEnvioTerminais({ currentUser, colaboradores }) {
             <div><p className="text-xl font-bold text-emerald-600">{terminals.filter(t => t.status === 'online').length}</p><p className="text-xs text-slate-500">Terminais online</p></div>
           </CardContent>
         </Card>
-      </div>
-
-
-      {/* Exportação FaceID */}
-      <div className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-        <Camera className="h-4 w-4 text-indigo-600 shrink-0" />
-        <div className="flex-1">
-          <p className="text-sm font-medium text-slate-700">Extrair FaceID dos terminais</p>
-          <p className="text-xs text-slate-400">Solicita ao TM-AIFace11F o envio dos utilizadores faciais para o timmy_ws_server</p>
-        </div>
-        <Select onValueChange={(id) => handleExportFaces(id)}>
-          <SelectTrigger className="h-8 w-[180px] bg-white text-xs">
-            <SelectValue placeholder="Terminal..." />
-          </SelectTrigger>
-          <SelectContent>
-            {terminals.map(t => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Toggle incluir foto */}
