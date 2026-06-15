@@ -116,8 +116,9 @@ export default function ControloAcesso() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 w-full">
-      <div className="w-full max-w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
+  <div className="min-h-screen bg-slate-50 w-full">
+    {/* Mudamos max-w-7xl para max-w-full e aumentamos levemente o padding horizontal para respirar nas bordas */}
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
 
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
