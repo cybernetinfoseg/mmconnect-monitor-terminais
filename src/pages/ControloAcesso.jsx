@@ -150,7 +150,7 @@ export default function ControloAcesso() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
           {/* Coluna Esquerda — Lista de Terminais (Fica sempre visível à esquerda) */}
-          <div className="bg-white border border-slate-200 rounded-xl p-4 max-h-[70vh] overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 max-h-[70vh] overflow-y-auto max-w-xs w-full">
             <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <Monitor className="h-4 w-4 text-slate-500" /> Terminais
             </h3>
