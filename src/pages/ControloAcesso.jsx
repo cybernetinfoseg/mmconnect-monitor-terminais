@@ -183,7 +183,7 @@ export default function ControloAcesso() {
           {terminal ? (
             <>
               {/* Coluna Central — Comandos */}
-              <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+              <div className="hidden lg:block bg-white border border-slate-200 rounded-xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-slate-900 font-bold text-base">{terminal.nome}</h2>
