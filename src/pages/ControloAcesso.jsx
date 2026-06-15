@@ -35,7 +35,10 @@ export default function ControloAcesso() {
   const [mobileCmdOpen, setMobileCmdOpen] = useState(false);
   const queryClient = useQueryClient();
 
-  useEffect(() => { base44.auth.me().then(setCurrentUser).catch(() => {}); }, []);
+  useEffect(() => { 
+    base44.auth.me().then(setCurrentUser).catch(() => {}); 
+  }, []);
+
   const isAdmin = currentUser?.role === 'admin';
 
   const { data: terminals = [] } = useQuery({
@@ -59,7 +62,7 @@ export default function ControloAcesso() {
     refetchInterval: 15000,
   });
 
-  // Terminais suportados para controlo de acesso
+  // Filtragem básica apenas para garantir os tipos de conexão válidos de controlo de acesso
   const terminaisAcesso = useMemo(() =>
     terminals.filter(t =>
       t.tipo_conexao === 'websocket_cloud' ||
@@ -70,7 +73,12 @@ export default function ControloAcesso() {
     [terminals]
   );
 
-  const terminal = selectedTerminal ? terminals.find(t => t.id === selectedTerminal.id) || selectedTerminal : null;
+  // Encontra dinamicamente o estado mais fresco do terminal selecionado
+  const terminal = useMemo(() => {
+    if (!selectedTerminal) return null;
+    return terminals.find(t => t.id === selectedTerminal.id) || selectedTerminal;
+  }, [selectedTerminal, terminals]);
+
   const isTimmy = terminal?.tipo_conexao === 'websocket_cloud';
 
   const sendCmd = useCallback(async (action, params = {}, label = '') => {
@@ -144,10 +152,10 @@ export default function ControloAcesso() {
         )}
       </div>
 
-      {/* Main Container - Enquadramento Azul */}
+      {/* Main Container - O Retângulo Azul */}
       <div className="flex flex-1 overflow-hidden p-4 gap-4 h-[calc(100vh-140px)]">
 
-        {/* Coluna Esquerda: Lista de Terminais (Sempre Ativa) */}
+        {/* Coluna Esquerda: Lista de Terminais (Sempre Ativa e Visível) */}
         <div className="w-80 bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden shadow-sm shrink-0">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
             <Monitor className="h-4 w-4 text-slate-600" />
@@ -161,10 +169,10 @@ export default function ControloAcesso() {
                 key={t.id}
                 onClick={() => { setSelectedTerminal(t); setDoorState('normal'); }}
                 className={cn(
-                  'w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all border border-transparent',
+                  'w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all border',
                   selectedTerminal?.id === t.id
                     ? 'bg-slate-900 border-slate-900 text-white shadow-md'
-                    : 'text-slate-700 hover:bg-slate-50 hover:border-slate-100'
+                    : 'bg-white border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-100'
                 )}
               >
                 <div className={cn('w-2.5 h-2.5 rounded-full shrink-0 shadow-sm', t.status === 'online' ? 'bg-emerald-500' : 'bg-slate-300')} />
@@ -182,12 +190,12 @@ export default function ControloAcesso() {
           </div>
         </div>
 
-        {/* Conteúdo Dinâmico Centralizado */}
+        {/* Área Principal Dinâmica (Centro / Direita) */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {terminal ? (
             <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
               
-              {/* Bloco de Comandos (Ocupa 2 colunas horizontais para melhor enquadramento) */}
+              {/* Bloco de Comandos (Retângulo Vermelho - Ocupa 2 colunas) */}
               <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 flex flex-col justify-between overflow-y-auto shadow-sm">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -218,7 +226,7 @@ export default function ControloAcesso() {
                 </div>
               </div>
 
-              {/* Coluna Verde (Operações Recentes) - Agora Posicionada ao Lado/Abaixo integrada */}
+              {/* Bloco de Operações (Retângulo Verde - Agora alinhado abaixo/ao lado corretamente) */}
               <div className="bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden shadow-sm">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
                   <h3 className="text-slate-900 font-semibold text-xs flex items-center gap-2">
@@ -256,8 +264,11 @@ export default function ControloAcesso() {
 
             </div>
           ) : (
+            /* Estado Inicial (Sua segunda imagem de ecrã vazio) */
             <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl bg-white p-8 text-center shadow-sm">
-              <Shield className="h-12 w-12 text-slate-300 mb-3" />
+              <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3 border border-slate-100">
+                <Shield className="h-6 w-6 text-slate-300" />
+              </div>
               <p className="text-slate-500 text-sm font-medium">Selecione um terminal na barra lateral esquerda para iniciar o controlo e monitorização.</p>
             </div>
           )}
