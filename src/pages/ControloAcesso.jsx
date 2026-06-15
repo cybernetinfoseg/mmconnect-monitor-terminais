@@ -62,7 +62,7 @@ export default function ControloAcesso() {
     refetchInterval: 15000,
   });
 
-  // Filtragem básica apenas para garantir os tipos de conexão válidos de controlo de acesso
+  // Filtra os terminais suportados para o controlo de acesso
   const terminaisAcesso = useMemo(() =>
     terminals.filter(t =>
       t.tipo_conexao === 'websocket_cloud' ||
@@ -73,7 +73,7 @@ export default function ControloAcesso() {
     [terminals]
   );
 
-  // Encontra dinamicamente o estado mais fresco do terminal selecionado
+  // Sincroniza o terminal selecionado com a lista atualizada
   const terminal = useMemo(() => {
     if (!selectedTerminal) return null;
     return terminals.find(t => t.id === selectedTerminal.id) || selectedTerminal;
@@ -126,7 +126,7 @@ export default function ControloAcesso() {
   return (
     <div className="h-full w-full bg-slate-50 flex flex-col overflow-hidden">
       
-      {/* Top Header */}
+      {/* Top Header Dinâmico */}
       <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-slate-900 rounded-lg">
@@ -152,15 +152,15 @@ export default function ControloAcesso() {
         )}
       </div>
 
-      {/* Main Container - O Retângulo Azul */}
+      {/* Main Grid — O Enquadramento Azul Completo */}
       <div className="flex flex-1 overflow-hidden p-4 gap-4 h-[calc(100vh-140px)]">
 
-        {/* Coluna Esquerda: Lista de Terminais (Sempre Ativa e Visível) */}
+        {/* BARRA LATERAL ESQUERDA: Sempre visível e ativa, independente da seleção */}
         <div className="w-80 bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden shadow-sm shrink-0">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
             <Monitor className="h-4 w-4 text-slate-600" />
             <h3 className="text-sm font-semibold text-slate-700">Terminais</h3>
-            <Badge variant="secondary" className="ml-auto text-[10px]">{terminaisAcesso.length}</Badge>
+            <Badge variant="secondary" className="ml-auto text-[10px] bg-slate-200 text-slate-700">{terminaisAcesso.length}</Badge>
           </div>
           
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
@@ -185,17 +185,17 @@ export default function ControloAcesso() {
               </button>
             ))}
             {terminaisAcesso.length === 0 && (
-              <p className="text-slate-400 text-xs py-8 text-center">Nenhum terminal encontrado.</p>
+              <p className="text-slate-400 text-xs py-8 text-center">Nenhum terminal configurado.</p>
             )}
           </div>
         </div>
 
-        {/* Área Principal Dinâmica (Centro / Direita) */}
+        {/* CONTEÚDO DA DIREITA: Alterna entre ecrã vazio e painel de controlo ativo */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {terminal ? (
             <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
               
-              {/* Bloco de Comandos (Retângulo Vermelho - Ocupa 2 colunas) */}
+              {/* Painel de Ações (Retângulo Vermelho) */}
               <div className="md:col-span-2 bg-white border border-slate-200 rounded-xl p-5 flex flex-col justify-between overflow-y-auto shadow-sm">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -226,8 +226,8 @@ export default function ControloAcesso() {
                 </div>
               </div>
 
-              {/* Bloco de Operações (Retângulo Verde - Agora alinhado abaixo/ao lado corretamente) */}
-              <div className="bg-white border border-slate-200 rounded-xl flex flex-col overflow-hidden shadow-sm">
+              {/* Bloco de Operações Recentes (Retângulo Verde - Alinhado à Direita/Abaixo) */}
+              <div className="bg-white border border-slate-200 rounded-xl p-0 flex flex-col overflow-hidden shadow-sm">
                 <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
                   <h3 className="text-slate-900 font-semibold text-xs flex items-center gap-2">
                     <Zap className="h-4 w-4 text-amber-500" />
@@ -245,7 +245,7 @@ export default function ControloAcesso() {
                     </div>
                   ) : (
                     opLogs.map(log => (
-                      <div key={log.id} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-slate-100 shadow-sm transition-all hover:border-slate-200">
+                      <div key={log.id} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-slate-100 shadow-sm">
                         {log.sucesso ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" /> : <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap justify-between">
@@ -264,7 +264,7 @@ export default function ControloAcesso() {
 
             </div>
           ) : (
-            /* Estado Inicial (Sua segunda imagem de ecrã vazio) */
+            /* Estado Vazio Inteligente — Mantém a UI limpa dentro da caixa azul */
             <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-200 rounded-xl bg-white p-8 text-center shadow-sm">
               <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3 border border-slate-100">
                 <Shield className="h-6 w-6 text-slate-300" />
@@ -276,7 +276,7 @@ export default function ControloAcesso() {
 
       </div>
 
-      {/* Mobile Control Dialog Trigger */}
+      {/* Suporte Mobile (Opcional — Aciona Dialog se necessário em telas pequenas) */}
       {terminal && (
         <div className="lg:hidden p-4 bg-white border-t border-slate-200 shrink-0">
           <Button onClick={() => setMobileCmdOpen(true)} className="w-full bg-slate-900 text-white text-xs">
@@ -286,10 +286,10 @@ export default function ControloAcesso() {
             <DialogContent className="w-[95vw] max-w-md max-h-[85vh] overflow-y-auto">
               <DialogHeader><DialogTitle>{terminal.nome}</DialogTitle></DialogHeader>
               <div className="grid grid-cols-2 gap-3 pt-2">
-                <DoorButton icon={DoorOpen} label="Abrir Porta" sublabel="Pulso único" color="emerald" onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
-                <DoorButton icon={Unlock} label="Aberto Forçado" sublabel="Permanente" color="amber" active={doorState === 'unlock'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} />
-                <DoorButton icon={Lock} label="Bloquear" sublabel="Nenhum acesso" color="red" active={doorState === 'lock'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} />
-                <DoorButton icon={RotateCcw} label="Modo Normal" sublabel="Repor estado" color="slate" disabled={!isTimmy} onClick={() => handleDoorAction('normal')} />
+                <DoorButton icon={DoorOpen} label="Abrir Porta" color="emerald" onClick={() => sendCmd('opendoor', {}, 'Porta aberta')} />
+                <DoorButton icon={Unlock} label="Aberto Forçado" color="amber" active={doorState === 'unlock'} disabled={!isTimmy} onClick={() => handleDoorAction('unlock')} />
+                <DoorButton icon={Lock} label="Bloquear" color="red" active={doorState === 'lock'} disabled={!isTimmy} onClick={() => handleDoorAction('lock')} />
+                <DoorButton icon={RotateCcw} label="Modo Normal" color="slate" disabled={!isTimmy} onClick={() => handleDoorAction('normal')} />
                 <DoorButton icon={BellOff} label="Cancelar Alarme" color="violet" disabled={!isTimmy} onClick={() => handleAlarm(true)} />
                 <DoorButton icon={Power} label="Reiniciar" color="orange" onClick={() => sendCmd('reboot', {}, 'A reiniciar...')} confirm="Reiniciar terminal?" />
               </div>
