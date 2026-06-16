@@ -173,8 +173,7 @@ export default function Auditoria() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full overflow-x-hidden">
-      <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-6xl">
-
+      <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
