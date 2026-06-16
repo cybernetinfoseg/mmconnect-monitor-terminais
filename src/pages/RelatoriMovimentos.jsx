@@ -96,7 +96,7 @@ export default function RelatorioMovimentos() {
   if (isLoading) return <div className="p-6 text-center">A carregar movimentos...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 sm:p-6">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
