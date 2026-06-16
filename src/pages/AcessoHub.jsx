@@ -10,12 +10,12 @@ import Visitantes from './Visitantes';
 import RelatoriMovimentos from './RelatoriMovimentos';
 
 const TABS = [
-  { id: 'controlo',     label: 'Controlo de Portas',      icon: Shield,    desc: 'Comandos remotos de portas e terminais' },
-  { id: 'zonas',        label: 'Zonas de Acesso',          icon: DoorOpen,  desc: 'Áreas restritas e regras de acesso' },
-  { id: 'visitantes',   label: 'Visitantes',               icon: UserCheck, desc: 'Registos de entrada e badges temporários' },
-  { id: 'mapa',         label: 'Mapa de Terminais',        icon: MapPin,    desc: 'Planta baixa interativa' },
-  { id: 'movimentos',  label: 'Relatório Movimentos',     icon: BarChart3, desc: 'Trilho completo de acessos por pessoa ou terminal' },
-];
+{ id: 'controlo', label: 'Controlo de Portas', icon: Shield, desc: 'Comandos remotos de portas e terminais' },
+{ id: 'zonas', label: 'Zonas de Acesso', icon: DoorOpen, desc: 'Áreas restritas e regras de acesso' },
+{ id: 'visitantes', label: 'Visitantes', icon: UserCheck, desc: 'Registos de entrada e badges temporários' },
+{ id: 'mapa', label: 'Mapa de Terminais', icon: MapPin, desc: 'Planta baixa interativa' },
+{ id: 'movimentos', label: 'Relatório Movimentos', icon: BarChart3, desc: 'Trilho completo de acessos por pessoa ou terminal' }];
+
 
 export default function AcessoHub() {
   const [activeTab, setActiveTab] = useState('controlo');
@@ -24,7 +24,7 @@ export default function AcessoHub() {
     <div className="min-h-screen bg-slate-50 w-full">
       {/* Header */}
       <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6">
+        <div className="mx-auto px-3 sm:px-6 max-w-f">
           {/* Título */}
           <div className="flex items-center gap-3 pt-4 pb-2">
             <div className="p-2 bg-slate-900 rounded-xl shrink-0">
@@ -38,7 +38,7 @@ export default function AcessoHub() {
 
           {/* Tabs */}
           <div className="flex gap-0.5 overflow-x-auto pb-0 scrollbar-none">
-            {TABS.map(tab => {
+            {TABS.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
               return (
@@ -47,16 +47,16 @@ export default function AcessoHub() {
                   onClick={() => setActiveTab(tab.id)}
                   className={cn(
                     'flex items-center gap-2 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-all shrink-0',
-                    active
-                      ? 'border-slate-900 text-slate-900'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-                  )}
-                >
+                    active ?
+                    'border-slate-900 text-slate-900' :
+                    'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  )}>
+                  
                   <Icon className="h-3.5 w-3.5 shrink-0" />
                   <span className="hidden sm:inline">{tab.label}</span>
                   <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
-                </button>
-              );
+                </button>);
+
             })}
           </div>
         </div>
@@ -64,19 +64,19 @@ export default function AcessoHub() {
 
       {/* Conteúdo — cada tab renderiza a sua página original sem header próprio */}
       <div className="w-full">
-        {activeTab === 'controlo' && (
-          <div className="[&>div>div>div:first-child]:hidden">
+        {activeTab === 'controlo' &&
+        <div className="[&>div>div>div:first-child]:hidden">
             {/* Esconde o header interno da ControloAcesso pois já temos o hub */}
             <ControloAcessoInner />
           </div>
-        )}
+        }
         {activeTab === 'zonas' && <ZonasWrapper />}
         {activeTab === 'visitantes' && <VisitantesWrapper />}
         {activeTab === 'mapa' && <MapaWrapper />}
         {activeTab === 'movimentos' && <RelatoriMovimentosWrapper />}
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 // Wrappers leves — apenas montam o componente existente com ajustes de fundo
