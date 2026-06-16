@@ -140,7 +140,7 @@ export default function Dashboard() {
         <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="backdrop-blur-sm border border-slate-200/50 rounded-xl p-3 sm:p-4 space-y-3 bg-white/7">
+            className="backdrop-blur-sm border border-slate-200/50 rounded-xl p-3 sm:p-4 space-y-3 bg-white/5">
             
           <div className="flex flex-wrap gap-2 items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtros</span>
