@@ -2,16 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { 
-  Monitor, 
-  Wifi, 
-  WifiOff, 
-  MapPin, 
+import {
+  Monitor,
+  Wifi,
+  WifiOff,
+  MapPin,
   AlertTriangle,
   User,
   LayoutList,
-  X,
-} from 'lucide-react';
+  X } from
+'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -40,14 +40,14 @@ export default function Dashboard() {
 
   // Fetch monitor config to get actual refresh interval
   useEffect(() => {
-    base44.entities.MonitorConfig.list()
-      .then((configs) => {
-        const config = configs[0];
-        if (config?.intervalo_sync_minutos) {
-          setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
-        }
-      })
-      .catch(() => setRefreshInterval(30000));
+    base44.entities.MonitorConfig.list().
+    then((configs) => {
+      const config = configs[0];
+      if (config?.intervalo_sync_minutos) {
+        setRefreshInterval(config.intervalo_sync_minutos * 60 * 1000);
+      }
+    }).
+    catch(() => setRefreshInterval(30000));
   }, []);
 
   const perms = resolvePermissions(currentUser);
@@ -61,7 +61,7 @@ export default function Dashboard() {
       return res.data?.terminals || [];
     },
     refetchInterval: refreshInterval,
-    enabled: !!currentUser,
+    enabled: !!currentUser
   });
 
   // Fetch alerts with server-side filtering for security
@@ -74,30 +74,30 @@ export default function Dashboard() {
       // Non-admins: buscar terminais via backend function para garantir visibilidade correcta
       const res = await base44.functions.invoke('getMyTerminals', {});
       const myTerminals = res.data?.terminals || [];
-      const myTerminalIds = myTerminals.map(t => t.id);
+      const myTerminalIds = myTerminals.map((t) => t.id);
       if (myTerminalIds.length === 0) return [];
       // Fetch alerts and filter by owned terminals
       const allAlerts = await base44.entities.AlertIncident.list('-created_date', 50);
-      return allAlerts.filter(a => myTerminalIds.includes(a.terminal_id));
+      return allAlerts.filter((a) => myTerminalIds.includes(a.terminal_id));
     },
     refetchInterval: refreshInterval,
-    enabled: !!currentUser,
+    enabled: !!currentUser
   });
 
   // Get unique values for filters
-  const locais = useMemo(() => 
-    [...new Set(terminals.map(t => t.local).filter(Boolean))].sort(),
-    [terminals]
+  const locais = useMemo(() =>
+  [...new Set(terminals.map((t) => t.local).filter(Boolean))].sort(),
+  [terminals]
   );
 
   const usuarios = useMemo(() =>
-    [...new Set(terminals.map(t => t.usuario_email || t.created_by).filter(Boolean))].sort(),
-    [terminals]
+  [...new Set(terminals.map((t) => t.usuario_email || t.created_by).filter(Boolean))].sort(),
+  [terminals]
   );
 
   // Apply filters (null or '' = no filter)
   const filteredTerminals = useMemo(() => {
-    return terminals.filter(t => {
+    return terminals.filter((t) => {
       if (localFilter && t.local !== localFilter) return false;
       if (statusFilter && t.status !== statusFilter) return false;
       if (userFilter && (t.usuario_email || t.created_by) !== userFilter) return false;
@@ -107,15 +107,15 @@ export default function Dashboard() {
 
   // Calculate KPIs
   const stats = useMemo(() => {
-    const online = filteredTerminals.filter(t => t.status === 'online').length;
-    const offline = filteredTerminals.filter(t => t.status === 'offline').length;
+    const online = filteredTerminals.filter((t) => t.status === 'online').length;
+    const offline = filteredTerminals.filter((t) => t.status === 'offline').length;
     return {
       total: filteredTerminals.length,
       online,
       offline,
-      onlinePercentage: filteredTerminals.length > 0 
-        ? ((online / filteredTerminals.length) * 100).toFixed(1) 
-        : 0
+      onlinePercentage: filteredTerminals.length > 0 ?
+      (online / filteredTerminals.length * 100).toFixed(1) :
+      0
     };
   }, [filteredTerminals]);
 
@@ -138,17 +138,17 @@ export default function Dashboard() {
       <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 max-w-[1920px]">
         {/* Filters */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 backdrop-blur-sm border border-slate-200/50 rounded-xl p-3 sm:p-4 space-y-3"
-        >
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="backdrop-blur-sm border border-slate-200/50 rounded-xl p-3 sm:p-4 space-y-3 bg-white/7">
+            
           <div className="flex flex-wrap gap-2 items-center justify-between">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtros</span>
-            {(localFilter || statusFilter || userFilter) && (
-              <Button variant="ghost" size="sm" onClick={() => { setLocalFilter(null); setStatusFilter(null); setUserFilter(null); }} className="text-slate-500 hover:text-slate-700 h-7 px-2 text-xs">
+            {(localFilter || statusFilter || userFilter) &&
+              <Button variant="ghost" size="sm" onClick={() => {setLocalFilter(null);setStatusFilter(null);setUserFilter(null);}} className="text-slate-500 hover:text-slate-700 h-7 px-2 text-xs">
                 ✕ Limpar filtros
               </Button>
-            )}
+              }
           </div>
 
           <div className={`grid grid-cols-1 sm:grid-cols-2 ${canSeeAll ? 'lg:grid-cols-3' : 'lg:grid-cols-2'} gap-2`}>
@@ -158,12 +158,12 @@ export default function Dashboard() {
                 <MapPin className="h-3 w-3" /> Local
               </label>
               <select
-                value={localFilter || ''}
-                onChange={e => setLocalFilter(e.target.value || null)}
-                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
-              >
+                  value={localFilter || ''}
+                  onChange={(e) => setLocalFilter(e.target.value || null)}
+                  className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full">
+                  
                 <option value="">Todos</option>
-                {locais.map(l => <option key={l} value={l}>{l}</option>)}
+                {locais.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
 
@@ -173,10 +173,10 @@ export default function Dashboard() {
                 <LayoutList className="h-3 w-3" /> Status
               </label>
               <select
-                value={statusFilter || ''}
-                onChange={e => setStatusFilter(e.target.value || null)}
-                className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
-              >
+                  value={statusFilter || ''}
+                  onChange={(e) => setStatusFilter(e.target.value || null)}
+                  className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full">
+                  
                 <option value="">Todos</option>
                 <option value="online">Online</option>
                 <option value="offline">Offline</option>
@@ -184,21 +184,21 @@ export default function Dashboard() {
             </div>
 
             {/* Utilizador (admin only) */}
-            {canSeeAll && (
+            {canSeeAll &&
               <div>
                 <label className="text-[10px] font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1 mb-1">
                   <User className="h-3 w-3" /> Utilizador
                 </label>
                 <select
                   value={userFilter || ''}
-                  onChange={e => setUserFilter(e.target.value || null)}
-                  className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full"
-                >
+                  onChange={(e) => setUserFilter(e.target.value || null)}
+                  className="h-8 px-2 rounded-md border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300 w-full">
+                  
                   <option value="">Todos</option>
-                  {usuarios.map(u => <option key={u} value={u}>{u}</option>)}
+                  {usuarios.map((u) => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
-            )}
+              }
           </div>
 
 
@@ -207,42 +207,42 @@ export default function Dashboard() {
         {/* KPIs */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <KPICard
-            title="Total de Terminais"
-            value={stats.total}
-            icon={Monitor}
-            color="blue"
-            onClick={() => { setStatusFilter(''); setLocalFilter(null); setUserFilter(null); }}
-            active={!statusFilter && !localFilter && !userFilter}
-          />
+              title="Total de Terminais"
+              value={stats.total}
+              icon={Monitor}
+              color="blue"
+              onClick={() => {setStatusFilter('');setLocalFilter(null);setUserFilter(null);}}
+              active={!statusFilter && !localFilter && !userFilter} />
+            
           <KPICard
-            title="Online"
-            value={stats.online}
-            icon={Wifi}
-            color="green"
-            trend="up"
-            trendValue={`${stats.onlinePercentage}% disponível`}
-            onClick={() => setStatusFilter(statusFilter === 'online' ? '' : 'online')}
-            active={statusFilter === 'online'}
-          />
+              title="Online"
+              value={stats.online}
+              icon={Wifi}
+              color="green"
+              trend="up"
+              trendValue={`${stats.onlinePercentage}% disponível`}
+              onClick={() => setStatusFilter(statusFilter === 'online' ? '' : 'online')}
+              active={statusFilter === 'online'} />
+            
           <KPICard
-            title="Offline"
-            value={stats.offline}
-            icon={WifiOff}
-            color="red"
-            onClick={() => setStatusFilter(statusFilter === 'offline' ? '' : 'offline')}
-            active={statusFilter === 'offline'}
-          />
+              title="Offline"
+              value={stats.offline}
+              icon={WifiOff}
+              color="red"
+              onClick={() => setStatusFilter(statusFilter === 'offline' ? '' : 'offline')}
+              active={statusFilter === 'offline'} />
+            
         </div>
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           {/* Chart + Status Widget */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
-            className="md:col-span-1"
-          >
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1 }}
+              className="md:col-span-1">
+              
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider">
@@ -250,20 +250,20 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <StatusPieChart 
-                  online={stats.online} 
-                  offline={stats.offline}
-                  compact
-                />
+                <StatusPieChart
+                    online={stats.online}
+                    offline={stats.offline}
+                    compact />
+                  
                 {/* Status bar */}
                 <div className="space-y-2 border-t border-slate-100 pt-3">
                   {(() => {
-                    const pct = stats.total > 0 ? Math.round((stats.online / stats.total) * 100) : 0;
-                    const color = pct >= 80 ? 'emerald' : pct >= 50 ? 'amber' : 'red';
-                    const barClass = color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-red-500';
-                    const textClass = color === 'emerald' ? 'text-emerald-600' : color === 'amber' ? 'text-amber-600' : 'text-red-600';
-                    return (
-                      <>
+                      const pct = stats.total > 0 ? Math.round(stats.online / stats.total * 100) : 0;
+                      const color = pct >= 80 ? 'emerald' : pct >= 50 ? 'amber' : 'red';
+                      const barClass = color === 'emerald' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-500' : 'bg-red-500';
+                      const textClass = color === 'emerald' ? 'text-emerald-600' : color === 'amber' ? 'text-amber-600' : 'text-red-600';
+                      return (
+                        <>
                         <div className="flex justify-between items-center">
                           <span className="text-xs text-slate-500">Disponibilidade</span>
                           <span className={cn("text-sm font-bold", textClass)}>{pct}%</span>
@@ -285,9 +285,9 @@ export default function Dashboard() {
                             <p className="text-[10px] text-slate-400 flex items-center justify-center gap-0.5"><WifiOff className="h-2.5 w-2.5" /> Offline</p>
                           </div>
                         </div>
-                      </>
-                    );
-                  })()}
+                      </>);
+
+                    })()}
                 </div>
               </CardContent>
             </Card>
@@ -295,11 +295,11 @@ export default function Dashboard() {
 
           {/* Table */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="md:col-span-1 lg:col-span-2"
-          >
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="md:col-span-1 lg:col-span-2">
+              
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -311,22 +311,22 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <TerminalsTable 
-                  terminals={filteredTerminals} 
-                  maxRows={12}
-                  compact
-                />
+                <TerminalsTable
+                    terminals={filteredTerminals}
+                    maxRows={12}
+                    compact />
+                  
               </CardContent>
             </Card>
           </motion.div>
 
           {/* Alerts */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3 }}
-            className="md:col-span-1 lg:col-span-1"
-          >
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 }}
+              className="md:col-span-1 lg:col-span-1">
+              
             <Card className="h-full bg-white/80 backdrop-blur-sm border-slate-200/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-xs sm:text-sm font-semibold text-slate-600 uppercase tracking-wider flex items-center justify-between">
@@ -335,11 +335,11 @@ export default function Dashboard() {
                     Incidentes
                   </span>
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowExtrasModal(true)}
-                    className="h-6 px-2 text-[10px] text-slate-400 hover:text-slate-600 gap-1"
-                  >
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowExtrasModal(true)}
+                      className="h-6 px-2 text-[10px] text-slate-400 hover:text-slate-600 gap-1">
+                      
                     <LayoutList className="h-3 w-3" />
                     Ver mais
                   </Button>
@@ -356,13 +356,13 @@ export default function Dashboard() {
         <PresencaWidget />
 
         {/* Extras Modal */}
-        {showExtrasModal && (
+        {showExtrasModal &&
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col"
-            >
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+              
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                 <h2 className="text-base font-semibold text-slate-800">Auditoria &amp; Alertas</h2>
                 <button onClick={() => setShowExtrasModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
@@ -377,9 +377,9 @@ export default function Dashboard() {
               </div>
             </motion.div>
           </div>
-        )}
+          }
         </div>
       </div>
-    </PullToRefresh>
-  );
+    </PullToRefresh>);
+
 }
