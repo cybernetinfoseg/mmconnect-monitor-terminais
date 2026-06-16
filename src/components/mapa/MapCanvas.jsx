@@ -32,31 +32,31 @@ function getImageRenderedRect(img, containerRect, fit) {
   const conRatio = cw / ch;
   let rw, rh;
   if (fit === 'contain') {
-    if (imgRatio > conRatio) { rw = cw; rh = cw / imgRatio; }
-    else { rh = ch; rw = ch * imgRatio; }
-  } else { // cover
-    if (imgRatio > conRatio) { rh = ch; rw = ch * imgRatio; }
-    else { rw = cw; rh = cw / imgRatio; }
+    if (imgRatio > conRatio) {rw = cw;rh = cw / imgRatio;} else
+    {rh = ch;rw = ch * imgRatio;}
+  } else {// cover
+    if (imgRatio > conRatio) {rh = ch;rw = ch * imgRatio;} else
+    {rw = cw;rh = cw / imgRatio;}
   }
   return {
     left: (cw - rw) / 2,
     top: (ch - rh) / 2,
     width: rw,
-    height: rh,
+    height: rh
   };
 }
 
 export default function MapCanvas({
   zoom, mapHeight, selectedPlanta, selectedPlantaId, loadingPlantas, loadingTerminals,
   imageFit, isEditMode, visibleTerminals, positions, selectedTerminal, setSelectedTerminal,
-  iconOverrides, iconSize, handleDragEnd, setShowNewPlantaForm, GRID_SIZE,
+  iconOverrides, iconSize, handleDragEnd, setShowNewPlantaForm, GRID_SIZE
 }) {
   const containerRef = useRef(null);
   const imgRef = useRef(null);
   const [imgReady, setImgReady] = useState(false);
 
   // Reset imgReady when image source changes
-  useEffect(() => { setImgReady(false); }, [selectedPlanta?.planta_url]);
+  useEffect(() => {setImgReady(false);}, [selectedPlanta?.planta_url]);
 
   // Convert stored % position (relative to image area) → CSS % relative to container
   const toContainerPct = useCallback((pos) => {
@@ -68,8 +68,8 @@ export default function MapCanvas({
     const ir = getImageRenderedRect(img, containerRect, imageFit);
     if (!ir) return pos;
     return {
-      x: (ir.left + (pos.x / 100) * ir.width) / containerRect.width * 100,
-      y: (ir.top + (pos.y / 100) * ir.height) / containerRect.height * 100,
+      x: (ir.left + pos.x / 100 * ir.width) / containerRect.width * 100,
+      y: (ir.top + pos.y / 100 * ir.height) / containerRect.height * 100
     };
   }, [selectedPlanta?.planta_url, imageFit, imgReady]);
 
@@ -81,15 +81,15 @@ export default function MapCanvas({
     const containerRect = container.getBoundingClientRect();
     if (!selectedPlanta?.planta_url || !imgReady || !img) {
       return {
-        x: Math.max(1, Math.min(99, ((clientX - containerRect.left) / containerRect.width) * 100)),
-        y: Math.max(1, Math.min(99, ((clientY - containerRect.top) / containerRect.height) * 100)),
+        x: Math.max(1, Math.min(99, (clientX - containerRect.left) / containerRect.width * 100)),
+        y: Math.max(1, Math.min(99, (clientY - containerRect.top) / containerRect.height * 100))
       };
     }
     const ir = getImageRenderedRect(img, containerRect, imageFit);
     if (!ir) return { x: 50, y: 50 };
     return {
-      x: Math.max(0, Math.min(100, ((clientX - containerRect.left - ir.left) / ir.width) * 100)),
-      y: Math.max(0, Math.min(100, ((clientY - containerRect.top - ir.top) / ir.height) * 100)),
+      x: Math.max(0, Math.min(100, (clientX - containerRect.left - ir.left) / ir.width * 100)),
+      y: Math.max(0, Math.min(100, (clientY - containerRect.top - ir.top) / ir.height * 100))
     };
   }, [selectedPlanta?.planta_url, imageFit, imgReady]);
 
@@ -100,8 +100,8 @@ export default function MapCanvas({
     if (!container) return;
     const containerRect = container.getBoundingClientRect();
     // containerX/containerY are already % of container coming from TerminalMarker
-    const clientX = containerRect.left + (containerX / 100) * containerRect.width;
-    const clientY = containerRect.top + (containerY / 100) * containerRect.height;
+    const clientX = containerRect.left + containerX / 100 * containerRect.width;
+    const clientY = containerRect.top + containerY / 100 * containerRect.height;
     const imgPct = fromContainerToImagePct(clientX, clientY);
     handleDragEnd(terminalId, imgPct.x, imgPct.y);
   }, [fromContainerToImagePct, handleDragEnd]);
@@ -115,63 +115,63 @@ export default function MapCanvas({
         minWidth: '100%',
         height: zoom <= 100 ? '100%' : `${zoom}%`,
         minHeight: 420,
-        position: 'relative',
+        position: 'relative'
       }}>
         {/* Container that all markers are positioned relative to */}
         <div
           ref={containerRef}
           data-map-container
-          className="relative w-full h-full"
+          className="relative w-full h-full mx-auto"
           style={{
-            backgroundImage: !hasImage
-              ? `linear-gradient(to right,#dde3ed 1px,transparent 1px),linear-gradient(to bottom,#dde3ed 1px,transparent 1px)`
-              : undefined,
+            backgroundImage: !hasImage ?
+            `linear-gradient(to right,#dde3ed 1px,transparent 1px),linear-gradient(to bottom,#dde3ed 1px,transparent 1px)` :
+            undefined,
             backgroundSize: !hasImage ? `${GRID_SIZE}px ${GRID_SIZE}px` : undefined,
             backgroundColor: '#f8fafc',
-            minHeight: 420,
+            minHeight: 420
           }}
-          onClick={() => setSelectedTerminal(null)}
-        >
+          onClick={() => setSelectedTerminal(null)}>
+          
           {/* Background image via <img> so we can measure rendered rect */}
-          {hasImage && (
-            <img
-              ref={imgRef}
-              src={selectedPlanta.planta_url}
-              alt="planta"
-              onLoad={() => setImgReady(true)}
-              className="absolute inset-0 w-full h-full pointer-events-none select-none"
-              style={{ objectFit: imageFit === 'none' ? 'none' : imageFit, objectPosition: 'center' }}
-            />
-          )}
+          {hasImage &&
+          <img
+            ref={imgRef}
+            src={selectedPlanta.planta_url}
+            alt="planta"
+            onLoad={() => setImgReady(true)}
+            className="absolute inset-0 w-full h-full pointer-events-none select-none"
+            style={{ objectFit: imageFit === 'none' ? 'none' : imageFit, objectPosition: 'center' }} />
+
+          }
 
           {/* Planta name label */}
-          {selectedPlanta && (
-            <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-white/85 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-rose-600 shadow-sm pointer-events-none">
+          {selectedPlanta &&
+          <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 bg-white/85 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-rose-600 shadow-sm pointer-events-none">
               <MapPin className="h-3 w-3" />
               PLANTA — {selectedPlanta.nome.toUpperCase()}
             </div>
-          )}
+          }
 
           {/* Edit mode banner */}
-          {isEditMode && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white text-xs px-4 py-1 rounded-full shadow-lg pointer-events-none">
+          {isEditMode &&
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white text-xs px-4 py-1 rounded-full shadow-lg pointer-events-none">
               Modo de edição — arraste os terminais
             </div>
-          )}
+          }
 
           {/* No planta selected */}
-          {!selectedPlantaId && !loadingPlantas && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
+          {!selectedPlantaId && !loadingPlantas &&
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-2">
               <MapPin className="h-12 w-12 opacity-20" />
               <p className="text-sm font-medium">Crie ou selecione uma planta para começar</p>
               <Button size="sm" variant="outline" className="mt-1" onClick={() => setShowNewPlantaForm(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Nova planta
               </Button>
             </div>
-          )}
+          }
 
           {/* Markers */}
-          {selectedPlantaId && (!hasImage || imgReady) && visibleTerminals.map(terminal => {
+          {selectedPlantaId && (!hasImage || imgReady) && visibleTerminals.map((terminal) => {
             const storedPos = positions[terminal.id] || { x: 50, y: 50 };
             const displayPos = toContainerPct(storedPos);
             const isSelected = selectedTerminal?.id === terminal.id;
@@ -185,9 +185,9 @@ export default function MapCanvas({
                 onClick={setSelectedTerminal}
                 isSelected={isSelected}
                 iconOverride={iconOverrides[terminal.id]}
-                iconSize={iconSize}
-              />
-            );
+                iconSize={iconSize} />);
+
+
           })}
 
           {/* Smart tooltip */}
@@ -201,19 +201,19 @@ export default function MapCanvas({
                   terminal={selectedTerminal}
                   posX={displayPos.x}
                   posY={displayPos.y}
-                  onClose={() => setSelectedTerminal(null)}
-                />
-              );
+                  onClose={() => setSelectedTerminal(null)} />);
+
+
             })()}
           </AnimatePresence>
 
-          {loadingTerminals && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/50">
+          {loadingTerminals &&
+          <div className="absolute inset-0 flex items-center justify-center bg-white/50">
               <div className="w-7 h-7 border-4 border-slate-200 border-t-rose-500 rounded-full animate-spin" />
             </div>
-          )}
+          }
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
