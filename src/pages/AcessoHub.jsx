@@ -24,7 +24,7 @@ export default function AcessoHub() {
     <div className="min-h-screen bg-slate-50 w-full">
       {/* Header */}
       <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
-        <div className="mx-auto px-3 sm:px-6 max-w-f">
+        <div className="mx-auto px-3 sm:px-6 max-w-full">
           {/* Título */}
           <div className="flex items-center gap-3 pt-4 pb-2">
             <div className="p-2 bg-slate-900 rounded-xl shrink-0">
