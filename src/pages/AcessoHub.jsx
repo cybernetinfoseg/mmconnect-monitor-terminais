@@ -37,7 +37,7 @@ export default function AcessoHub() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-0.5 overflow-x-auto pb-0 scrollbar-none">
+          <div className="flex items-center justify-center text-muted-foreground flex-wrap h-auto gap-1 bg-slate-100 p-1 rounded-xl">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
