@@ -245,7 +245,7 @@ export default function Agendamentos() {
   );
 
   return (
-    <div className="w-full px-3 sm:px-6 py-4 sm:py-6 space-y-6 max-w-4xl overflow-x-hidden">
+    <div className="w-full max-w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
