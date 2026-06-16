@@ -144,7 +144,7 @@ export default function ExportacaoMarcacoes() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 w-full overflow-x-hidden">
-      <div className="w-full sm:px-6 py-4 sm:py-6 space-y-6 max-w-4xl px-4">
+      <div className="w-full sm:px-6 sm:py-6 space-y-6 max-w-4xl mx-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
