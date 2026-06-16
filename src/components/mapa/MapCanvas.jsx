@@ -121,7 +121,7 @@ export default function MapCanvas({
         <div
           ref={containerRef}
           data-map-container
-          className="relative w-full h-full mx-auto"
+          className="relative w-full h-full"
           style={{
             backgroundImage: !hasImage ?
             `linear-gradient(to right,#dde3ed 1px,transparent 1px),linear-gradient(to bottom,#dde3ed 1px,transparent 1px)` :
