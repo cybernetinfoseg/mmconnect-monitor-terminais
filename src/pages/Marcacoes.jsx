@@ -344,96 +344,96 @@ export default function Marcacoes() {
                 </Button>
               </div>
               {/* Filtros de terminal */}
-              <div className="flex flex-wrap gap-2 items-center hidden">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input
-                  placeholder="Nome, SN, IP, porta..."
-                  value={collectSearch}
-                  onChange={(e) => setCollectSearch(e.target.value)}
-                  className="pl-8 h-8 text-xs w-[180px]" />
-                
-                </div>
-                <Select value={collectTipo} onValueChange={setCollectTipo}>
-                  <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Todos os tipos" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os tipos</SelectItem>
-                    <SelectItem value="ip_local">IP Local</SelectItem>
-                    <SelectItem value="ip_publico">IP Público</SelectItem>
-                    <SelectItem value="dns">DNS/No-IP</SelectItem>
-                    <SelectItem value="p2s">P2S VPN</SelectItem>
-                    <SelectItem value="heartbeat">Heartbeat TCP</SelectItem>
-                    <SelectItem value="adms_push">ADMS / Push</SelectItem>
-                    <SelectItem value="sdk_tcp">SDK-TCP</SelectItem>
-                    <SelectItem value="websocket_cloud">WebSocket Cloud</SelectItem>
-                    <SelectItem value="api">API</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={collectStatus} onValueChange={setCollectStatus}>
-                  <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Todos os statu" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os status</SelectItem>
-                    <SelectItem value="online">Online</SelectItem>
-                    <SelectItem value="offline">Offline</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={collectLocal} onValueChange={setCollectLocal}>
-                  <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Todos os locais" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os locais</SelectItem>
-                    {[...new Set(terminals.map((t) => t.local).filter(Boolean))].sort().map((l) =>
-                  <SelectItem key={l} value={l}>{l}</SelectItem>
-                  )}
-                  </SelectContent>
-                </Select>
-                {[...new Set(terminals.map((t) => t.fabricante).filter(Boolean))].length > 0 &&
-              <Select value={collectFabricante} onValueChange={setCollectFabricante}>
-                    <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Todos os fabrican" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os fabricantes</SelectItem>
-                      {[...new Set(terminals.map((t) => t.fabricante).filter(Boolean))].sort().map((f) =>
-                  <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>
-                  )}
-                    </SelectContent>
-                  </Select>
-              }
-                {isAdmin &&
-              <Select value={collectUser} onValueChange={setCollectUser}>
-                    <SelectTrigger className="h-8 text-xs w-[170px]"><SelectValue placeholder="Todos os utilizadores" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os utilizadores</SelectItem>
-                      {[...new Set(terminals.map((t) => t.usuario_email || t.created_by).filter(Boolean))].sort().map((u) =>
-                  <SelectItem key={u} value={u}>{u}</SelectItem>
-                  )}
-                    </SelectContent>
-                  </Select>
-              }
-                {(collectSearch || collectTipo !== 'all' || collectStatus !== 'all' || collectLocal !== 'all' || collectFabricante !== 'all' || collectUser !== 'all') &&
-              <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-400 px-2"
-              onClick={() => {setCollectSearch('');setCollectTipo('all');setCollectStatus('all');setCollectLocal('all');setCollectFabricante('all');setCollectUser('all');}}>
-                    Limpar
-                  </Button>
-              }
-              </div>
-              <div className="flex flex-wrap gap-2 hidden">
-                {filteredCollectTerminals.map((t) => {
-                const cap = getTimmyCapabilities(t.modelo);
-                const isTimmy = t.tipo_conexao === 'websocket_cloud';
-                return (
-                  <Button key={t.id} variant="outline" size="sm" disabled={!!collecting} onClick={() => handleCollectOne(t)}
-                  className={cn('text-xs gap-1.5 flex-col h-auto py-1.5 px-2.5 items-start', t.status === 'online' ? 'border-emerald-300 text-emerald-700' : 'border-slate-200 text-slate-500')}>
-                      <div className="flex items-center gap-1.5">
-                        {collecting === t.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                        <span className="font-medium">{t.nome}</span>
-                        {t.status === 'online' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />}
-                      </div>
-                      {isTimmy &&
-                    <span className="text-slate-400 text-[10px] font-normal">{cap.icon} {cap.name !== 'Timmy Genérico' ? cap.name : cap.description}</span>
-                    }
-                    </Button>);
+              
 
-              })}
-               </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+              
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
             </CardContent>
           </Card>
         }
