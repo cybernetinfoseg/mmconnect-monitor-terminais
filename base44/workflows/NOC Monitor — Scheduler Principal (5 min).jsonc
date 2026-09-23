@@ -1,0 +1,44 @@
+{
+  "name": "NOC Monitor \u2014 Scheduler Principal (5 min)",
+  "description": "Scheduler consolidado: monitoriza todos os terminais, avalia regras de alerta, executa a\u00e7\u00f5es agendadas, verifica escala\u00e7\u00f5es (1\u00d7/hora) e faz limpeza de hist\u00f3rico (1\u00d7/dia \u00e0s 03:00 UTC).",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "interval",
+      "cron_expression": null,
+      "one_time_date": null,
+      "timezone": "UTC",
+      "interval_value": 5,
+      "interval_unit": "minutes",
+      "interval_anchor": "2026-05-13T19:05:31.866000",
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "noc_monitor_scheduler_principal_5_min",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "mainScheduler",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "mainScheduler"
+  }
+}
